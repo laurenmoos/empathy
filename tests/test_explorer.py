@@ -127,6 +127,17 @@ def test_view_selection_is_separate_from_playback() -> None:
     assert "Play simulation" in source
 
 
+def test_each_view_only_shows_its_own_layer() -> None:
+    source, parser = parsed_explorer()
+
+    assert {"truthPanel", "modelOnePanel", "modelTwoPanel"} <= parser.ids
+    assert '$("truthPanel").hidden = learnedMode;' in source
+    assert '$("modelOnePanel").hidden = !learnedMode;' in source
+    assert '$("modelTwoPanel").hidden = !learnedMode;' in source
+    assert "if (learnedMode && learnedData) {\n        drawLearnedBelief();" in source
+    assert "if (learnedMode && learnedData && learnedPlaying) {" in source
+
+
 def test_explorer_exposes_the_same_operator_update_order_as_the_simulator() -> None:
     source, _ = parsed_explorer()
 

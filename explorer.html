@@ -75,6 +75,7 @@
     .mode-choice.active { border-color: var(--aqua); box-shadow: inset 0 0 0 1px var(--aqua); }
     .mode-choice.active span { color: #c5e1df; }
     .mode-context { min-height: 2.2em; margin: 0; color: var(--muted); font-size: .72rem; line-height: 1.35; }
+    [hidden] { display: none !important; }
     .visuals { padding: 1.2rem; display: grid; grid-template-columns: 1.15fr .85fr; gap: 1rem; align-content: start; }
     figure { margin: 0; padding: .8rem; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); overflow: hidden; }
     figure:first-child { grid-column: 1 / -1; }
@@ -156,7 +157,7 @@
     </aside>
 
     <section class="visuals">
-      <figure>
+      <figure id="truthPanel">
         <figcaption><strong>Ground truth</strong></figcaption>
         <canvas id="worldCanvas" width="1200" height="525"></canvas>
         <div class="legend">
@@ -169,7 +170,7 @@
           <div class="metric"><small>Ball position</small><b id="stateReadout">12% across · 55% high</b></div>
         </div>
       </figure>
-      <figure>
+      <figure id="modelOnePanel" hidden>
         <figcaption><strong>Model 1 · Belief superposition</strong><span id="beliefPhase"></span></figcaption>
         <canvas id="beliefCanvas" width="600" height="600"></canvas>
         <div class="legend">
@@ -177,7 +178,7 @@
           <span><i class="dot" style="background:var(--coral)"></i>current true state</span>
         </div>
       </figure>
-      <section class="model-two" aria-label="Model 2 output">
+      <section class="model-two" id="modelTwoPanel" aria-label="Model 2 output" hidden>
         <strong>Model 2 · Second-order perception</strong>
         <small>World guess</small>
         <b id="operatorReadout">Forces on the ball: none</b>
@@ -449,7 +450,14 @@
       return names.length ? names.join(" · ") : "constant motion";
     }
 
+    function setViewVisibility() {
+      $("truthPanel").hidden = learnedMode;
+      $("modelOnePanel").hidden = !learnedMode;
+      $("modelTwoPanel").hidden = !learnedMode;
+    }
+
     function updateOutputs() {
+      setViewVisibility();
       numericIds.forEach(id => {
         const output = document.querySelector(`output[data-for="${id}"]`);
         if (!output) return;
@@ -493,10 +501,10 @@
     }
 
     function draw() {
-      if (learnedMode && learnedData && learnedPlaying) {
-        drawLearnedWorld(); drawLearnedBelief(); updateOutputs();
+      if (learnedMode && learnedData) {
+        drawLearnedBelief(); updateOutputs();
       } else {
-        drawWorld(); drawBelief(); updateOutputs();
+        drawWorld(); updateOutputs();
       }
     }
 
@@ -516,7 +524,7 @@
         accumulator += elapsed;
         while (accumulator >= .055) { simulationStep(); accumulator -= .055; }
       }
-      if (learnedMode && learnedData) {
+      if (learnedMode && learnedData && learnedPlaying) {
         learnedAccumulator += elapsed;
         if (learnedAccumulator >= .12) {
           learnedFrame = (learnedFrame + 1) % learnedData.ground_truth.frame_count;

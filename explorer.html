@@ -50,6 +50,7 @@
       background: transparent;
     }
     .card h2 { margin: 0 0 .6rem; font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+    .group-note { margin: -.25rem 0 .65rem; color: var(--muted); font-size: .72rem; }
     label { display: grid; grid-template-columns: 1fr auto; gap: .25rem .75rem; margin-top: .72rem; font-size: .82rem; }
     label:first-of-type { margin-top: 0; }
     output { color: var(--aqua); font: 600 .75rem ui-monospace, monospace; }
@@ -120,6 +121,7 @@
 
         <section class="card">
           <h2>Walls</h2>
+          <p class="group-note">The ball bounces off these boundaries. Bounce controls how much speed it keeps.</p>
           <label>Right wall · x<output data-for="verticalWallPosition"></output><input id="verticalWallPosition" type="range" min="0.2" max="0.95" step="0.01" value="0.72"></label>
           <label>Right wall bounce<output data-for="verticalRestitution"></output><input id="verticalRestitution" type="range" min="0" max="1" step="0.01" value="0.8"></label>
           <label>Floor · y<output data-for="horizontalWallPosition"></output><input id="horizontalWallPosition" type="range" min="0.05" max="0.9" step="0.01" value="0.18"></label>
@@ -159,10 +161,9 @@
         </div>
       </figure>
       <section class="readout" aria-label="Current world readout">
-        <div class="metric"><small>time</small><b id="timeReadout">0.0 s</b></div>
-        <div class="metric"><small>state</small><b id="stateReadout">x 0.12 · y 0.55</b></div>
-        <div class="metric full"><small>active world operators</small><b id="operatorReadout">constant motion</b></div>
-        <div class="metric full"><small>world parameter vector</small><b id="vectorReadout">[0.00, 0.00, 0.00]</b></div>
+        <div class="metric"><small>Elapsed</small><b id="timeReadout">0.0 s</b></div>
+        <div class="metric"><small>Ball position</small><b id="stateReadout">12% across · 55% high</b></div>
+        <div class="metric full"><small>Forces on the ball</small><b id="operatorReadout">none</b></div>
       </section>
     </section>
   </main>
@@ -295,6 +296,15 @@
         const wall = worldPoint(canvas, {x: 0, y: p.horizontalWallPosition});
         ctx.beginPath(); ctx.moveTo(0, wall.y); ctx.lineTo(canvas.width, wall.y); ctx.stroke();
       }
+      ctx.setLineDash([]);
+      ctx.fillStyle = "rgba(247,215,116,.82)";
+      ctx.font = `${Math.max(12, canvas.width * .014)}px ui-monospace, monospace`;
+      const rightWall = worldPoint(canvas, {x: p.verticalWallPosition, y: 0});
+      const floor = worldPoint(canvas, {x: 0, y: p.horizontalWallPosition});
+      ctx.textAlign = "right";
+      ctx.fillText("right wall", rightWall.x - 8, 20);
+      ctx.textAlign = "left";
+      ctx.fillText("floor", 10, floor.y - 8);
       ctx.restore();
     }
 
@@ -343,14 +353,12 @@
       beliefCtx.fillRect(left.x, 0, right.x - left.x, beliefCanvas.height);
     }
 
-    function operatorNames(p) {
+    function forceSummary(p) {
       const names = [];
-      if (p.wind) names.push("horizontal acceleration");
-      if (p.gravity) names.push("vertical acceleration");
+      if (p.wind) names.push(`wind ${p.wind < 0 ? "left" : "right"}`);
+      if (p.gravity) names.push(`gravity ${p.gravity < 0 ? "down" : "up"}`);
       if (p.damping) names.push("damping");
-      if (p.verticalWallEnabled) names.push("vertical wall");
-      if (p.horizontalWallEnabled) names.push("horizontal wall");
-      return names.length ? names.join(" · ") : "constant motion";
+      return names.length ? names.join(" · ") : "none";
     }
 
     function updateOutputs() {
@@ -366,9 +374,8 @@
       });
       const p = params();
       $("timeReadout").textContent = `${(stepCount * dt).toFixed(1)} s`;
-      $("stateReadout").textContent = `x ${state.x.toFixed(2)} · y ${state.y.toFixed(2)}`;
-      $("operatorReadout").textContent = operatorNames(p);
-      $("vectorReadout").textContent = `[${p.wind.toFixed(2)}, ${p.gravity.toFixed(2)}, ${p.damping.toFixed(2)}]`;
+      $("stateReadout").textContent = `${Math.round(state.x * 100)}% across · ${Math.round(state.y * 100)}% high`;
+      $("operatorReadout").textContent = forceSummary(p);
       $("runSimulation").textContent = playing
         ? "Pause"
         : stepCount === 0 ? "Run simulation" : "Resume simulation";

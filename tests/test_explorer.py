@@ -66,6 +66,12 @@ def test_explorer_is_a_self_contained_parameter_interface() -> None:
     assert "· off" not in source
     assert "always on" not in source
     assert source.count("<h2>Walls</h2>") == 1
+    assert "world parameter vector" not in source
+    assert "active world operators" not in source
+    assert "Ball position" in source
+    assert "Forces on the ball" in source
+    assert "right wall" in source
+    assert "floor" in source
     assert "Adjust the controls below" not in source
     assert "Set the physical parameters, then run" not in source
     assert '<br><span id="visibilityState">' not in source

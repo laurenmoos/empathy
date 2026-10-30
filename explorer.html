@@ -54,6 +54,7 @@
     label:first-of-type { margin-top: 0; }
     output { color: var(--aqua); font: 600 .75rem ui-monospace, monospace; }
     input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: var(--aqua); }
+    input[type="range"]:disabled { opacity: .35; }
     button {
       color: var(--ink);
       background: #18262a;
@@ -64,7 +65,7 @@
     }
     button { cursor: pointer; font-weight: 650; }
     button.primary { background: var(--aqua); color: #06201d; border-color: transparent; }
-    .actions { display: grid; grid-template-columns: 1.35fr 1fr; gap: .45rem; }
+    .actions { display: grid; grid-template-columns: 1.2fr 1.2fr .8fr; gap: .45rem; }
     .visuals { padding: 1.2rem; display: grid; grid-template-columns: 1.15fr .85fr; gap: 1rem; align-content: start; }
     figure { margin: 0; padding: .8rem; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); overflow: hidden; }
     figure:first-child { grid-column: 1 / -1; }
@@ -107,6 +108,7 @@
         <section class="card run-card">
           <div class="actions">
             <button class="primary" id="runSimulation">Run simulation</button>
+            <button id="runLearned">Run learned example</button>
             <button id="reset">Reset</button>
           </div>
         </section>
@@ -147,7 +149,7 @@
         </div>
       </figure>
       <figure>
-        <figcaption><strong>Model 1 · Belief superposition</strong></figcaption>
+        <figcaption><strong>Model 1 · Belief superposition</strong><span id="beliefPhase"></span></figcaption>
         <canvas id="beliefCanvas" width="600" height="600"></canvas>
         <div class="legend">
           <span><i class="dot" style="background:var(--violet)"></i>possible path</span>
@@ -180,6 +182,10 @@
     let trail = [];
     let stepCount = 0;
     let possiblePaths = [];
+    let learnedMode = false;
+    let learnedData = null;
+    let learnedFrame = 0;
+    let learnedAccumulator = 0;
 
     function params() {
       const p = Object.fromEntries(numericIds.map(id => [id, Number($(id).value)]));
@@ -247,6 +253,10 @@
       rebuildPossibilities();
       updateOutputs();
       draw();
+    }
+
+    function setControlsDisabled(disabled) {
+      controlIds.forEach(id => { $(id).disabled = disabled; });
     }
 
     function worldPoint(canvas, s) {
@@ -349,12 +359,66 @@
       beliefCtx.fillRect(left.x, 0, right.x - left.x, beliefCanvas.height);
     }
 
+    function decodeBytes(encoded) {
+      const raw = atob(encoded);
+      return Uint8Array.from(raw, character => character.charCodeAt(0));
+    }
+
+    function drawLearnedWorld() {
+      const truth = learnedData.ground_truth;
+      const bytes = learnedData.frameBytes;
+      const offset = learnedFrame * truth.width * truth.height;
+      const image = worldCtx.createImageData(truth.width, truth.height);
+      for (let index = 0; index < truth.width * truth.height; index++) {
+        const value = bytes[offset + index];
+        const cursor = index * 4;
+        image.data[cursor] = value;
+        image.data[cursor + 1] = value;
+        image.data[cursor + 2] = value;
+        image.data[cursor + 3] = 255;
+      }
+      const buffer = document.createElement("canvas");
+      buffer.width = truth.width; buffer.height = truth.height;
+      buffer.getContext("2d").putImageData(image, 0, 0);
+      worldCtx.imageSmoothingEnabled = false;
+      worldCtx.drawImage(buffer, 0, 0, worldCanvas.width, worldCanvas.height);
+    }
+
+    function drawLearnedBelief() {
+      const model = learnedData.model1;
+      const values = learnedFrame < learnedData.ground_truth.frame_count / 2
+        ? learnedData.preBelief : learnedData.postBelief;
+      const image = beliefCtx.createImageData(model.width, model.height);
+      values.forEach((value, index) => {
+        const cursor = index * 4;
+        image.data[cursor] = 42 + Math.round(value * 213);
+        image.data[cursor + 1] = 12 + Math.round(value * 112);
+        image.data[cursor + 2] = 70 + Math.round(value * 185);
+        image.data[cursor + 3] = 255;
+      });
+      const buffer = document.createElement("canvas");
+      buffer.width = model.width; buffer.height = model.height;
+      buffer.getContext("2d").putImageData(image, 0, 0);
+      beliefCtx.imageSmoothingEnabled = false;
+      beliefCtx.drawImage(buffer, 0, 0, beliefCanvas.width, beliefCanvas.height);
+    }
+
     function forceSummary(p) {
       const names = [];
       if (p.wind) names.push(`wind ${p.wind < 0 ? "left" : "right"}`);
       if (p.gravity) names.push(`gravity ${p.gravity < 0 ? "down" : "up"}`);
       if (p.damping) names.push("damping");
       return names.length ? names.join(" · ") : "none";
+    }
+
+    function learnedWorldSummary(flat) {
+      const names = [];
+      if (flat[0] >= .5) names.push(`vertical force ${flat[1].toFixed(2)}`);
+      if (flat[2] >= .5) names.push(`horizontal force ${flat[3].toFixed(2)}`);
+      if (flat[4] >= .5) names.push(`damping ${flat[5].toFixed(2)}`);
+      if (flat[6] >= .5) names.push("right wall");
+      if (flat[9] >= .5) names.push("floor");
+      return names.length ? names.join(" · ") : "constant motion";
     }
 
     function updateOutputs() {
@@ -369,15 +433,36 @@
         output.textContent = value.toFixed(2) + suffix;
       });
       const p = params();
+      if (learnedMode && learnedData) {
+        const count = learnedData.ground_truth.frame_count;
+        $("timeReadout").textContent = `frame ${learnedFrame + 1} of ${count}`;
+        $("stateReadout").textContent = "observed clip · saved ground truth";
+        $("operatorReadout").textContent = learnedWorldSummary(
+          learnedData.model2.predicted_world_flat
+        );
+        $("beliefPhase").textContent = learnedFrame < count / 2
+          ? "pre-belief" : "post-belief after observation";
+        $("runLearned").textContent = "Learned example running";
+        $("runSimulation").textContent = "Return to simulation";
+        return;
+      }
       $("timeReadout").textContent = `${(stepCount * dt).toFixed(1)} s`;
       $("stateReadout").textContent = `${Math.round(state.x * 100)}% across · ${Math.round(state.y * 100)}% high`;
       $("operatorReadout").textContent = `Forces on the ball: ${forceSummary(p)}`;
+      $("beliefPhase").textContent = "candidate hidden paths";
+      $("runLearned").textContent = "Run learned example";
       $("runSimulation").textContent = playing
         ? "Pause"
         : stepCount === 0 ? "Run simulation" : "Resume simulation";
     }
 
-    function draw() { drawWorld(); drawBelief(); updateOutputs(); }
+    function draw() {
+      if (learnedMode && learnedData) {
+        drawLearnedWorld(); drawLearnedBelief(); updateOutputs();
+      } else {
+        drawWorld(); drawBelief(); updateOutputs();
+      }
+    }
 
     function simulationStep() {
       state = advance(state, params());
@@ -395,16 +480,45 @@
         accumulator += elapsed;
         while (accumulator >= .055) { simulationStep(); accumulator -= .055; }
       }
+      if (learnedMode && learnedData) {
+        learnedAccumulator += elapsed;
+        if (learnedAccumulator >= .12) {
+          learnedFrame = (learnedFrame + 1) % learnedData.ground_truth.frame_count;
+          learnedAccumulator = 0;
+        }
+      }
       draw();
       requestAnimationFrame(animate);
     }
 
     controlIds.forEach(id => $(id).addEventListener("input", () => {
+      learnedMode = false;
       playing = false;
       resetSimulation();
     }));
-    $("reset").addEventListener("click", () => { playing = false; resetSimulation(); });
-    $("runSimulation").addEventListener("click", () => { playing = !playing; updateOutputs(); });
+    $("reset").addEventListener("click", () => {
+      learnedMode = false; playing = false; setControlsDisabled(false); resetSimulation();
+    });
+    $("runSimulation").addEventListener("click", () => {
+      if (learnedMode) {
+        learnedMode = false; playing = false; setControlsDisabled(false); resetSimulation(); return;
+      }
+      playing = !playing; updateOutputs();
+    });
+    $("runLearned").addEventListener("click", async () => {
+      if (!learnedData) {
+        const payload = await fetch("learned-example.json").then(response => response.json());
+        learnedData = {
+          ...payload,
+          frameBytes: decodeBytes(payload.ground_truth.frames_base64),
+          preBelief: decodeBytes(payload.model1.pre_belief_u8),
+          postBelief: decodeBytes(payload.model1.post_belief_u8)
+        };
+      }
+      playing = false; learnedMode = true; learnedFrame = 0; learnedAccumulator = 0;
+      setControlsDisabled(true);
+      draw();
+    });
 
     resetSimulation();
     requestAnimationFrame(animate);

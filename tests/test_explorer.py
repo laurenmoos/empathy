@@ -1,8 +1,10 @@
+import json
 from html.parser import HTMLParser
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
 EXPLORER = ROOT / "explorer.html"
+LEARNED_EXAMPLE = ROOT / "learned-example.json"
 
 
 class ExplorerParser(HTMLParser):
@@ -37,6 +39,7 @@ def test_explorer_is_a_self_contained_parameter_interface() -> None:
 
     required_controls = {
         "runSimulation",
+        "runLearned",
         "reset",
         "wind",
         "gravity",
@@ -51,6 +54,8 @@ def test_explorer_is_a_self_contained_parameter_interface() -> None:
     assert not parser.external_urls
     assert "requestAnimationFrame" in source
     assert "Run simulation" in source
+    assert "Run learned example" in source
+    assert 'fetch("learned-example.json")' in source
     assert "Start with an example" not in source
     assert 'id="preset"' not in source
     assert "const presets" not in source
@@ -89,6 +94,18 @@ def test_explorer_is_a_self_contained_parameter_interface() -> None:
     assert '<br><span id="visibilityState">' not in source
     assert 'class="status"' not in source
     assert 'class="section-title"' not in source
+
+
+def test_learned_example_connects_ground_truth_model1_and_model2() -> None:
+    payload = json.loads(LEARNED_EXAMPLE.read_text())
+
+    assert payload["schema_version"] == "learned-demo-v1"
+    assert payload["ground_truth"]["frame_count"] > 1
+    assert payload["ground_truth"]["frames_base64"]
+    assert len(payload["model1"]["pre_belief_u8"]) > 100
+    assert len(payload["model1"]["post_belief_u8"]) > 100
+    assert len(payload["model2"]["predicted_world_flat"]) == 12
+    assert len(payload["ground_truth"]["world_flat"]) == 12
 
 
 def test_explorer_exposes_the_same_operator_update_order_as_the_simulator() -> None:

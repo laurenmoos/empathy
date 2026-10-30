@@ -69,13 +69,23 @@ class MatchedPossibilityBank:
             raise ValueError("valid events must be a boolean event vector")
         if len(self.probe_ids) != len(self.probes):
             raise ValueError("probe identifiers must match probes")
+        if len(set(self.probe_ids)) != len(self.probe_ids):
+            raise ValueError("probe identifiers must be unique")
         object.__setattr__(self, "true_labels", truth.copy())
         object.__setattr__(self, "predicted_labels", predicted.copy())
         object.__setattr__(self, "valid_events", valid.copy())
 
 
 def _probe_id(probe: Probe) -> str:
-    return f"{probe.context_id}:{probe.step}:{probe.x:g}:{probe.y:g}"
+    return ":".join(
+        (
+            probe.context_id,
+            str(probe.step),
+            repr(float(probe.x)),
+            repr(float(probe.y)),
+            repr(float(probe.tolerance)),
+        )
+    )
 
 
 def _labels_for_world(
@@ -112,6 +122,8 @@ def build_matched_possibility_bank(
         raise ValueError("true and predicted worlds must have one value per event")
     if not true_tuple:
         raise ValueError("at least one event world is required")
+    if not probe_tuple:
+        raise ValueError("at least one probe is required")
     context_map: dict[str, EvaluationContext] = {}
     for context in contexts:
         if context.context_id in context_map:
@@ -119,6 +131,9 @@ def build_matched_possibility_bank(
         context_map[context.context_id] = context
     if not context_map:
         raise ValueError("at least one evaluation context is required")
+    probe_ids = tuple(_probe_id(probe) for probe in probe_tuple)
+    if len(set(probe_ids)) != len(probe_ids):
+        raise ValueError("probe identifiers must be unique")
     for probe in probe_tuple:
         if probe.context_id not in context_map:
             raise ValueError(f"probe context is not registered: {probe.context_id}")
@@ -150,8 +165,11 @@ def build_matched_possibility_bank(
         predicted_labels=predicted_labels,
         valid_events=valid,
         event_ids=tuple(f"event-{index}" for index in range(len(true_tuple))),
-        probe_ids=tuple(_probe_id(probe) for probe in probe_tuple),
+        probe_ids=probe_ids,
         probes=probe_tuple,
         recovered=recovered,
-        metadata={"contexts": context_metadata},
+        metadata={
+            "contexts": context_metadata,
+            "probes": [asdict(probe) for probe in probe_tuple],
+        },
     )

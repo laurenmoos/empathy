@@ -51,6 +51,23 @@ def test_masked_timesteps_do_not_change_prediction() -> None:
     assert torch.equal(first.entry_state, second.entry_state)
 
 
+def test_nan_padded_frames_do_not_poison_forward_or_gradients() -> None:
+    config = load_model1_config(Path("configs/model1/v1.yaml"))
+    model = Model1(config.model, prediction_steps=12)
+    frames, times, mask = _inputs()
+    frames[:, 4:] = float("nan")
+    times[:, 4:] = float("nan")
+
+    prediction = model(frames, times, mask)
+    prediction.positions.sum().backward()
+
+    assert torch.isfinite(prediction.positions).all()
+    assert all(
+        parameter.grad is None or torch.isfinite(parameter.grad).all()
+        for parameter in model.parameters()
+    )
+
+
 def test_initialization_and_forward_replay_under_seed() -> None:
     config = load_model1_config(Path("configs/model1/v1.yaml"))
     frames, times, mask = _inputs()

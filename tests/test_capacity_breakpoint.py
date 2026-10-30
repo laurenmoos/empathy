@@ -178,3 +178,43 @@ def test_first_crossing_survives_non_monotonic_later_recovery() -> None:
 
     assert frontier.breakpoint == "W1"
     assert frontier.warnings == ("non_monotonic_recovery_after_breakpoint",)
+
+
+def test_non_finite_coherence_is_insufficient_not_a_pass() -> None:
+    invalid = TemporalCoherenceReport(
+        ("event",),
+        ("probe",),
+        np.asarray([np.nan]),
+        float("nan"),
+        1.0,
+        1.0,
+        1,
+        1,
+        "ok",
+    )
+
+    frontier = find_capacity_breakpoint(
+        ("W0",),
+        {"W0": invalid},
+        {"W0": _complexity(0.9)},
+        THRESHOLDS,
+    )
+
+    assert frontier.breakpoint is None
+    assert frontier.levels[0].passed is None
+    assert frontier.levels[0].reasons == ("insufficient_data",)
+
+
+def test_non_finite_complexity_bound_is_insufficient_not_a_pass() -> None:
+    invalid = _complexity(float("nan"))
+
+    frontier = find_capacity_breakpoint(
+        ("W0",),
+        {"W0": _coherence(0.95)},
+        {"W0": invalid},
+        THRESHOLDS,
+    )
+
+    assert frontier.breakpoint is None
+    assert frontier.levels[0].passed is None
+    assert frontier.levels[0].reasons == ("insufficient_data",)

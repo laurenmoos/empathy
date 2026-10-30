@@ -61,6 +61,7 @@ def _architecture_key(config: Model1Config) -> tuple[object, ...]:
         config.dataset.frame_size,
         config.dataset.clip_steps,
         config.dataset.prediction_steps,
+        config.dataset.velocity_bounds,
         config.model,
     )
 
@@ -105,6 +106,10 @@ def load_checkpoint(
 ) -> tuple[Model1, CheckpointMetadata]:
     payload = torch.load(Path(path), map_location=device, weights_only=False)
     config: Model1Config = payload["config"]
+    metadata = payload["metadata"]
+    schema_is_consistent = metadata.get("schema_version") == config.schema_version
+    if config.schema_version != "model1-v1" or not schema_is_consistent:
+        raise ValueError("checkpoint schema is unsupported or inconsistent")
     if expected_config is not None and _architecture_key(config) != _architecture_key(
         expected_config
     ):
@@ -112,7 +117,7 @@ def load_checkpoint(
     model = Model1(config.model, prediction_steps=config.dataset.prediction_steps).to(device)
     model.load_state_dict(payload["model_state"])
     model.eval()
-    return model, CheckpointMetadata(**payload["metadata"])
+    return model, CheckpointMetadata(**metadata)
 
 
 def _run_batch(
@@ -126,11 +131,13 @@ def _run_batch(
         pre_prediction,
         height=config.dataset.frame_size,
         width=config.dataset.frame_size,
+        step_mask=batch.target_mask,
     )
     post_belief = rasterize_mixture(
         post_prediction,
         height=config.dataset.frame_size,
         width=config.dataset.frame_size,
+        step_mask=batch.target_mask,
     )
     return model1_loss(
         pre_prediction,
@@ -142,10 +149,13 @@ def _run_batch(
     )
 
 
-def _average(values: list[dict[str, float]]) -> dict[str, float]:
+def _average(values: list[tuple[dict[str, float], int]]) -> dict[str, float]:
+    total_count = sum(count for _, count in values)
+    if total_count < 1:
+        raise ValueError("cannot average zero samples")
     return {
-        key: float(np.mean([item[key] for item in values]))
-        for key in values[0]
+        key: sum(item[key] * count for item, count in values) / total_count
+        for key in values[0][0]
     }
 
 
@@ -201,7 +211,7 @@ def train_model1(
     history_path = output / "history.jsonl"
     for epoch in range(config.training.epochs):
         model.train()
-        train_values: list[dict[str, float]] = []
+        train_values: list[tuple[dict[str, float], int]] = []
         for raw_batch in train_loader:
             batch = raw_batch.to(device)
             optimizer.zero_grad(set_to_none=True)
@@ -209,13 +219,15 @@ def train_model1(
             terms.total.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), config.training.gradient_clip)
             optimizer.step()
-            train_values.append(_term_values(terms))
+            train_values.append((_term_values(terms), len(batch.example_ids)))
         model.eval()
-        validation_values: list[dict[str, float]] = []
+        validation_values: list[tuple[dict[str, float], int]] = []
         with torch.inference_mode():
             for raw_batch in validation_loader:
                 terms = _run_batch(model, raw_batch.to(device), config)
-                validation_values.append(_term_values(terms))
+                validation_values.append(
+                    (_term_values(terms), len(raw_batch.example_ids))
+                )
         train_average = _average(train_values)
         validation_average = _average(validation_values)
         row = {f"train_{key}": value for key, value in train_average.items()}

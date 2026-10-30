@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from itertools import combinations
 from typing import Any
@@ -269,10 +269,47 @@ def _bootstrap_interval(
         selected = rng.choice(values, size=values.size, replace=True)
         bootstrap[index] = float(np.median(selected))
     lower, upper = np.percentile(bootstrap, [2.5, 97.5])
-    return ShatteringInterval(
-        float(min(lower, values.min())),
-        float(max(upper, values.max())),
+    return ShatteringInterval(float(lower), float(upper))
+
+
+def _metadata_equal(left: Any, right: Any) -> bool:
+    if isinstance(left, np.ndarray) or isinstance(right, np.ndarray):
+        return bool(np.array_equal(np.asarray(left), np.asarray(right)))
+    if isinstance(left, Mapping) and isinstance(right, Mapping):
+        return set(left) == set(right) and all(
+            _metadata_equal(left[key], right[key]) for key in left
+        )
+    if isinstance(left, Sequence) and not isinstance(left, (str, bytes)):
+        if not isinstance(right, Sequence) or isinstance(right, (str, bytes)):
+            return False
+        return len(left) == len(right) and all(
+            _metadata_equal(left_value, right_value)
+            for left_value, right_value in zip(left, right, strict=True)
+        )
+    return bool(left == right)
+
+
+def _validate_oracle_metadata(true_matrix: LabelMatrix, recovered_matrix: LabelMatrix) -> None:
+    keys = (
+        "operator_support",
+        "uncertainty_grid",
+        "tolerance",
+        "contexts",
+        "entry_grid",
+        "query_steps",
+        "simulation_config",
+        "probe_sampling",
     )
+    for key in keys:
+        true_has_key = key in true_matrix.metadata
+        recovered_has_key = key in recovered_matrix.metadata
+        if true_has_key != recovered_has_key or (
+            true_has_key
+            and not _metadata_equal(
+                true_matrix.metadata[key], recovered_matrix.metadata[key]
+            )
+        ):
+            raise ValueError(f"oracle configuration differs for {key}")
 
 
 def estimate_complexity_recovery(
@@ -291,8 +328,11 @@ def estimate_complexity_recovery(
         raise ValueError("at least one search seed is required")
     if bootstrap_samples < 1:
         raise ValueError("bootstrap samples must be positive")
+    if not true_matrix.probes or not recovered_matrix.probes:
+        raise ValueError("at least one probe is required")
     if true_matrix.probes != recovered_matrix.probes:
         raise ValueError("true and recovered matrices must share probes")
+    _validate_oracle_metadata(true_matrix, recovered_matrix)
     world_ids = tuple(sorted(true_matrix.world_ids))
     truth = _canonical_matrix(true_matrix, world_ids)
     recovered = _canonical_matrix(recovered_matrix, world_ids)

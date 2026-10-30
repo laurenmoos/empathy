@@ -7,7 +7,7 @@ import torch
 
 from perception_env.model1.config import load_model1_config
 from perception_env.model1.data import Model1ExampleRecord
-from perception_env.model1.train import load_checkpoint, train_model1
+from perception_env.model1.train import _average, load_checkpoint, train_model1
 
 
 def _record(index: int) -> Model1ExampleRecord:
@@ -94,3 +94,28 @@ def test_checkpoint_round_trip_and_dimension_validation(tmp_path) -> None:
     bad = replace(config, model=replace(config.model, modes=7))
     with pytest.raises(ValueError, match="configuration"):
         load_checkpoint(result.best_checkpoint, expected_config=bad)
+
+    incompatible_normalization = replace(
+        config,
+        dataset=replace(config.dataset, velocity_bounds=(-2.0, 2.0)),
+    )
+    with pytest.raises(ValueError, match="configuration"):
+        load_checkpoint(result.best_checkpoint, expected_config=incompatible_normalization)
+
+    payload = torch.load(result.best_checkpoint, weights_only=False)
+    payload["config"] = replace(config, schema_version="unknown")
+    unsupported = tmp_path / "unsupported.pt"
+    torch.save(payload, unsupported)
+    with pytest.raises(ValueError, match="schema"):
+        load_checkpoint(unsupported)
+
+
+def test_metric_averaging_is_weighted_by_sample_count() -> None:
+    averaged = _average(
+        [
+            ({"total": 1.0, "state": 2.0}, 2),
+            ({"total": 4.0, "state": 8.0}, 1),
+        ]
+    )
+
+    assert averaged == {"total": 2.0, "state": 4.0}

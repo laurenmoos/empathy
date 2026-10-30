@@ -118,3 +118,15 @@ def test_coherence_rejects_mismatched_identifiers() -> None:
             ("event",),
             ("only-one-probe",),
         )
+
+
+def test_coherence_rejects_empty_probe_axis_instead_of_returning_nan() -> None:
+    with pytest.raises(ValueError, match="at least one probe"):
+        compute_temporal_coherence(
+            np.zeros((1, 0), dtype=bool),
+            np.zeros((1, 0), dtype=bool),
+            np.asarray([True]),
+            np.asarray([True]),
+            ("event",),
+            (),
+        )

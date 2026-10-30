@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import platform
 import random
 import time
 from dataclasses import asdict, dataclass
@@ -48,6 +49,41 @@ def _state_hash(model: InverseWorldCNN) -> str:
     )
 
 
+def _provenance(training: BeliefDataset, validation: BeliefDataset, device: torch.device) -> dict:
+    manifest = training.manifest
+    rows = manifest.get("rows", [])
+    worlds = manifest.get("world_ids", [])
+    result = {
+        "dataset_hash": manifest["dataset_hash"],
+        "input_hash": manifest["input_hash"],
+        "target_hash": manifest["target_hash"],
+        "runtime": {
+            "python": platform.python_version(),
+            "torch": str(torch.__version__),
+            "numpy": str(np.__version__),
+            "platform": platform.platform(),
+            "device": str(device),
+            "device_name": torch.cuda.get_device_name(device)
+            if device.type == "cuda"
+            else platform.machine(),
+            "cuda_version": torch.version.cuda,
+            "deterministic_algorithms": torch.are_deterministic_algorithms_enabled(),
+            "torch_num_threads": torch.get_num_threads(),
+        },
+    }
+    for name, dataset in (("train", training), ("validation", validation)):
+        indices = dataset.indices.tolist()
+        result[f"{name}_row_indices"] = indices
+        result[f"{name}_row_ids"] = [
+            rows[index].get("episode_id", f"row-{index}") if index < len(rows) else f"row-{index}"
+            for index in indices
+        ]
+        result[f"{name}_world_ids"] = [
+            worlds[index] if index < len(worlds) else None for index in indices
+        ]
+    return result
+
+
 def _measure(model, loader, device, config) -> dict[str, float | int]:
     model.eval()
     activity_sum, parameter_sum, activity_count, parameter_count = 0.0, 0.0, 0, 0
@@ -89,7 +125,7 @@ def train_model(dataset_root: Path, config: TrainingConfig, output: Path) -> Tra
     torch.use_deterministic_algorithms(True)
     if device.type == "cpu":
         torch.set_num_threads(1)
-    model = InverseWorldCNN().to(device)
+    model = InverseWorldCNN(input_mode=config.input_mode, control_seed=config.seed).to(device)
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay
     )
@@ -110,6 +146,7 @@ def train_model(dataset_root: Path, config: TrainingConfig, output: Path) -> Tra
     )
     initial = _measure(model, train_loader, device, config)
     initial_hash = _state_hash(model)
+    provenance = _provenance(training, validation, device)
     output.mkdir(parents=True)
     epochs, best, best_epoch = [], float("inf"), -1
     checkpoint = {}
@@ -138,6 +175,9 @@ def train_model(dataset_root: Path, config: TrainingConfig, output: Path) -> Tra
                 **{f"validation_{k}": v for k, v in validation_metrics.items()},
             }
         )
+        improved = validation_metrics["total"] < best
+        if improved:
+            best, best_epoch = validation_metrics["total"], epoch
         checkpoint = {
             "architecture": ARCHITECTURE,
             "input_schema": INPUT_SCHEMA_VERSION,
@@ -148,11 +188,14 @@ def train_model(dataset_root: Path, config: TrainingConfig, output: Path) -> Tra
             "config": asdict(config),
             "dataset_hash": training.manifest["dataset_hash"],
             "epoch": epoch,
+            "best_validation_loss": best,
+            "selected_epoch": best_epoch,
+            "validation_loss": validation_metrics["total"],
+            "provenance": provenance,
             "torch_version": str(torch.__version__),
             "state_hash": _state_hash(model),
         }
-        if validation_metrics["total"] < best:
-            best, best_epoch = validation_metrics["total"], epoch
+        if improved:
             torch.save(checkpoint, output / "best.pt")
     torch.save(checkpoint, output / "final.pt")
     metrics = {
@@ -168,6 +211,8 @@ def train_model(dataset_root: Path, config: TrainingConfig, output: Path) -> Tra
         "dataset_hash": training.manifest["dataset_hash"],
         "config": asdict(config),
         "selected_epoch": best_epoch,
+        "best_validation_loss": best,
+        "provenance": provenance,
         "train_row_indices": training.indices.tolist(),
         "validation_row_indices": validation.indices.tolist(),
         "parameter_count": sum(parameter.numel() for parameter in model.parameters()),
@@ -198,8 +243,8 @@ def load_model(
         raise ValueError("checkpoint architecture or schema mismatch")
     if expected_dataset_hash is not None and payload.get("dataset_hash") != expected_dataset_hash:
         raise ValueError("checkpoint dataset hash mismatch")
-    TrainingConfig(**payload["config"])
-    model = InverseWorldCNN()
+    config = TrainingConfig(**payload["config"])
+    model = InverseWorldCNN(input_mode=config.input_mode, control_seed=config.seed)
     model.load_state_dict(payload["state_dict"], strict=True)
     if _state_hash(model) != payload.get("state_hash"):
         raise ValueError("checkpoint state hash mismatch")

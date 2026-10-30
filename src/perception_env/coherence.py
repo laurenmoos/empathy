@@ -57,6 +57,8 @@ def compute_temporal_coherence(
         raise ValueError("event masks must match the event dimension")
     if len(event_ids) != truth.shape[0] or len(probe_ids) != truth.shape[1]:
         raise ValueError("event and probe identifiers must match label dimensions")
+    if truth.shape[1] == 0:
+        raise ValueError("at least one probe is required")
 
     event_ids_tuple = tuple(str(value) for value in event_ids)
     probe_ids_tuple = tuple(str(value) for value in probe_ids)
@@ -138,7 +140,11 @@ def find_capacity_breakpoint(
         coherence_report = coherence[level]
         complexity_report = complexity[level]
         reasons: list[str] = []
-        if coherence_report.status != "ok" or coherence_report.aggregate_coherence is None:
+        if (
+            coherence_report.status != "ok"
+            or coherence_report.aggregate_coherence is None
+            or not np.isfinite(coherence_report.aggregate_coherence)
+        ):
             reasons.append("insufficient_data")
             passed: bool | None = None
         else:
@@ -146,7 +152,7 @@ def find_capacity_breakpoint(
                 reasons.append("coherence_below_threshold")
             if complexity_report.ratio_status == "defined":
                 ratio_lower = complexity_report.ratio_interval.lower
-                if ratio_lower is None:
+                if ratio_lower is None or not np.isfinite(ratio_lower):
                     reasons.append("insufficient_data")
                 elif ratio_lower < thresholds.min_shattering_ratio:
                     reasons.append("shattering_ratio_below_threshold")

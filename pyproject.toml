@@ -13,10 +13,12 @@ dependencies = [
   "numpy>=2.0",
   "pillow>=10.0",
   "pyyaml>=6.0",
-  "torch>=2.5",
 ]
 
 [project.optional-dependencies]
+ml = [
+  "torch>=2.5",
+]
 dev = [
   "pytest>=8.0",
   "ruff>=0.8",

@@ -92,9 +92,15 @@ class Model1(nn.Module):
         batch, steps = frames.shape[:2]
         if times.shape != (batch, steps) or mask.shape != (batch, steps):
             raise ValueError("times and mask must match the clip batch/time shape")
-        features = self.frame_encoder(frames.reshape(batch * steps, *frames.shape[2:]))
+        if mask.dtype != torch.bool:
+            raise ValueError("clip mask must be boolean [batch, time]")
+        safe_frames = frames.masked_fill(~mask[:, :, None, None, None], 0.0)
+        safe_times = times.masked_fill(~mask, 0.0)
+        features = self.frame_encoder(
+            safe_frames.reshape(batch * steps, *safe_frames.shape[2:])
+        )
         features = features.reshape(batch, steps, -1)
-        encoding = self.clip_encoder(features, times, mask)
+        encoding = self.clip_encoder(features, safe_times, mask)
         positions, logits = self.trajectory_head(encoding)
         prediction = TrajectoryMixture(
             positions=positions,

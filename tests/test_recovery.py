@@ -39,7 +39,10 @@ def test_matched_bank_uses_identical_event_and_probe_axes() -> None:
     assert bank.true_labels.shape == (2, 2)
     assert bank.predicted_labels.shape == (2, 2)
     assert bank.event_ids == ("event-0", "event-1")
-    assert bank.probe_ids == ("shared:1:0.2:0.5", "shared:2:0.3:0.5")
+    assert bank.probe_ids == (
+        "shared:1:0.2:0.5:1e-09",
+        "shared:2:0.3:0.5:1e-09",
+    )
     assert bank.valid_events.tolist() == [True, True]
     assert np.array_equal(bank.true_labels, bank.predicted_labels)
     assert bank.metadata["contexts"]["shared"]["query_steps"] == [1, 2]
@@ -119,4 +122,53 @@ def test_matched_bank_rejects_query_step_outside_context() -> None:
             (world,),
             (_context(),),
             (Probe("shared", 0.4, 0.5, 3, 0.01),),
+        )
+
+
+def test_probe_ids_include_tolerance_and_metadata_preserves_definitions() -> None:
+    world = WorldSchema.v1().world()
+    probes = (
+        Probe("shared", 0.2, 0.5, 1, 0.01),
+        Probe("shared", 0.2, 0.5, 1, 0.02),
+    )
+
+    bank = build_matched_possibility_bank(
+        (world,),
+        (world,),
+        (_context(),),
+        probes,
+    )
+
+    assert bank.probe_ids == (
+        "shared:1:0.2:0.5:0.01",
+        "shared:1:0.2:0.5:0.02",
+    )
+    assert bank.metadata["probes"] == [
+        {"context_id": "shared", "x": 0.2, "y": 0.5, "step": 1, "tolerance": 0.01},
+        {"context_id": "shared", "x": 0.2, "y": 0.5, "step": 1, "tolerance": 0.02},
+    ]
+
+
+def test_matched_bank_rejects_duplicate_probe_definitions() -> None:
+    world = WorldSchema.v1().world()
+    probe = Probe("shared", 0.2, 0.5, 1, 0.01)
+
+    with pytest.raises(ValueError, match="probe identifiers must be unique"):
+        build_matched_possibility_bank(
+            (world,),
+            (world,),
+            (_context(),),
+            (probe, probe),
+        )
+
+
+def test_matched_bank_rejects_empty_probe_bank() -> None:
+    world = WorldSchema.v1().world()
+
+    with pytest.raises(ValueError, match="at least one probe"):
+        build_matched_possibility_bank(
+            (world,),
+            (world,),
+            (_context(),),
+            (),
         )

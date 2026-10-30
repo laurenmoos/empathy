@@ -51,3 +51,22 @@ def test_actual_path_rasterizer_ignores_masked_steps() -> None:
 
     assert belief[0, 2, 2] == 1
     assert belief.sum() == 1
+
+
+def test_mixture_step_mask_removes_tail_mass_and_gradients() -> None:
+    positions = torch.tensor(
+        [[[[0.25, 0.25], [0.5, 0.5], [0.75, 0.75]]]], requires_grad=True
+    )
+    prediction = TrajectoryMixture(
+        positions=positions,
+        logits=torch.zeros(1, 1, requires_grad=True),
+        entry_state=torch.zeros(1, 4),
+    )
+    mask = torch.tensor([[True, True, False]])
+
+    belief = rasterize_mixture(prediction, height=5, width=5, step_mask=mask)
+    belief.collapsed.sum().backward()
+
+    assert belief.time_belief[0, 2].sum() == 0
+    assert torch.count_nonzero(positions.grad[0, 0, 2]) == 0
+    assert torch.isfinite(positions.grad).all()

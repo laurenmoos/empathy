@@ -1,7 +1,12 @@
 import numpy as np
+import pytest
 
 from perception_env.reachability import Probe
-from perception_env.shattering import LabelMatrix, estimate_complexity_recovery
+from perception_env.shattering import (
+    LabelMatrix,
+    _bootstrap_interval,
+    estimate_complexity_recovery,
+)
 
 PROBES = (
     Probe("context", 0.1, 0.1, 1, 0.01),
@@ -117,3 +122,41 @@ def test_global_and_context_conditioned_metrics_remain_distinct() -> None:
     )
 
     assert estimate.metric_name == "global_multi_context"
+
+
+def test_bootstrap_interval_is_the_true_percentile_interval_not_observed_range() -> None:
+    values = np.asarray([1.0] * 99 + [0.0])
+
+    interval = _bootstrap_interval(values, seed=7, samples=10_000)
+
+    assert interval.lower == 1.0
+    assert interval.upper == 1.0
+
+
+def test_complexity_recovery_rejects_mismatched_oracle_configuration() -> None:
+    true = _matrix([[False, False], [True, True]])
+    recovered = LabelMatrix(
+        true.values,
+        true.world_ids,
+        true.probes,
+        {
+            "operator_support": "fixture",
+            "uncertainty_grid": "different-grid",
+            "tolerance": 0.01,
+        },
+    )
+
+    with pytest.raises(ValueError, match="oracle configuration"):
+        _estimate(true, recovered)
+
+
+def test_complexity_recovery_rejects_empty_probe_bank() -> None:
+    empty = LabelMatrix(
+        np.zeros((2, 0), dtype=bool),
+        ("a", "b"),
+        (),
+        {"operator_support": "fixture", "uncertainty_grid": "fixed"},
+    )
+
+    with pytest.raises(ValueError, match="at least one probe"):
+        _estimate(empty, empty)

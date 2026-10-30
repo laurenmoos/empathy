@@ -48,10 +48,21 @@ def _bilinear_splats(positions: torch.Tensor, height: int, width: int) -> torch.
 
 
 def rasterize_mixture(
-    prediction: TrajectoryMixture, *, height: int, width: int
+    prediction: TrajectoryMixture,
+    *,
+    height: int,
+    width: int,
+    step_mask: torch.Tensor | None = None,
 ) -> BeliefPrediction:
     prediction.validate()
     per_mode = _bilinear_splats(prediction.positions, height, width)
+    if step_mask is not None:
+        if (
+            step_mask.shape != prediction.positions.shape[:1] + prediction.positions.shape[2:3]
+            or step_mask.dtype != torch.bool
+        ):
+            raise ValueError("step_mask must be boolean [batch, steps]")
+        per_mode = per_mode * step_mask[:, None, :, None, None].to(per_mode.dtype)
     weights = prediction.weights.to(per_mode.dtype)
     time_belief = (per_mode * weights[:, :, None, None, None]).sum(dim=1)
     mode_union = 1.0 - torch.prod(1.0 - per_mode.clamp(0.0, 1.0), dim=2)

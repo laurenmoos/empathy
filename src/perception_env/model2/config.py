@@ -120,8 +120,10 @@ class TrainingConfig:
             for v in (self.weight_decay, self.activity_weight, self.parameter_weight)
         ):
             raise ValueError("loss weights and weight decay must be finite and nonnegative")
-        if self.input_mode != "full" or self.num_workers != 0:
-            raise ValueError("MVP supports full histories and num_workers=0 only")
+        if self.input_mode not in {"full", "single_belief", "shuffled_history"}:
+            raise ValueError("unknown input control mode")
+        if self.num_workers != 0:
+            raise ValueError("num_workers=0 is required for deterministic reference training")
         if self.device not in {"cpu", "cuda", "mps"}:
             raise ValueError("device must be cpu, cuda, or mps")
 
@@ -131,6 +133,18 @@ class EvaluationConfig:
     search_seeds: tuple[int, ...] = (7, 19, 31)
     max_n: int = 3
     budget: int = 100
+
+    def __post_init__(self) -> None:
+        _integer(max_n=self.max_n, budget=self.budget)
+        if self.budget < 1:
+            raise ValueError("search budget must be positive")
+        if not isinstance(self.search_seeds, (tuple, list)) or not self.search_seeds:
+            raise ValueError("search_seeds must be a nonempty sequence")
+        for seed in self.search_seeds:
+            _integer(search_seed=seed)
+        if len(set(self.search_seeds)) != len(self.search_seeds):
+            raise ValueError("search_seeds must be distinct")
+        object.__setattr__(self, "search_seeds", tuple(self.search_seeds))
 
 
 def load_config(path: Path) -> tuple[FixtureConfig, TrainingConfig, EvaluationConfig]:

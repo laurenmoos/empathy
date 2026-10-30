@@ -23,8 +23,10 @@ class DatasetConfig:
     occluder: dict[str, float]
 
     def __post_init__(self) -> None:
-        if min(self.frame_size, self.clip_steps, self.prediction_steps) < 1:
+        if min(self.frame_size, self.clip_steps) < 1:
             raise ValueError("dataset dimensions must be positive")
+        if self.prediction_steps < 2:
+            raise ValueError("prediction_steps must be at least 2")
         if len(self.counts) != 3 or len(self.quick_counts) != 3:
             raise ValueError("dataset counts must contain train, validation, and test")
         if any(value < 0 for value in (*self.counts, *self.quick_counts, self.max_attempts)):

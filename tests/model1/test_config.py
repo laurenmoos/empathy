@@ -39,3 +39,15 @@ def test_config_rejects_nonpositive_dimensions(tmp_path, path, value) -> None:
 
     with pytest.raises(ValueError):
         load_model1_config(target)
+
+
+def test_config_rejects_unsupported_one_step_prediction_horizon(tmp_path) -> None:
+    import yaml
+
+    payload = yaml.safe_load(Path("configs/model1/v1.yaml").read_text())
+    payload["dataset"]["prediction_steps"] = 1
+    target = tmp_path / "one-step.yaml"
+    target.write_text(yaml.safe_dump(payload))
+
+    with pytest.raises(ValueError, match="prediction_steps"):
+        load_model1_config(target)

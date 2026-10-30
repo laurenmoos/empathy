@@ -6,11 +6,16 @@ import torch
 from torch import nn
 
 from .contracts import WorldPrediction
+from .transforms import CONTROL_MODES, transform_tensors
 
 
 class InverseWorldCNN(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self, *, input_mode: str = "full", control_seed: int = 0) -> None:
         super().__init__()
+        if input_mode not in CONTROL_MODES or type(control_seed) is not int or control_seed < 0:
+            raise ValueError("unknown input control mode or invalid seed")
+        self.input_mode = input_mode
+        self.control_seed = control_seed
         blocks = []
         for before, after in ((12, 32), (32, 64), (64, 64)):
             blocks.extend(
@@ -49,6 +54,9 @@ class InverseWorldCNN(nn.Module):
             values[:, :, 2], values[:, :, 1] - values[:, :, 0], atol=1e-6, rtol=0
         ):
             raise ValueError("belief difference must equal post minus pre")
+        values, _ = transform_tensors(
+            values, history_mask, mode=self.input_mode, seed=self.control_seed
+        )
         features = self.hidden(self.encoder(values.flatten(1, 2)))
         return WorldPrediction(
             self.activity_head(features), torch.sigmoid(self.parameter_head(features))

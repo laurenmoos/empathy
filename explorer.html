@@ -65,7 +65,16 @@
     }
     button { cursor: pointer; font-weight: 650; }
     button.primary { background: var(--aqua); color: #06201d; border-color: transparent; }
-    .actions { display: grid; grid-template-columns: 1.2fr 1.2fr .8fr; gap: .45rem; }
+    .actions { display: grid; gap: .55rem; }
+    .view-switch, .playback { display: grid; gap: .45rem; }
+    .view-switch { grid-template-columns: 1fr 1fr; }
+    .playback { grid-template-columns: 1.35fr 1fr; }
+    .mode-choice { text-align: left; }
+    .mode-choice strong, .mode-choice span { display: block; }
+    .mode-choice span { margin-top: .18rem; color: var(--muted); font-size: .67rem; font-weight: 450; }
+    .mode-choice.active { border-color: var(--aqua); box-shadow: inset 0 0 0 1px var(--aqua); }
+    .mode-choice.active span { color: #c5e1df; }
+    .mode-context { min-height: 2.2em; margin: 0; color: var(--muted); font-size: .72rem; line-height: 1.35; }
     .visuals { padding: 1.2rem; display: grid; grid-template-columns: 1.15fr .85fr; gap: 1rem; align-content: start; }
     figure { margin: 0; padding: .8rem; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); overflow: hidden; }
     figure:first-child { grid-column: 1 / -1; }
@@ -107,9 +116,21 @@
       <div class="controls">
         <section class="card run-card">
           <div class="actions">
-            <button class="primary" id="runSimulation">Run simulation</button>
-            <button id="runLearned">Run learned example</button>
-            <button id="reset">Reset</button>
+            <div class="view-switch" aria-label="Choose what to inspect">
+              <button class="mode-choice active" id="simulationMode">
+                <strong>Simulation view</strong>
+                <span>change forces and inspect the world</span>
+              </button>
+              <button class="mode-choice" id="runLearned">
+                <strong>Model view</strong>
+                <span>watch learned beliefs and the world guess</span>
+              </button>
+            </div>
+            <p class="mode-context" id="modeContext">You’re peeking directly into the world. The controls change its forces.</p>
+            <div class="playback">
+              <button class="primary" id="runSimulation">Play simulation</button>
+              <button id="reset">Reset</button>
+            </div>
           </div>
         </section>
 
@@ -186,6 +207,7 @@
     let learnedData = null;
     let learnedFrame = 0;
     let learnedAccumulator = 0;
+    let learnedPlaying = false;
 
     function params() {
       const p = Object.fromEntries(numericIds.map(id => [id, Number($(id).value)]));
@@ -448,22 +470,30 @@
         );
         $("beliefPhase").textContent = learnedFrame < count / 2
           ? "pre-belief" : "post-belief after observation";
-        $("runLearned").textContent = "Learned example running";
-        $("runSimulation").textContent = "Return to simulation";
+        $("simulationMode").classList.remove("active");
+        $("runLearned").classList.add("active");
+        $("simulationMode").setAttribute("aria-pressed", "false");
+        $("runLearned").setAttribute("aria-pressed", "true");
+        $("modeContext").textContent = "You’re watching the models: learned rollouts first, then a world guess.";
+        $("runSimulation").textContent = learnedPlaying
+          ? "Pause learned example" : "Play learned example";
         return;
       }
       $("timeReadout").textContent = `${(stepCount * dt).toFixed(1)} s`;
       $("stateReadout").textContent = `${Math.round(state.x * 100)}% across · ${Math.round(state.y * 100)}% high`;
       $("operatorReadout").textContent = `Forces on the ball: ${forceSummary(p)}`;
       $("beliefPhase").textContent = "candidate hidden paths";
-      $("runLearned").textContent = "Run learned example";
+      $("simulationMode").classList.add("active");
+      $("runLearned").classList.remove("active");
+      $("simulationMode").setAttribute("aria-pressed", "true");
+      $("runLearned").setAttribute("aria-pressed", "false");
+      $("modeContext").textContent = "You’re peeking directly into the world. The controls change its forces.";
       $("runSimulation").textContent = playing
-        ? "Pause"
-        : stepCount === 0 ? "Run simulation" : "Resume simulation";
+        ? "Pause simulation" : "Play simulation";
     }
 
     function draw() {
-      if (learnedMode && learnedData) {
+      if (learnedMode && learnedData && learnedPlaying) {
         drawLearnedWorld(); drawLearnedBelief(); updateOutputs();
       } else {
         drawWorld(); drawBelief(); updateOutputs();
@@ -499,17 +529,25 @@
 
     controlIds.forEach(id => $(id).addEventListener("input", () => {
       learnedMode = false;
+      learnedPlaying = false;
       playing = false;
       resetSimulation();
     }));
     $("reset").addEventListener("click", () => {
-      learnedMode = false; playing = false; setControlsDisabled(false); resetSimulation();
+      if (learnedMode) {
+        learnedFrame = 0; learnedPlaying = false; learnedAccumulator = 0; draw(); return;
+      }
+      playing = false; resetSimulation();
     });
     $("runSimulation").addEventListener("click", () => {
       if (learnedMode) {
-        learnedMode = false; playing = false; setControlsDisabled(false); resetSimulation(); return;
+        learnedPlaying = !learnedPlaying; updateOutputs(); return;
       }
       playing = !playing; updateOutputs();
+    });
+    $("simulationMode").addEventListener("click", () => {
+      learnedMode = false; learnedPlaying = false; playing = false;
+      setControlsDisabled(false); resetSimulation();
     });
     $("runLearned").addEventListener("click", async () => {
       if (!learnedData) {
@@ -521,7 +559,8 @@
           postBelief: decodeBytes(payload.model1.post_belief_u8)
         };
       }
-      playing = false; learnedMode = true; learnedFrame = 0; learnedAccumulator = 0;
+      playing = false; learnedMode = true; learnedPlaying = true;
+      learnedFrame = 0; learnedAccumulator = 0;
       setControlsDisabled(true);
       draw();
     });

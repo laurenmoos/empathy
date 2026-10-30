@@ -53,8 +53,8 @@ def test_explorer_is_a_self_contained_parameter_interface() -> None:
     assert parser.canvases == {"worldCanvas", "beliefCanvas"}
     assert not parser.external_urls
     assert "requestAnimationFrame" in source
-    assert "Run simulation" in source
-    assert "Run learned example" in source
+    assert "Play simulation" in source
+    assert "Model view" in source
     assert 'fetch("learned-example.json")' in source
     assert "Start with an example" not in source
     assert 'id="preset"' not in source
@@ -114,6 +114,17 @@ def test_learned_square_frames_preserve_their_aspect_ratio() -> None:
     assert "const side = Math.min(worldCanvas.width, worldCanvas.height);" in source
     assert "drawImage(buffer, 0, 0, worldCanvas.width, worldCanvas.height)" not in source
     assert 'worldCtx.imageSmoothingQuality = "high";' in source
+
+
+def test_view_selection_is_separate_from_playback() -> None:
+    source, parser = parsed_explorer()
+
+    assert {"simulationMode", "runLearned", "runSimulation", "reset", "modeContext"} <= parser.ids
+    assert "Simulation view" in source
+    assert "change forces and inspect the world" in source
+    assert "Model view" in source
+    assert "watch learned beliefs and the world guess" in source
+    assert "Play simulation" in source
 
 
 def test_explorer_exposes_the_same_operator_update_order_as_the_simulator() -> None:

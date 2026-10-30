@@ -138,6 +138,26 @@ def test_each_view_only_shows_its_own_layer() -> None:
     assert "if (learnedMode && learnedData && learnedPlaying) {" in source
 
 
+def test_model_view_renders_byte_beliefs_without_clipping() -> None:
+    source, _ = parsed_explorer()
+
+    assert "const normalized = value / 255;" in source
+    assert "Math.sqrt(normalized)" in source
+    assert 'beliefCtx.imageSmoothingQuality = "high";' in source
+    assert "brighter = more rollouts agree" in source
+    assert "current true state" not in source
+
+
+def test_model_view_removes_irrelevant_simulation_controls_and_stretched_card() -> None:
+    source, _ = parsed_explorer()
+
+    assert source.count('class="card simulation-settings"') == 3
+    assert 'document.body.classList.toggle("model-view", learnedMode);' in source
+    assert ".model-view .simulation-settings { display: none; }" in source
+    assert ".model-two { align-self: start;" in source
+    assert "main, .model-view main { grid-template-columns: 1fr; }" in source
+
+
 def test_explorer_exposes_the_same_operator_update_order_as_the_simulator() -> None:
     source, _ = parsed_explorer()
 

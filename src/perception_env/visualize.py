@@ -391,3 +391,72 @@ def render_dataset_contact_sheet(
         "panels_per_record": ["world code", "observed frame", "pre belief"],
     }
     return _save_visual(fig, Path(path), metadata)
+
+
+def render_shattering_matrix(
+    estimate: "ShatteringEstimate", path: Path
+) -> VisualArtifact:
+    from .shattering import ShatteringEstimate, count_labelings
+
+    if not isinstance(estimate, ShatteringEstimate):
+        raise TypeError("estimate must be a ShatteringEstimate")
+    matrix = estimate.matrix
+    unique_rows, inverse, counts = np.unique(
+        matrix.values, axis=0, return_inverse=True, return_counts=True
+    )
+    order = np.argsort(inverse)
+    grouped = matrix.values[order]
+
+    fig, (matrix_ax, summary_ax) = plt.subplots(
+        1, 2, figsize=(9.5, max(3.5, 0.22 * len(grouped) + 1.8)),
+        gridspec_kw={"width_ratios": [1.8, 1.0]},
+    )
+    matrix_ax.imshow(grouped, cmap="Blues", vmin=0, vmax=1, aspect="auto")
+    matrix_ax.set(
+        xlabel="probe",
+        ylabel="world (grouped by labeling)",
+        title="World × probe possibility labels",
+    )
+    for index in estimate.selected_probe_indices:
+        matrix_ax.add_patch(
+            plt.Rectangle(
+                (index - 0.5, -0.5),
+                1,
+                len(grouped),
+                fill=False,
+                edgecolor="#e07a2d",
+                linewidth=2,
+            )
+        )
+    summary_ax.axis("off")
+    summary_ax.set_title("Empirical shattering estimate", loc="left", weight="bold")
+    summary_ax.text(
+        0.0,
+        0.95,
+        "\n".join(
+            [
+                f"metric: {estimate.metric_name}",
+                f"dimension: {estimate.dimension}",
+                f"selected probes: {list(estimate.selected_probe_indices)}",
+                f"realized: {estimate.realized_labelings}/{estimate.possible_labelings}",
+                f"distinct rows: {len(unique_rows)}",
+                f"duplicates: {int(np.sum(counts - 1))}",
+                f"budget: {estimate.metadata['budget']}",
+                f"exhaustive: {estimate.exhaustive}",
+            ]
+        ),
+        va="top",
+        family="monospace",
+    )
+    fig.tight_layout()
+    metadata: dict[str, Any] = {
+        "kind": "shattering_matrix",
+        "dimension": estimate.dimension,
+        "selected_probe_indices": list(estimate.selected_probe_indices),
+        "distinct_labelings": count_labelings(matrix),
+        "world_count": matrix.values.shape[0],
+        "probe_count": matrix.values.shape[1],
+        "budget": estimate.metadata["budget"],
+        "metric_name": estimate.metric_name,
+    }
+    return _save_visual(fig, Path(path), metadata)

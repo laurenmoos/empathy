@@ -101,7 +101,8 @@ def test_learned_example_connects_ground_truth_model1_and_model2() -> None:
 
     assert payload["schema_version"] == "learned-demo-v2"
     assert len(payload["rollouts"]) >= 2
-    assert len({tuple(rollout["ground_truth"]["world_flat"]) for rollout in payload["rollouts"]}) >= 2
+    worlds = {tuple(rollout["ground_truth"]["world_flat"]) for rollout in payload["rollouts"]}
+    assert len(worlds) >= 2
     for rollout in payload["rollouts"]:
         assert rollout["ground_truth"]["frame_count"] > 1
         assert rollout["ground_truth"]["frames_base64"]

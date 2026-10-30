@@ -66,24 +66,20 @@
     button.primary { background: var(--aqua); color: #06201d; border-color: transparent; }
     .actions { display: grid; grid-template-columns: 1.35fr 1fr; gap: .45rem; }
     .visuals { padding: 1.2rem; display: grid; grid-template-columns: 1.15fr .85fr; gap: 1rem; align-content: start; }
-    .model-map { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; align-items: center; gap: .65rem; padding: .7rem .85rem; border: 1px solid var(--line); border-radius: 12px; }
-    .model-map div { min-width: 0; }
-    .model-map strong { display: block; font-size: .78rem; }
-    .model-map span { color: var(--muted); font-size: .7rem; }
-    .model-map .arrow { color: var(--aqua); font-size: 1rem; }
-    .model-note { grid-column: 1 / -1; margin: -.55rem 0 0; color: var(--muted); font-size: .68rem; }
     figure { margin: 0; padding: .8rem; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); overflow: hidden; }
     figure:first-child { grid-column: 1 / -1; }
     figcaption { display: flex; justify-content: space-between; align-items: baseline; padding: .15rem .25rem .75rem; }
     figcaption strong { font-size: .95rem; }
-    figcaption span { color: var(--muted); font-size: .76rem; }
     canvas { display: block; width: 100%; aspect-ratio: 16 / 7; border-radius: 10px; background: #05090b; }
     #beliefCanvas { aspect-ratio: 1 / 1; }
-    .readout { display: grid; grid-template-columns: repeat(2, 1fr); gap: .6rem; align-content: start; }
+    .truth-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: .6rem; margin-top: .8rem; }
     .metric { padding: .85rem; background: rgba(5, 12, 14, .66); border: 1px solid var(--line); border-radius: 11px; }
     .metric small { display: block; color: var(--muted); margin-bottom: .3rem; }
     .metric b { font: 650 .86rem ui-monospace, monospace; }
-    .metric.full { grid-column: 1 / -1; }
+    .model-two { padding: 1rem; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
+    .model-two strong { display: block; font-size: .95rem; }
+    .model-two small { display: block; margin: .85rem 0 .25rem; color: var(--muted); }
+    .model-two b { font: 650 .9rem ui-monospace, monospace; }
     .legend { display: flex; flex-wrap: wrap; gap: .8rem; margin-top: .8rem; color: var(--muted); font-size: .75rem; }
     .dot { display: inline-block; width: .65rem; height: .65rem; border-radius: 50%; margin-right: .3rem; }
     @media (max-width: 900px) {
@@ -98,8 +94,6 @@
       .controls, .visuals { grid-template-columns: 1fr; }
       figure:first-child { grid-column: auto; }
       aside, .visuals { padding: .75rem; }
-      .model-map { grid-template-columns: 1fr; }
-      .model-map .arrow { transform: rotate(90deg); justify-self: center; }
     }
   </style>
 </head>
@@ -139,35 +133,31 @@
     </aside>
 
     <section class="visuals">
-      <div class="model-map" aria-label="Ground truth and model flow">
-        <div><strong>Ground truth</strong><span>actual physics and occlusion</span></div>
-        <span class="arrow">→</span>
-        <div><strong>Model 1</strong><span>possible hidden paths</span></div>
-        <span class="arrow">→</span>
-        <div><strong>Model 2</strong><span>guessed forces and rules</span></div>
-      </div>
-      <p class="model-note">This explorer uses simulator-generated stand-ins for the two model outputs; trained CNNs are not running here yet.</p>
       <figure>
-        <figcaption><strong>Ground truth simulation</strong><span>hidden from the models behind the gray occluder</span></figcaption>
+        <figcaption><strong>Ground truth</strong></figcaption>
         <canvas id="worldCanvas" width="1200" height="525"></canvas>
         <div class="legend">
           <span><i class="dot" style="background:var(--coral)"></i>ball</span>
           <span><i class="dot" style="background:var(--aqua)"></i>visible trajectory</span>
           <span><i class="dot" style="background:var(--yellow)"></i>wall</span>
         </div>
+        <div class="truth-metrics" aria-label="Ground truth state">
+          <div class="metric"><small>Elapsed</small><b id="timeReadout">0.0 s</b></div>
+          <div class="metric"><small>Ball position</small><b id="stateReadout">12% across · 55% high</b></div>
+        </div>
       </figure>
       <figure>
-        <figcaption><strong>Model 1 · Path beliefs</strong><span>superposition of possible hidden trajectories</span></figcaption>
+        <figcaption><strong>Model 1 · Belief superposition</strong></figcaption>
         <canvas id="beliefCanvas" width="600" height="600"></canvas>
         <div class="legend">
           <span><i class="dot" style="background:var(--violet)"></i>possible path</span>
           <span><i class="dot" style="background:var(--coral)"></i>current true state</span>
         </div>
       </figure>
-      <section class="readout" aria-label="Current world readout">
-        <div class="metric"><small>Elapsed</small><b id="timeReadout">0.0 s</b></div>
-        <div class="metric"><small>Ball position</small><b id="stateReadout">12% across · 55% high</b></div>
-        <div class="metric full"><small>Model 2 · World guess</small><b id="operatorReadout">Forces on the ball: none</b></div>
+      <section class="model-two" aria-label="Model 2 output">
+        <strong>Model 2 · Second-order perception</strong>
+        <small>World guess</small>
+        <b id="operatorReadout">Forces on the ball: none</b>
       </section>
     </section>
   </main>

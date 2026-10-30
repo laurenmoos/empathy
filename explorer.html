@@ -37,7 +37,11 @@
     h2 { margin: 0; font-size: 1rem; }
     .intro { margin: .45rem 0 1rem; color: var(--muted); font-size: .78rem; line-height: 1.45; }
     label { display: grid; gap: .35rem; color: var(--muted); font-size: .75rem; }
-    select, button {
+    .control { margin-top: .85rem; }
+    .control-line { display: flex; justify-content: space-between; gap: 1rem; }
+    .control output { color: var(--aqua); font: 650 .76rem ui-monospace, monospace; }
+    input[type="range"] { width: 100%; accent-color: var(--aqua); }
+    button {
       width: 100%;
       padding: .65rem .75rem;
       color: var(--ink);
@@ -48,7 +52,9 @@
     }
     button { cursor: pointer; font-weight: 700; }
     button.primary { color: #06201d; background: var(--aqua); border-color: transparent; }
-    .buttons { display: grid; grid-template-columns: 1.35fr 1fr; gap: .45rem; margin-top: .7rem; }
+    .buttons { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; margin-top: .7rem; }
+    .buttons .primary { grid-column: 1 / -1; }
+    button:disabled { cursor: wait; opacity: .6; }
     .status { min-height: 2.5em; margin: .7rem 0 0; color: var(--muted); font-size: .72rem; line-height: 1.35; }
     .model-two {
       margin-top: 1.2rem;
@@ -126,18 +132,30 @@
   <header><h1>Perception environment</h1></header>
   <main>
     <aside>
-      <h2>Learned rollout</h2>
-      <p class="intro">Watch the observed ball and Model 1’s possible hidden paths in the same scene.</p>
-      <label>Held-out rollout<select id="rolloutSelect"></select></label>
+      <h2>Set the world</h2>
+      <p class="intro">Choose the forces, then let the two models infer this world from the occluded rollout.</p>
+      <label class="control">
+        <span class="control-line"><span>Gravity · down ↔ up</span><output id="gravityValue">−0.10</output></span>
+        <input id="gravity" type="range" min="-0.30" max="0.30" step="0.05" value="-0.10">
+      </label>
+      <label class="control">
+        <span class="control-line"><span>Wind · left ↔ right</span><output id="windValue">0.00</output></span>
+        <input id="wind" type="range" min="-0.30" max="0.30" step="0.05" value="0.00">
+      </label>
+      <label class="control">
+        <span class="control-line"><span>Damping</span><output id="dampingValue">0.00</output></span>
+        <input id="damping" type="range" min="0" max="0.60" step="0.05" value="0.00">
+      </label>
       <div class="buttons">
-        <button class="primary" id="playback">Play rollout</button>
+        <button class="primary" id="runInference">Run &amp; guess</button>
+        <button id="playback">Pause</button>
         <button id="reset">Reset</button>
       </div>
-      <p class="status" id="statusMessage">Loading learned rollouts…</p>
+      <p class="status" id="statusMessage">Running the initial world…</p>
 
       <section class="model-two" id="modelTwoPanel" aria-label="Model 2 output">
         <h2>Model 2 · Second-order perception</h2>
-        <small>Guessed active operators · normalized parameters</small>
+        <small>Model 2 sees Model 1’s belief image—not the rollout or these settings.</small>
         <b id="operatorReadout">Waiting for beliefs</b>
         <div class="comparison">
           <div class="comparison-row heading"><span>Operator</span><span>Ground-truth parameters</span><span>Guessed parameters</span></div>
@@ -168,20 +186,18 @@
     const $ = id => document.getElementById(id);
     const worldCanvas = $("worldCanvas");
     const worldCtx = worldCanvas.getContext("2d");
-    let learnedRollouts = [];
     let learnedData = null;
-    let learnedIndex = 0;
     let learnedFrame = 0;
     let playing = false;
     let accumulator = 0;
     let previousTimestamp = 0;
+    let statusOverride = null;
+    let requestSerial = 0;
 
     const worldSlots = [
-      {name: "vertical force", activity: 0, parameters: [1]},
-      {name: "horizontal force", activity: 2, parameters: [3]},
-      {name: "damping", activity: 4, parameters: [5]},
-      {name: "right wall", activity: 6, parameters: [7, 8]},
-      {name: "floor", activity: 9, parameters: [10, 11]}
+      {name: "gravity", operator: "vertical_acceleration", parameter: "a_y"},
+      {name: "wind", operator: "horizontal_acceleration", parameter: "a_x"},
+      {name: "damping", operator: "damping", parameter: "lambda"}
     ];
 
     function decodeBytes(encoded) {
@@ -195,13 +211,13 @@
       }
     }
 
-    function validateLearnedRollout(rollout) {
-      if (!rollout || typeof rollout !== "object" || typeof rollout.example_id !== "string") {
-        throw new Error("rollout must have an example ID");
+    function validateLiveResult(payload) {
+      if (!payload || payload.schema_version !== "live-inference-v1") {
+        throw new Error("inference response must use the live v1 schema");
       }
-      const truth = rollout.ground_truth;
-      const model1 = rollout.model1;
-      const model2 = rollout.model2;
+      const truth = payload.ground_truth;
+      const model1 = payload.model1;
+      const model2 = payload.model2;
       if (!truth || !model1 || !model2) throw new Error("rollout is missing a required model stage");
       if (![truth.width, truth.height, truth.frame_count].every(Number.isInteger)) {
         throw new Error("ground-truth dimensions must be integers");
@@ -233,20 +249,16 @@
           || postBelief.length !== model1.width * model1.height) {
         throw new Error("belief byte length does not match its dimensions");
       }
-      return {...rollout, frameBytes, preBelief, postBelief};
-    }
-
-    function validateLearnedPayload(payload) {
-      if (!payload || payload.schema_version !== "learned-demo-v2"
-          || !Array.isArray(payload.rollouts) || !payload.rollouts.length) {
-        throw new Error("learned rollout payload must use the nonempty v2 schema");
+      if (!truth.operators || !model2.operators) {
+        throw new Error("inference response is missing physical operator values");
       }
-      return payload.rollouts.map(validateLearnedRollout);
+      return {...payload, frameBytes, preBelief, postBelief};
     }
 
-    function worldSlotValue(flat, slot) {
-      if (flat[slot.activity] < .5) return "off";
-      return slot.parameters.map(index => Number(flat[index]).toFixed(2)).join(" · ");
+    function worldSlotValue(operators, slot) {
+      const operator = operators[slot.operator];
+      if (!operator || !operator.active) return "inactive";
+      return Number(operator.parameters[slot.parameter]).toFixed(2);
     }
 
     function comparisonElements(actual, predicted) {
@@ -262,10 +274,10 @@
       });
     }
 
-    function learnedWorldSummary(flat) {
+    function learnedWorldSummary(operators) {
       const active = worldSlots
-        .filter(slot => flat[slot.activity] >= .5)
-        .map(slot => `${slot.name} ${worldSlotValue(flat, slot)}`);
+        .filter(slot => operators[slot.operator]?.active)
+        .map(slot => `${slot.name} ${worldSlotValue(operators, slot)}`);
       return active.length ? active.join(" · ") : "constant motion";
     }
 
@@ -334,18 +346,22 @@
     }
 
     function updateOutputs() {
-      if (!learnedData) return;
+      if (!learnedData) {
+        if (statusOverride) $("statusMessage").textContent = statusOverride;
+        $("playback").textContent = "Play";
+        return;
+      }
       const truth = learnedData.ground_truth;
       const postObservation = learnedFrame >= truth.reappearance_step;
       const hidden = learnedFrame >= truth.hidden_start && learnedFrame <= truth.hidden_end;
       $("timeReadout").textContent = `frame ${learnedFrame + 1} of ${truth.frame_count}`;
-      $("truthPhase").textContent = `rollout ${learnedIndex + 1} of ${learnedRollouts.length}`;
-      $("playback").textContent = playing ? "Pause rollout" : "Play rollout";
-      $("statusMessage").textContent = hidden
+      $("truthPhase").textContent = hidden ? "ball hidden · Model 1 belief visible" : "ground truth visible";
+      $("playback").textContent = playing ? "Pause" : "Play";
+      $("statusMessage").textContent = statusOverride || (hidden
         ? "The ball is hidden. Purple shows Model 1’s belief beneath the occluder."
         : postObservation
           ? "The ball has reappeared. Model 1 has revised its belief."
-          : "The observed ball is approaching the occluder.";
+          : "The observed ball is approaching the occluder.");
     }
 
     function draw() {
@@ -353,44 +369,57 @@
       updateOutputs();
     }
 
-    function selectLearnedRollout(index) {
-      const candidateIndex = Number(index);
-      if (!Number.isInteger(candidateIndex) || !learnedRollouts[candidateIndex]) {
-        throw new Error("learned rollout selection is out of range");
-      }
-      const candidate = learnedRollouts[candidateIndex];
+    function showInference(candidate) {
       const comparison = comparisonElements(
-        candidate.ground_truth.world_flat,
-        candidate.model2.predicted_world_flat
+        candidate.ground_truth.operators,
+        candidate.model2.operators
       );
-      learnedIndex = candidateIndex;
       learnedData = candidate;
       learnedFrame = 0;
       accumulator = 0;
       $("comparisonRows").replaceChildren(...comparison);
-      $("operatorReadout").textContent = learnedWorldSummary(candidate.model2.predicted_world_flat);
+      $("operatorReadout").textContent = learnedWorldSummary(candidate.model2.operators);
       draw();
     }
 
-    async function loadLearnedRollouts() {
+    function selectedParameters() {
+      return {
+        gravity: Number($("gravity").value),
+        wind: Number($("wind").value),
+        damping: Number($("damping").value)
+      };
+    }
+
+    async function runInference() {
+      const serial = ++requestSerial;
+      const parameters = selectedParameters();
+      playing = false;
+      statusOverride = "Running the simulation, Model 1, and Model 2…";
+      $("runInference").disabled = true;
+      $("operatorReadout").textContent = "Guessing…";
+      $("comparisonRows").replaceChildren();
+      updateOutputs();
       try {
-        const response = await fetch("learned-example.json");
-        if (!response.ok) throw new Error(`rollout request failed: ${response.status}`);
-        const payload = await response.json();
-        const prepared = validateLearnedPayload(payload);
-        const options = prepared.map((rollout, index) => {
-          const option = document.createElement("option");
-          option.value = String(index);
-          option.textContent = `Rollout ${index + 1} · ${rollout.example_id}`;
-          return option;
+        const response = await fetch("/api/infer", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(parameters)
         });
-        learnedRollouts = prepared;
-        $("rolloutSelect").replaceChildren(...options);
-        selectLearnedRollout(0);
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || `inference failed: ${response.status}`);
+        if (serial !== requestSerial) return;
+        const prepared = validateLiveResult(payload);
+        statusOverride = null;
+        showInference(prepared);
+        playing = true;
       } catch (error) {
+        if (serial !== requestSerial) return;
         playing = false;
-        $("statusMessage").textContent =
-          "Couldn’t load learned rollouts. Open the demo from http://localhost:8765.";
+        statusOverride = `Couldn’t run inference: ${error.message}`;
+        $("operatorReadout").textContent = "No guess available";
+        updateOutputs();
+      } finally {
+        if (serial === requestSerial) $("runInference").disabled = false;
       }
     }
 
@@ -420,16 +449,25 @@
       accumulator = 0;
       draw();
     });
-    $("rolloutSelect").addEventListener("change", event => {
-      try {
-        selectLearnedRollout(event.target.value);
-      } catch (error) {
-        event.target.value = String(learnedIndex);
-        $("statusMessage").textContent = "Couldn’t select that rollout; the previous one remains.";
-      }
+    $("runInference").addEventListener("click", runInference);
+
+    function showControlValue(id) {
+      const value = Number($(id).value);
+      $(`${id}Value`).textContent = value.toFixed(2).replace("-", "−");
+    }
+    ["gravity", "wind", "damping"].forEach(id => {
+      $(id).addEventListener("input", () => {
+        showControlValue(id);
+        playing = false;
+        statusOverride = "Parameters changed. Run again to update the beliefs and guess.";
+        $("operatorReadout").textContent = "Run to update";
+        $("comparisonRows").replaceChildren();
+        updateOutputs();
+      });
+      showControlValue(id);
     });
 
-    loadLearnedRollouts();
+    runInference();
     requestAnimationFrame(animate);
   </script>
 </body>

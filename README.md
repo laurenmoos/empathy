@@ -4,7 +4,13 @@ A visually inspectable toy environment for experiments on second-order perceptua
 
 ## Interactive parameter explorer
 
-Open [`explorer.html`](explorer.html) directly in a browser. It is a self-contained interface with presets, sliders, play/pause, and reset controls for gravity, wind, damping, walls, the initial ball state, and occluder geometry. The observed world and the superposition of possible hidden paths update together; no server or command line is required.
+After the Model 1 and Model 2 checkpoints below have been created, launch the live explorer with:
+
+```bash
+.venv/bin/perception-env live-demo
+```
+
+Then open [http://localhost:8765](http://localhost:8765). Set gravity, wind, and damping and click **Run & guess**. The page simulates that exact world, overlays Model 1's learned hidden-path superposition beneath the occluder, and compares the physical parameters you chose with Model 2's belief-only guess. Walls and the occluder are fixed scene geometry, not adjustable operators in this interface.
 
 ## Install and run
 

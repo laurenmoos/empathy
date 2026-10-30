@@ -50,6 +50,11 @@ class _LiveDemoHandler(SimpleHTTPRequestHandler):
             return
         self._json(HTTPStatus.OK, result.to_payload())
 
+    def do_GET(self) -> None:  # noqa: N802
+        if self.path == "/":
+            self.path = "/explorer.html"
+        super().do_GET()
+
     def log_message(self, format: str, *args: object) -> None:
         return
 
@@ -62,8 +67,8 @@ def create_server(
 ) -> ThreadingHTTPServer:
     """Create an injectable server; loading model checkpoints is the caller's job."""
     root = Path(root).resolve()
-    if not (root / "index.html").is_file():
-        raise FileNotFoundError(f"demo index not found: {root / 'index.html'}")
+    if not (root / "explorer.html").is_file():
+        raise FileNotFoundError(f"demo page not found: {root / 'explorer.html'}")
     class BoundLiveDemoHandler(_LiveDemoHandler):
         pass
 

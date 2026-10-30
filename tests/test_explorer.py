@@ -1,10 +1,8 @@
-import json
 from html.parser import HTMLParser
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
 EXPLORER = ROOT / "explorer.html"
-LEARNED_EXAMPLE = ROOT / "learned-example.json"
 
 
 class ExplorerParser(HTMLParser):
@@ -34,37 +32,55 @@ def parsed_explorer() -> tuple[str, ExplorerParser]:
     return source, parser
 
 
-def test_explorer_is_one_self_contained_learned_rollout_interface() -> None:
+def test_explorer_is_one_live_parameter_inference_interface() -> None:
     source, parser = parsed_explorer()
 
-    assert {"playback", "reset", "rolloutSelect", "worldCanvas"} <= parser.ids
+    assert {
+        "gravity",
+        "gravityValue",
+        "wind",
+        "windValue",
+        "damping",
+        "dampingValue",
+        "runInference",
+        "playback",
+        "reset",
+        "worldCanvas",
+    } <= parser.ids
     assert parser.canvases == {"worldCanvas"}
     assert not parser.external_urls
     assert "requestAnimationFrame" in source
-    assert "Learned rollout" in source
-    assert 'fetch("learned-example.json")' in source
+    assert "Set the world" in source
+    assert 'fetch("/api/infer"' in source
+    assert 'gravity: Number($("gravity").value)' in source
+    assert 'wind: Number($("wind").value)' in source
+    assert 'damping: Number($("damping").value)' in source
     assert "Observed rollout + Model 1 beliefs" in source
     assert "Model 2 · Second-order perception" in source
-    for removed in ("simulationMode", "runLearned", "modelOnePanel", "beliefCanvas", "view-switch"):
+    for removed in (
+        "simulationMode",
+        "runLearned",
+        "modelOnePanel",
+        "beliefCanvas",
+        "view-switch",
+        "rolloutSelect",
+        "learned-example.json",
+    ):
         assert removed not in source
 
 
-def test_learned_example_connects_ground_truth_model1_and_model2() -> None:
-    payload = json.loads(LEARNED_EXAMPLE.read_text())
+def test_live_request_has_loading_error_and_comparison_states() -> None:
+    source, _ = parsed_explorer()
 
-    assert payload["schema_version"] == "learned-demo-v2"
-    assert len(payload["rollouts"]) >= 2
-    worlds = {tuple(rollout["ground_truth"]["world_flat"]) for rollout in payload["rollouts"]}
-    assert len(worlds) >= 2
-    for rollout in payload["rollouts"]:
-        truth = rollout["ground_truth"]
-        assert truth["frame_count"] > 1
-        assert 0 <= truth["reappearance_step"] < truth["frame_count"]
-        assert rollout["ground_truth"]["frames_base64"]
-        assert len(rollout["model1"]["pre_belief_u8"]) > 100
-        assert len(rollout["model1"]["post_belief_u8"]) > 100
-        assert len(rollout["model2"]["predicted_world_flat"]) == 12
-        assert len(rollout["ground_truth"]["world_flat"]) == 12
+    assert '"Content-Type": "application/json"' in source
+    assert "JSON.stringify(parameters)" in source
+    assert "response.ok" in source
+    assert "payload.error" in source
+    assert '$("runInference").disabled = true' in source
+    assert '$("runInference").disabled = false' in source
+    assert "Ground-truth parameters" in source
+    assert "Guessed parameters" in source
+    assert 'return "inactive"' in source
 
 
 def test_learned_square_frames_preserve_their_aspect_ratio() -> None:
@@ -81,7 +97,6 @@ def test_beliefs_are_composited_into_the_observed_rollout() -> None:
     assert {
         "truthPanel",
         "modelTwoPanel",
-        "rolloutSelect",
         "truthPhase",
         "beliefLegend",
         "comparisonRows",
@@ -92,15 +107,13 @@ def test_beliefs_are_composited_into_the_observed_rollout() -> None:
     assert "learnedFrame >= truth.hidden_start && learnedFrame <= truth.hidden_end" in source
     assert "purple = Model 1’s possible hidden paths" in source
     assert "learnedFrame >= truth.reappearance_step" in source
-    assert "payload.rollouts" in source
-    assert "validateLearnedPayload" in source
-    assert "validateLearnedRollout" in source
-    assert "Couldn’t load learned rollouts" in source
-    assert "selectLearnedRollout" in source
-    assert '$("rolloutSelect").addEventListener("change"' in source
+    assert 'payload.schema_version !== "live-inference-v1"' in source
+    assert "validateLiveResult" in source
+    assert "Couldn’t run inference" in source
+    assert "runInference" in source
     assert "Ground-truth parameters" in source
     assert "Guessed parameters" in source
-    assert "normalized parameters" in source
+    assert "normalized parameters" not in source
     assert "beliefPhase" not in parser.ids
     assert "Belief state" not in source
 

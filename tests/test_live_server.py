@@ -28,7 +28,7 @@ class FakeEngine:
 
 @pytest.fixture
 def running_server(tmp_path: Path):
-    (tmp_path / "index.html").write_text("<h1>demo</h1>")
+    (tmp_path / "explorer.html").write_text("<h1>demo</h1>")
     engine = FakeEngine()
     server = create_server("127.0.0.1", 0, tmp_path, engine)
     thread = threading.Thread(target=server.serve_forever, daemon=True)

@@ -44,7 +44,6 @@ def test_explorer_is_a_self_contained_parameter_interface() -> None:
         "verticalWallEnabled",
         "verticalWallPosition",
         "verticalRestitution",
-        "horizontalWallEnabled",
         "horizontalWallPosition",
         "horizontalRestitution",
         "initialY",
@@ -61,6 +60,8 @@ def test_explorer_is_a_self_contained_parameter_interface() -> None:
     assert 'id="preset"' not in source
     assert "const presets" not in source
     assert "playing = false" in source
+    assert 'id="horizontalWallEnabled"' not in source
+    assert "p.horizontalWallEnabled = true" in source
     assert "Adjust the controls below" not in source
     assert "Set the physical parameters, then run" not in source
     assert '<br><span id="visibilityState">' not in source

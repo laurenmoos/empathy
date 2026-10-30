@@ -38,6 +38,8 @@ Every subplan must provide a deterministic command that renders its main objects
 
 **Gate:** Held-out trajectories have calibrated coverage, belief tensor schema matches Subplan 1, and assimilation produces a post-belief without exposing first-order fields downstream.
 
+**Executable plan:** `docs/superpowers/plans/2026-10-30-model-1-belief-generator.md`
+
 ### Subplan 3: Model 2 inverse-world CNN
 
 **Question:** How much latent operator complexity can be recovered from belief histories alone?
@@ -47,6 +49,8 @@ Every subplan must provide a deterministic command that renders its main objects
 **Visual proof:** Belief history beside predicted and true world cards; operator-wise recovery plots; perceptually equivalent world pairs; recovered-versus-true possibility maps.
 
 **Gate:** The production model contains no first-order input path, beats constant and single-belief baselines, and regenerates held-out possibility judgments from its predicted world code.
+
+**Executable plan:** `docs/superpowers/plans/2026-10-30-model-2-inverse-world-cnn.md`
 
 ### Subplan 4: Streaming belief-revision loop
 
@@ -58,6 +62,8 @@ Every subplan must provide a deterministic command that renders its main objects
 
 **Gate:** The loop replays deterministically, improves possibility coverage over multiple events, and does not silently route first-order data to Model 2.
 
+**Executable plan:** `docs/superpowers/plans/2026-10-30-streaming-belief-revision-loop.md`
+
 ### Subplan 5: Coherence and complexity recovery
 
 **Question:** At what empirical operator-class complexity does the perceptual loop stop maintaining coherent possible/impossible judgments over time?
@@ -68,6 +74,8 @@ Every subplan must provide a deterministic command that renders its main objects
 
 **Gate:** Metrics recover known synthetic controls, report search budgets, separate parameter error from perceptual equivalence, and reproduce across registered seeds.
 
+**Executable plan:** `docs/superpowers/plans/2026-10-30-coherence-complexity-recovery.md`
+
 ### Subplan 6: Research demonstration and reproducibility package
 
 **Question:** Can another researcher inspect, rerun, and understand the central claim?
@@ -77,6 +85,8 @@ Every subplan must provide a deterministic command that renders its main objects
 **Visual proof:** One end-to-end dashboard or video showing a world, Model 1 beliefs, Model 2 world inference, iterative correction, and the complexity comparison.
 
 **Gate:** A clean environment reproduces the headline result and every reported number links to a configuration and saved artifact.
+
+**Executable plan:** `docs/superpowers/plans/2026-10-30-research-demo-reproducibility.md`
 
 ## Dependency flow
 

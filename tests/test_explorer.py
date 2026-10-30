@@ -41,10 +41,6 @@ def test_explorer_is_a_self_contained_parameter_interface() -> None:
         "wind",
         "gravity",
         "damping",
-        "verticalWallPosition",
-        "verticalRestitution",
-        "horizontalWallPosition",
-        "horizontalRestitution",
         "initialY",
         "initialVx",
         "occluderLeft",
@@ -65,7 +61,17 @@ def test_explorer_is_a_self_contained_parameter_interface() -> None:
     assert "p.verticalWallEnabled = true" in source
     assert "· off" not in source
     assert "always on" not in source
-    assert source.count("<h2>Walls</h2>") == 1
+    assert "<h2>Walls</h2>" not in source
+    for control in (
+        "verticalWallPosition",
+        "verticalRestitution",
+        "horizontalWallPosition",
+        "horizontalRestitution",
+    ):
+        assert f'id="{control}"' not in source
+    assert "p.verticalWallPosition = 0.9" in source
+    assert "p.horizontalWallPosition = 0.1" in source
+    assert "Initial horizontal speed" in source
     assert "world parameter vector" not in source
     assert "active world operators" not in source
     assert "Ball position" in source

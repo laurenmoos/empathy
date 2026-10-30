@@ -50,13 +50,10 @@
       background: transparent;
     }
     .card h2 { margin: 0 0 .6rem; font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
-    .group-note { margin: -.25rem 0 .65rem; color: var(--muted); font-size: .72rem; }
     label { display: grid; grid-template-columns: 1fr auto; gap: .25rem .75rem; margin-top: .72rem; font-size: .82rem; }
     label:first-of-type { margin-top: 0; }
     output { color: var(--aqua); font: 600 .75rem ui-monospace, monospace; }
     input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: var(--aqua); }
-    .check { display: flex; align-items: center; justify-content: space-between; }
-    .check input { width: 1.1rem; height: 1.1rem; accent-color: var(--violet); }
     button {
       color: var(--ink);
       background: #18262a;
@@ -87,7 +84,7 @@
       header { align-items: center; }
       main { grid-template-columns: 1fr; }
       aside { border-right: 0; border-bottom: 1px solid var(--line); }
-      .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .controls { grid-template-columns: 1fr; }
       .controls .run-card { grid-column: 1 / -1; }
     }
     @media (max-width: 640px) {
@@ -120,18 +117,9 @@
         </section>
 
         <section class="card">
-          <h2>Walls</h2>
-          <p class="group-note">The ball bounces off these boundaries. Bounce controls how much speed it keeps.</p>
-          <label>Right wall · x<output data-for="verticalWallPosition"></output><input id="verticalWallPosition" type="range" min="0.2" max="0.95" step="0.01" value="0.72"></label>
-          <label>Right wall bounce<output data-for="verticalRestitution"></output><input id="verticalRestitution" type="range" min="0" max="1" step="0.01" value="0.8"></label>
-          <label>Floor · y<output data-for="horizontalWallPosition"></output><input id="horizontalWallPosition" type="range" min="0.05" max="0.9" step="0.01" value="0.18"></label>
-          <label>Floor bounce<output data-for="horizontalRestitution"></output><input id="horizontalRestitution" type="range" min="0" max="1" step="0.01" value="0.75"></label>
-        </section>
-
-        <section class="card">
           <h2>Ball</h2>
           <label>Initial y<output data-for="initialY"></output><input id="initialY" type="range" min="0.15" max="0.85" step="0.01" value="0.55"></label>
-          <label>Initial v<sub>x</sub><output data-for="initialVx"></output><input id="initialVx" type="range" min="0.08" max="0.55" step="0.01" value="0.28"></label>
+          <label>Initial horizontal speed<output data-for="initialVx"></output><input id="initialVx" type="range" min="0.08" max="0.55" step="0.01" value="0.28"></label>
         </section>
 
         <section class="card">
@@ -171,9 +159,7 @@
   <script>
     const $ = (id) => document.getElementById(id);
     const controlIds = [
-      "wind", "gravity", "damping", "verticalWallPosition",
-      "verticalRestitution", "horizontalWallPosition",
-      "horizontalRestitution", "initialY", "initialVx", "occluderLeft", "occluderRight"
+      "wind", "gravity", "damping", "initialY", "initialVx", "occluderLeft", "occluderRight"
     ];
     const numericIds = controlIds.filter(id => !id.endsWith("Enabled"));
     const worldCanvas = $("worldCanvas");
@@ -192,7 +178,11 @@
     function params() {
       const p = Object.fromEntries(numericIds.map(id => [id, Number($(id).value)]));
       p.verticalWallEnabled = true;
+      p.verticalWallPosition = 0.9;
+      p.verticalRestitution = 0.85;
       p.horizontalWallEnabled = true;
+      p.horizontalWallPosition = 0.1;
+      p.horizontalRestitution = 0.75;
       if (p.occluderRight < p.occluderLeft + 0.08) p.occluderRight = p.occluderLeft + 0.08;
       return p;
     }

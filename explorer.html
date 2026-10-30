@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Perception Environment Explorer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #ecf6f5;
+      --muted: #91a7aa;
+      --panel: rgba(16, 27, 31, 0.92);
+      --line: rgba(174, 217, 216, 0.16);
+      --aqua: #63e6d5;
+      --violet: #ad92ff;
+      --coral: #ff8b73;
+      --yellow: #f7d774;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 75% 8%, rgba(89, 67, 158, 0.22), transparent 35rem),
+        radial-gradient(circle at 5% 90%, rgba(30, 125, 119, 0.18), transparent 36rem),
+        #091013;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 2rem;
+      padding: 2rem 2.25rem 1.35rem;
+      border-bottom: 1px solid var(--line);
+    }
+    h1 { margin: 0; font-size: clamp(1.5rem, 3vw, 2.5rem); letter-spacing: -0.04em; }
+    header p { margin: .5rem 0 0; color: var(--muted); max-width: 44rem; }
+    .status { text-align: right; font: 600 .78rem/1.5 ui-monospace, monospace; color: var(--aqua); }
+    main { display: grid; grid-template-columns: minmax(17rem, 21rem) 1fr; min-height: calc(100vh - 7.5rem); }
+    aside { padding: 1.2rem; border-right: 1px solid var(--line); background: rgba(4, 11, 13, .52); }
+    .controls { display: grid; gap: .85rem; }
+    .card {
+      padding: 1rem;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel);
+      box-shadow: 0 14px 35px rgba(0,0,0,.16);
+    }
+    .card h2 { margin: 0 0 .8rem; font-size: .72rem; letter-spacing: .13em; text-transform: uppercase; color: var(--muted); }
+    label { display: grid; grid-template-columns: 1fr auto; gap: .25rem .75rem; margin-top: .72rem; font-size: .82rem; }
+    label:first-of-type { margin-top: 0; }
+    output { color: var(--aqua); font: 600 .75rem ui-monospace, monospace; }
+    input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: var(--aqua); }
+    .check { display: flex; align-items: center; justify-content: space-between; }
+    .check input { width: 1.1rem; height: 1.1rem; accent-color: var(--violet); }
+    select, button {
+      color: var(--ink);
+      background: #18262a;
+      border: 1px solid rgba(174, 217, 216, .22);
+      border-radius: 9px;
+      padding: .65rem .75rem;
+      font: inherit;
+    }
+    select { width: 100%; }
+    button { cursor: pointer; font-weight: 650; }
+    button.primary { background: var(--aqua); color: #06201d; border-color: transparent; }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: .55rem; margin-top: .65rem; }
+    .visuals { padding: 1.2rem; display: grid; grid-template-columns: 1.15fr .85fr; gap: 1rem; align-content: start; }
+    figure { margin: 0; padding: .8rem; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); overflow: hidden; }
+    figure:first-child { grid-column: 1 / -1; }
+    figcaption { display: flex; justify-content: space-between; align-items: baseline; padding: .15rem .25rem .75rem; }
+    figcaption strong { font-size: .95rem; }
+    figcaption span { color: var(--muted); font-size: .76rem; }
+    canvas { display: block; width: 100%; aspect-ratio: 16 / 7; border-radius: 10px; background: #05090b; }
+    #beliefCanvas { aspect-ratio: 1 / 1; }
+    .readout { display: grid; grid-template-columns: repeat(2, 1fr); gap: .6rem; align-content: start; }
+    .metric { padding: .85rem; background: rgba(5, 12, 14, .66); border: 1px solid var(--line); border-radius: 11px; }
+    .metric small { display: block; color: var(--muted); margin-bottom: .3rem; }
+    .metric b { font: 650 .86rem ui-monospace, monospace; }
+    .metric.full { grid-column: 1 / -1; }
+    .legend { display: flex; flex-wrap: wrap; gap: .8rem; margin-top: .8rem; color: var(--muted); font-size: .75rem; }
+    .dot { display: inline-block; width: .65rem; height: .65rem; border-radius: 50%; margin-right: .3rem; }
+    @media (max-width: 900px) {
+      header { align-items: start; }
+      main { grid-template-columns: 1fr; }
+      aside { border-right: 0; border-bottom: 1px solid var(--line); }
+      .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .controls .card:first-child { grid-column: 1 / -1; }
+    }
+    @media (max-width: 640px) {
+      header { padding: 1.3rem; display: block; }
+      .status { text-align: left; margin-top: .8rem; }
+      .controls, .visuals { grid-template-columns: 1fr; }
+      figure:first-child { grid-column: auto; }
+      aside, .visuals { padding: .75rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Perception environment</h1>
+      <p>Change the world, then watch the visible ball and the hidden-path superposition update together.</p>
+    </div>
+    <div class="status"><span id="runState">RUNNING</span><br><span id="visibilityState">VISIBLE</span></div>
+  </header>
+  <main>
+    <aside>
+      <div class="controls">
+        <section class="card">
+          <h2>World preset</h2>
+          <select id="preset" aria-label="World preset">
+            <option value="constant">Constant motion</option>
+            <option value="gravity">Gravity</option>
+            <option value="wind">Wind</option>
+            <option value="wall">Bouncing wall</option>
+            <option value="complex">Combined world</option>
+          </select>
+          <div class="actions">
+            <button class="primary" id="playPause">Pause</button>
+            <button id="reset">Reset</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Forces</h2>
+          <label>Wind · a<sub>x</sub><output data-for="wind"></output><input id="wind" type="range" min="-0.5" max="0.5" step="0.01" value="0"></label>
+          <label>Gravity · a<sub>y</sub><output data-for="gravity"></output><input id="gravity" type="range" min="-0.8" max="0.4" step="0.01" value="0"></label>
+          <label>Damping · λ<output data-for="damping"></output><input id="damping" type="range" min="0" max="1" step="0.01" value="0"></label>
+        </section>
+
+        <section class="card">
+          <h2>Vertical wall</h2>
+          <label class="check">Enabled<input id="verticalWallEnabled" type="checkbox"></label>
+          <label>Position · x<output data-for="verticalWallPosition"></output><input id="verticalWallPosition" type="range" min="0.2" max="0.95" step="0.01" value="0.72"></label>
+          <label>Restitution<output data-for="verticalRestitution"></output><input id="verticalRestitution" type="range" min="0" max="1" step="0.01" value="0.8"></label>
+        </section>
+
+        <section class="card">
+          <h2>Horizontal wall</h2>
+          <label class="check">Enabled<input id="horizontalWallEnabled" type="checkbox"></label>
+          <label>Position · y<output data-for="horizontalWallPosition"></output><input id="horizontalWallPosition" type="range" min="0.05" max="0.9" step="0.01" value="0.18"></label>
+          <label>Restitution<output data-for="horizontalRestitution"></output><input id="horizontalRestitution" type="range" min="0" max="1" step="0.01" value="0.75"></label>
+        </section>
+
+        <section class="card">
+          <h2>Ball entry</h2>
+          <label>Initial y<output data-for="initialY"></output><input id="initialY" type="range" min="0.15" max="0.85" step="0.01" value="0.55"></label>
+          <label>Initial v<sub>x</sub><output data-for="initialVx"></output><input id="initialVx" type="range" min="0.08" max="0.55" step="0.01" value="0.28"></label>
+        </section>
+
+        <section class="card">
+          <h2>Occluder</h2>
+          <label>Left edge<output data-for="occluderLeft"></output><input id="occluderLeft" type="range" min="0.2" max="0.65" step="0.01" value="0.38"></label>
+          <label>Right edge<output data-for="occluderRight"></output><input id="occluderRight" type="range" min="0.35" max="0.85" step="0.01" value="0.58"></label>
+        </section>
+      </div>
+    </aside>
+
+    <section class="visuals">
+      <figure>
+        <figcaption><strong>Observed world</strong><span>The gray box is the occluder</span></figcaption>
+        <canvas id="worldCanvas" width="1200" height="525"></canvas>
+        <div class="legend">
+          <span><i class="dot" style="background:var(--coral)"></i>ball</span>
+          <span><i class="dot" style="background:var(--aqua)"></i>visible trajectory</span>
+          <span><i class="dot" style="background:var(--yellow)"></i>wall</span>
+        </div>
+      </figure>
+      <figure>
+        <figcaption><strong>Superposition of possible paths</strong><span>entry uncertainty only</span></figcaption>
+        <canvas id="beliefCanvas" width="600" height="600"></canvas>
+        <div class="legend">
+          <span><i class="dot" style="background:var(--violet)"></i>possible path</span>
+          <span><i class="dot" style="background:var(--coral)"></i>current true state</span>
+        </div>
+      </figure>
+      <section class="readout" aria-label="Current world readout">
+        <div class="metric"><small>time</small><b id="timeReadout">0.0 s</b></div>
+        <div class="metric"><small>state</small><b id="stateReadout">x 0.12 · y 0.55</b></div>
+        <div class="metric full"><small>active world operators</small><b id="operatorReadout">constant motion</b></div>
+        <div class="metric full"><small>world parameter vector</small><b id="vectorReadout">[0.00, 0.00, 0.00]</b></div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const controlIds = [
+      "wind", "gravity", "damping", "verticalWallEnabled", "verticalWallPosition",
+      "verticalRestitution", "horizontalWallEnabled", "horizontalWallPosition",
+      "horizontalRestitution", "initialY", "initialVx", "occluderLeft", "occluderRight"
+    ];
+    const numericIds = controlIds.filter(id => !id.endsWith("Enabled"));
+    const worldCanvas = $("worldCanvas");
+    const beliefCanvas = $("beliefCanvas");
+    const worldCtx = worldCanvas.getContext("2d");
+    const beliefCtx = beliefCanvas.getContext("2d");
+    const dt = 0.1;
+    let playing = true;
+    let accumulator = 0;
+    let previousTimestamp = 0;
+    let state;
+    let trail = [];
+    let stepCount = 0;
+    let possiblePaths = [];
+
+    const presets = {
+      constant: {wind: 0, gravity: 0, damping: 0, verticalWallEnabled: false, horizontalWallEnabled: false},
+      gravity: {wind: 0, gravity: -0.25, damping: 0, verticalWallEnabled: false, horizontalWallEnabled: false},
+      wind: {wind: 0.18, gravity: 0, damping: 0, verticalWallEnabled: false, horizontalWallEnabled: false},
+      wall: {wind: 0, gravity: 0, damping: 0, verticalWallEnabled: true, verticalWallPosition: 0.68, verticalRestitution: 0.85, horizontalWallEnabled: false},
+      complex: {wind: 0.12, gravity: -0.2, damping: 0.08, verticalWallEnabled: true, verticalWallPosition: 0.76, verticalRestitution: 0.82, horizontalWallEnabled: true, horizontalWallPosition: 0.16, horizontalRestitution: 0.72}
+    };
+
+    function params() {
+      const p = Object.fromEntries(numericIds.map(id => [id, Number($(id).value)]));
+      p.verticalWallEnabled = $("verticalWallEnabled").checked;
+      p.horizontalWallEnabled = $("horizontalWallEnabled").checked;
+      if (p.occluderRight < p.occluderLeft + 0.08) p.occluderRight = p.occluderLeft + 0.08;
+      return p;
+    }
+
+    function initialState(yOffset = 0, vxOffset = 0) {
+      const p = params();
+      return {x: 0.12, y: p.initialY + yOffset, vx: p.initialVx + vxOffset, vy: 0};
+    }
+
+    function advance(source, p) {
+      const next = {...source};
+      // 1. acceleration
+      next.vx += p.wind * dt;
+      next.vy += p.gravity * dt;
+      // 2. damping
+      const decay = Math.exp(-p.damping * dt);
+      next.vx *= decay;
+      next.vy *= decay;
+      // 3. position
+      next.x += next.vx * dt;
+      next.y += next.vy * dt;
+      // 4. collision resolution
+      if (p.verticalWallEnabled && ((source.x < p.verticalWallPosition && next.x >= p.verticalWallPosition) || (source.x > p.verticalWallPosition && next.x <= p.verticalWallPosition))) {
+        next.x = p.verticalWallPosition - (next.x - p.verticalWallPosition);
+        next.vx *= -p.verticalRestitution;
+      }
+      if (p.horizontalWallEnabled && ((source.y < p.horizontalWallPosition && next.y >= p.horizontalWallPosition) || (source.y > p.horizontalWallPosition && next.y <= p.horizontalWallPosition))) {
+        next.y = p.horizontalWallPosition - (next.y - p.horizontalWallPosition);
+        next.vy *= -p.horizontalRestitution;
+      }
+      return next;
+    }
+
+    function rebuildPossibilities() {
+      const p = params();
+      possiblePaths = [];
+      for (const dy of [-0.04, -0.02, 0, 0.02, 0.04]) {
+        for (const dvx of [-0.04, -0.02, 0, 0.02, 0.04]) {
+          let ghost = initialState(dy, dvx);
+          const path = [ghost];
+          for (let i = 0; i < 80; i++) {
+            ghost = advance(ghost, p);
+            path.push(ghost);
+            if (ghost.x < -0.1 || ghost.x > 1.1 || ghost.y < -0.1 || ghost.y > 1.1) break;
+          }
+          possiblePaths.push(path);
+        }
+      }
+    }
+
+    function resetSimulation() {
+      state = initialState();
+      trail = [state];
+      stepCount = 0;
+      accumulator = 0;
+      rebuildPossibilities();
+      updateOutputs();
+      draw();
+    }
+
+    function isHidden(s, p) {
+      return s.x >= p.occluderLeft && s.x <= p.occluderRight && s.y >= 0.08 && s.y <= 0.92;
+    }
+
+    function worldPoint(canvas, s) {
+      const pad = canvas.width * 0.04;
+      return {x: pad + s.x * (canvas.width - 2 * pad), y: pad + (1 - s.y) * (canvas.height - 2 * pad)};
+    }
+
+    function clear(ctx, canvas) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#05090b";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = "rgba(174,217,216,.08)";
+      ctx.lineWidth = 1;
+      for (let i = 1; i < 10; i++) {
+        ctx.beginPath(); ctx.moveTo(canvas.width * i / 10, 0); ctx.lineTo(canvas.width * i / 10, canvas.height); ctx.stroke();
+      }
+      for (let i = 1; i < 5; i++) {
+        ctx.beginPath(); ctx.moveTo(0, canvas.height * i / 5); ctx.lineTo(canvas.width, canvas.height * i / 5); ctx.stroke();
+      }
+    }
+
+    function strokePath(ctx, canvas, points, color, width) {
+      ctx.beginPath();
+      points.forEach((point, index) => {
+        const pixel = worldPoint(canvas, point);
+        if (index === 0) ctx.moveTo(pixel.x, pixel.y); else ctx.lineTo(pixel.x, pixel.y);
+      });
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.stroke();
+    }
+
+    function drawWalls(ctx, canvas, p) {
+      ctx.save();
+      ctx.strokeStyle = "#f7d774";
+      ctx.lineWidth = 4;
+      ctx.setLineDash([12, 9]);
+      if (p.verticalWallEnabled) {
+        const wall = worldPoint(canvas, {x: p.verticalWallPosition, y: 0});
+        ctx.beginPath(); ctx.moveTo(wall.x, 0); ctx.lineTo(wall.x, canvas.height); ctx.stroke();
+      }
+      if (p.horizontalWallEnabled) {
+        const wall = worldPoint(canvas, {x: 0, y: p.horizontalWallPosition});
+        ctx.beginPath(); ctx.moveTo(0, wall.y); ctx.lineTo(canvas.width, wall.y); ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function drawWorld() {
+      const p = params();
+      clear(worldCtx, worldCanvas);
+      drawWalls(worldCtx, worldCanvas, p);
+      strokePath(worldCtx, worldCanvas, trail, "rgba(99,230,213,.72)", 4);
+      const ball = worldPoint(worldCanvas, state);
+      worldCtx.beginPath();
+      worldCtx.arc(ball.x, ball.y, 12, 0, Math.PI * 2);
+      worldCtx.fillStyle = "#ff8b73";
+      worldCtx.shadowColor = "#ff8b73";
+      worldCtx.shadowBlur = 18;
+      worldCtx.fill();
+      worldCtx.shadowBlur = 0;
+      const left = worldPoint(worldCanvas, {x: p.occluderLeft, y: 0});
+      const right = worldPoint(worldCanvas, {x: p.occluderRight, y: 0});
+      const top = worldPoint(worldCanvas, {x: 0, y: .92});
+      const bottom = worldPoint(worldCanvas, {x: 0, y: .08});
+      const gradient = worldCtx.createLinearGradient(left.x, 0, right.x, 0);
+      gradient.addColorStop(0, "#293338"); gradient.addColorStop(.5, "#465158"); gradient.addColorStop(1, "#293338");
+      worldCtx.fillStyle = gradient;
+      worldCtx.fillRect(left.x, top.y, right.x - left.x, bottom.y - top.y);
+      worldCtx.strokeStyle = "rgba(255,255,255,.2)";
+      worldCtx.strokeRect(left.x, top.y, right.x - left.x, bottom.y - top.y);
+    }
+
+    function drawBelief() {
+      const p = params();
+      clear(beliefCtx, beliefCanvas);
+      drawWalls(beliefCtx, beliefCanvas, p);
+      possiblePaths.forEach((path, index) => {
+        const hue = 255 + (index % 5) * 7;
+        strokePath(beliefCtx, beliefCanvas, path, `hsla(${hue}, 95%, 75%, .10)`, 5);
+        const endpoint = worldPoint(beliefCanvas, path[path.length - 1]);
+        beliefCtx.fillStyle = "rgba(173,146,255,.22)";
+        beliefCtx.fillRect(endpoint.x - 3, endpoint.y - 3, 6, 6);
+      });
+      const ball = worldPoint(beliefCanvas, state);
+      beliefCtx.beginPath(); beliefCtx.arc(ball.x, ball.y, 7, 0, Math.PI * 2);
+      beliefCtx.fillStyle = "#ff8b73"; beliefCtx.fill();
+      const left = worldPoint(beliefCanvas, {x: p.occluderLeft, y: 0});
+      const right = worldPoint(beliefCanvas, {x: p.occluderRight, y: 0});
+      beliefCtx.fillStyle = "rgba(95,108,116,.16)";
+      beliefCtx.fillRect(left.x, 0, right.x - left.x, beliefCanvas.height);
+    }
+
+    function operatorNames(p) {
+      const names = [];
+      if (p.wind) names.push("horizontal acceleration");
+      if (p.gravity) names.push("vertical acceleration");
+      if (p.damping) names.push("damping");
+      if (p.verticalWallEnabled) names.push("vertical wall");
+      if (p.horizontalWallEnabled) names.push("horizontal wall");
+      return names.length ? names.join(" · ") : "constant motion";
+    }
+
+    function updateOutputs() {
+      numericIds.forEach(id => {
+        const output = document.querySelector(`output[data-for="${id}"]`);
+        if (output) output.textContent = Number($(id).value).toFixed(2);
+      });
+      const p = params();
+      $("runState").textContent = playing ? "RUNNING" : "PAUSED";
+      $("visibilityState").textContent = isHidden(state, p) ? "HIDDEN — BELIEF ACTIVE" : "VISIBLE";
+      $("visibilityState").style.color = isHidden(state, p) ? "var(--violet)" : "var(--aqua)";
+      $("timeReadout").textContent = `${(stepCount * dt).toFixed(1)} s`;
+      $("stateReadout").textContent = `x ${state.x.toFixed(2)} · y ${state.y.toFixed(2)}`;
+      $("operatorReadout").textContent = operatorNames(p);
+      $("vectorReadout").textContent = `[${p.wind.toFixed(2)}, ${p.gravity.toFixed(2)}, ${p.damping.toFixed(2)}]`;
+      $("playPause").textContent = playing ? "Pause" : "Play";
+    }
+
+    function draw() { drawWorld(); drawBelief(); updateOutputs(); }
+
+    function simulationStep() {
+      state = advance(state, params());
+      trail.push(state);
+      stepCount += 1;
+      if (trail.length > 160) trail.shift();
+      if (stepCount > 110 || state.x < -.15 || state.x > 1.15 || state.y < -.15 || state.y > 1.15) resetSimulation();
+    }
+
+    function animate(timestamp) {
+      if (!previousTimestamp) previousTimestamp = timestamp;
+      const elapsed = Math.min((timestamp - previousTimestamp) / 1000, .1);
+      previousTimestamp = timestamp;
+      if (playing) {
+        accumulator += elapsed;
+        while (accumulator >= .055) { simulationStep(); accumulator -= .055; }
+      }
+      draw();
+      requestAnimationFrame(animate);
+    }
+
+    function applyPreset(name) {
+      const preset = presets[name];
+      for (const [id, value] of Object.entries(preset)) {
+        if (id.endsWith("Enabled")) $(id).checked = value; else $(id).value = value;
+      }
+      resetSimulation();
+    }
+
+    controlIds.forEach(id => $(id).addEventListener("input", () => {
+      $("preset").value = "constant";
+      resetSimulation();
+    }));
+    $("preset").addEventListener("change", event => applyPreset(event.target.value));
+    $("reset").addEventListener("click", resetSimulation);
+    $("playPause").addEventListener("click", () => { playing = !playing; updateOutputs(); });
+
+    applyPreset("constant");
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>

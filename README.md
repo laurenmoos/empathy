@@ -2,6 +2,10 @@
 
 A visually inspectable toy environment for experiments on second-order perceptual coherence. One ball moves under deliberately simple forces, becomes occluded, and produces exact reachable sets and belief superpositions for downstream models.
 
+## Interactive parameter explorer
+
+Open [`explorer.html`](explorer.html) directly in a browser. It is a self-contained interface with presets, sliders, play/pause, and reset controls for gravity, wind, damping, walls, the initial ball state, and occluder geometry. The observed world and the superposition of possible hidden paths update together; no server or command line is required.
+
 ## Install and run
 
 ```bash

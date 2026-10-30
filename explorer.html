@@ -75,6 +75,9 @@
     .mode-choice.active { border-color: var(--aqua); box-shadow: inset 0 0 0 1px var(--aqua); }
     .mode-choice.active span { color: #c5e1df; }
     .mode-context { min-height: 2.2em; margin: 0; color: var(--muted); font-size: .72rem; line-height: 1.35; }
+    .rollout-picker { padding: .7rem; border: 1px solid var(--line); border-radius: 10px; background: rgba(16, 27, 31, .72); }
+    .rollout-picker label { margin: 0; }
+    select { grid-column: 1 / -1; width: 100%; margin-top: .35rem; padding: .5rem; color: var(--ink); background: #18262a; border: 1px solid var(--line); border-radius: 8px; }
     [hidden] { display: none !important; }
     .model-view main { grid-template-columns: minmax(14rem, 16rem) 1fr; }
     .model-view .simulation-settings { display: none; }
@@ -93,6 +96,10 @@
     .model-two strong { display: block; font-size: .95rem; }
     .model-two small { display: block; margin: .85rem 0 .25rem; color: var(--muted); }
     .model-two b { font: 650 .9rem ui-monospace, monospace; }
+    .comparison { display: grid; gap: .45rem; margin-top: 1rem; }
+    .comparison-row { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: .5rem; align-items: center; padding: .5rem 0; border-top: 1px solid var(--line); font-size: .72rem; }
+    .comparison-row.heading { color: var(--muted); border-top: 0; padding-top: 0; }
+    .comparison-row span:not(:first-child) { font-family: ui-monospace, monospace; }
     .legend { display: flex; flex-wrap: wrap; gap: .8rem; margin-top: .8rem; color: var(--muted); font-size: .75rem; }
     .dot { display: inline-block; width: .65rem; height: .65rem; border-radius: 50%; margin-right: .3rem; }
     @media (max-width: 900px) {
@@ -125,11 +132,14 @@
                 <span>change forces and inspect the world</span>
               </button>
               <button class="mode-choice" id="runLearned">
-                <strong>Model view</strong>
-                <span>watch learned beliefs and the world guess</span>
+                <strong>Learned rollout</strong>
+                <span>watch truth, beliefs, and the world guess together</span>
               </button>
             </div>
             <p class="mode-context" id="modeContext">You’re peeking directly into the world. The controls change its forces.</p>
+            <div class="rollout-picker" id="rolloutPicker" hidden>
+              <label>Held-out rollout<select id="rolloutSelect"></select></label>
+            </div>
             <div class="playback">
               <button class="primary" id="runSimulation">Play simulation</button>
               <button id="reset">Reset</button>
@@ -160,9 +170,9 @@
 
     <section class="visuals">
       <figure id="truthPanel">
-        <figcaption><strong>Ground truth</strong></figcaption>
+        <figcaption><strong>Ground truth</strong><span id="truthPhase"></span></figcaption>
         <canvas id="worldCanvas" width="1200" height="525"></canvas>
-        <div class="legend">
+        <div class="legend" id="truthLegend">
           <span><i class="dot" style="background:var(--coral)"></i>ball</span>
           <span><i class="dot" style="background:var(--aqua)"></i>visible trajectory</span>
           <span><i class="dot" style="background:var(--yellow)"></i>wall</span>
@@ -181,8 +191,12 @@
       </figure>
       <section class="model-two" id="modelTwoPanel" aria-label="Model 2 output" hidden>
         <strong>Model 2 · Second-order perception</strong>
-        <small>World guess</small>
+        <small>World guess · evaluation with normalized parameters</small>
         <b id="operatorReadout">Forces on the ball: none</b>
+        <div class="comparison">
+          <div class="comparison-row heading"><span>Operator</span><span>Actual world</span><span>Model 2 guess</span></div>
+          <div id="comparisonRows"></div>
+        </div>
       </section>
     </section>
   </main>
@@ -206,6 +220,8 @@
     let stepCount = 0;
     let possiblePaths = [];
     let learnedMode = false;
+    let learnedRollouts = [];
+    let learnedIndex = 0;
     let learnedData = null;
     let learnedFrame = 0;
     let learnedAccumulator = 0;
@@ -454,11 +470,60 @@
       return names.length ? names.join(" · ") : "constant motion";
     }
 
+    const worldSlots = [
+      {name: "vertical force", activity: 0, parameters: [1]},
+      {name: "horizontal force", activity: 2, parameters: [3]},
+      {name: "damping", activity: 4, parameters: [5]},
+      {name: "right wall", activity: 6, parameters: [7, 8]},
+      {name: "floor", activity: 9, parameters: [10, 11]}
+    ];
+
+    function worldSlotValue(flat, slot) {
+      if (flat[slot.activity] < .5) return "off";
+      return slot.parameters.map(index => Number(flat[index]).toFixed(2)).join(" · ");
+    }
+
+    function renderWorldComparison(actual, predicted) {
+      $("comparisonRows").replaceChildren(...worldSlots.map(slot => {
+        const row = document.createElement("div");
+        row.className = "comparison-row";
+        [slot.name, worldSlotValue(actual, slot), worldSlotValue(predicted, slot)].forEach(value => {
+          const cell = document.createElement("span");
+          cell.textContent = value;
+          row.append(cell);
+        });
+        return row;
+      }));
+    }
+
+    function prepareLearnedRollout(rollout) {
+      return {
+        ...rollout,
+        frameBytes: decodeBytes(rollout.ground_truth.frames_base64),
+        preBelief: decodeBytes(rollout.model1.pre_belief_u8),
+        postBelief: decodeBytes(rollout.model1.post_belief_u8)
+      };
+    }
+
+    function selectLearnedRollout(index) {
+      learnedIndex = Number(index);
+      learnedData = learnedRollouts[learnedIndex];
+      learnedFrame = 0;
+      learnedAccumulator = 0;
+      renderWorldComparison(
+        learnedData.ground_truth.world_flat,
+        learnedData.model2.predicted_world_flat
+      );
+      draw();
+    }
+
     function setViewVisibility() {
       document.body.classList.toggle("model-view", learnedMode);
-      $("truthPanel").hidden = learnedMode;
+      $("truthPanel").hidden = false;
       $("modelOnePanel").hidden = !learnedMode;
       $("modelTwoPanel").hidden = !learnedMode;
+      $("rolloutPicker").hidden = !learnedMode;
+      $("truthLegend").hidden = learnedMode;
     }
 
     function updateOutputs() {
@@ -483,11 +548,12 @@
         );
         $("beliefPhase").textContent = learnedFrame < count / 2
           ? "pre-belief" : "post-belief after observation";
+        $("truthPhase").textContent = `held-out rollout ${learnedIndex + 1} of ${learnedRollouts.length}`;
         $("simulationMode").classList.remove("active");
         $("runLearned").classList.add("active");
         $("simulationMode").setAttribute("aria-pressed", "false");
         $("runLearned").setAttribute("aria-pressed", "true");
-        $("modeContext").textContent = "You’re watching the models: learned rollouts first, then a world guess.";
+        $("modeContext").textContent = "Ground truth, Model 1 beliefs, and Model 2’s guess now share one playhead.";
         $("runSimulation").textContent = learnedPlaying
           ? "Pause learned example" : "Play learned example";
         return;
@@ -496,6 +562,7 @@
       $("stateReadout").textContent = `${Math.round(state.x * 100)}% across · ${Math.round(state.y * 100)}% high`;
       $("operatorReadout").textContent = `Forces on the ball: ${forceSummary(p)}`;
       $("beliefPhase").textContent = "candidate hidden paths";
+      $("truthPhase").textContent = "interactive physics";
       $("simulationMode").classList.add("active");
       $("runLearned").classList.remove("active");
       $("simulationMode").setAttribute("aria-pressed", "true");
@@ -507,7 +574,7 @@
 
     function draw() {
       if (learnedMode && learnedData) {
-        drawLearnedBelief(); updateOutputs();
+        drawLearnedWorld(); drawLearnedBelief(); updateOutputs();
       } else {
         drawWorld(); updateOutputs();
       }
@@ -563,19 +630,24 @@
       setControlsDisabled(false); resetSimulation();
     });
     $("runLearned").addEventListener("click", async () => {
-      if (!learnedData) {
+      if (!learnedRollouts.length) {
         const payload = await fetch("learned-example.json").then(response => response.json());
-        learnedData = {
-          ...payload,
-          frameBytes: decodeBytes(payload.ground_truth.frames_base64),
-          preBelief: decodeBytes(payload.model1.pre_belief_u8),
-          postBelief: decodeBytes(payload.model1.post_belief_u8)
-        };
+        learnedRollouts = payload.rollouts.map(prepareLearnedRollout);
+        $("rolloutSelect").replaceChildren(...learnedRollouts.map((rollout, index) => {
+          const option = document.createElement("option");
+          option.value = String(index);
+          option.textContent = `Rollout ${index + 1} · ${rollout.example_id}`;
+          return option;
+        }));
+        selectLearnedRollout(0);
       }
       playing = false; learnedMode = true; learnedPlaying = true;
       learnedFrame = 0; learnedAccumulator = 0;
       setControlsDisabled(true);
       draw();
+    });
+    $("rolloutSelect").addEventListener("change", event => {
+      selectLearnedRollout(event.target.value);
     });
 
     resetSimulation();

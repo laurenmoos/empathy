@@ -54,7 +54,7 @@ def test_explorer_is_a_self_contained_parameter_interface() -> None:
     assert not parser.external_urls
     assert "requestAnimationFrame" in source
     assert "Play simulation" in source
-    assert "Model view" in source
+    assert "Learned rollout" in source
     assert 'fetch("learned-example.json")' in source
     assert "Start with an example" not in source
     assert 'id="preset"' not in source
@@ -101,6 +101,7 @@ def test_learned_example_connects_ground_truth_model1_and_model2() -> None:
 
     assert payload["schema_version"] == "learned-demo-v2"
     assert len(payload["rollouts"]) >= 2
+    assert len({tuple(rollout["ground_truth"]["world_flat"]) for rollout in payload["rollouts"]}) >= 2
     for rollout in payload["rollouts"]:
         assert rollout["ground_truth"]["frame_count"] > 1
         assert rollout["ground_truth"]["frames_base64"]
@@ -124,20 +125,36 @@ def test_view_selection_is_separate_from_playback() -> None:
     assert {"simulationMode", "runLearned", "runSimulation", "reset", "modeContext"} <= parser.ids
     assert "Simulation view" in source
     assert "change forces and inspect the world" in source
-    assert "Model view" in source
-    assert "watch learned beliefs and the world guess" in source
+    assert "Learned rollout" in source
+    assert "watch truth, beliefs, and the world guess together" in source
     assert "Play simulation" in source
 
 
-def test_each_view_only_shows_its_own_layer() -> None:
+def test_learned_view_shows_truth_beliefs_and_guess_on_one_timeline() -> None:
     source, parser = parsed_explorer()
 
-    assert {"truthPanel", "modelOnePanel", "modelTwoPanel"} <= parser.ids
-    assert '$("truthPanel").hidden = learnedMode;' in source
+    assert {
+        "truthPanel",
+        "modelOnePanel",
+        "modelTwoPanel",
+        "rolloutPicker",
+        "rolloutSelect",
+        "truthPhase",
+        "truthLegend",
+        "comparisonRows",
+    } <= parser.ids
+    assert '$("truthPanel").hidden = false;' in source
     assert '$("modelOnePanel").hidden = !learnedMode;' in source
     assert '$("modelTwoPanel").hidden = !learnedMode;' in source
-    assert "if (learnedMode && learnedData) {\n        drawLearnedBelief();" in source
+    assert '$("truthLegend").hidden = learnedMode;' in source
+    assert "drawLearnedWorld(); drawLearnedBelief();" in source
     assert "if (learnedMode && learnedData && learnedPlaying) {" in source
+    assert "payload.rollouts" in source
+    assert "selectLearnedRollout" in source
+    assert '$("rolloutSelect").addEventListener("change"' in source
+    assert "Actual world" in source
+    assert "Model 2 guess" in source
+    assert "normalized parameters" in source
 
 
 def test_model_view_renders_byte_beliefs_without_clipping() -> None:

@@ -104,7 +104,9 @@ def test_learned_example_connects_ground_truth_model1_and_model2() -> None:
     worlds = {tuple(rollout["ground_truth"]["world_flat"]) for rollout in payload["rollouts"]}
     assert len(worlds) >= 2
     for rollout in payload["rollouts"]:
-        assert rollout["ground_truth"]["frame_count"] > 1
+        truth = rollout["ground_truth"]
+        assert truth["frame_count"] > 1
+        assert 0 <= truth["reappearance_step"] < truth["frame_count"]
         assert rollout["ground_truth"]["frames_base64"]
         assert len(rollout["model1"]["pre_belief_u8"]) > 100
         assert len(rollout["model1"]["post_belief_u8"]) > 100
@@ -150,7 +152,11 @@ def test_learned_view_shows_truth_beliefs_and_guess_on_one_timeline() -> None:
     assert '$("truthLegend").hidden = learnedMode;' in source
     assert "drawLearnedWorld(); drawLearnedBelief();" in source
     assert "if (learnedMode && learnedData && learnedPlaying) {" in source
+    assert "learnedFrame >= learnedData.ground_truth.reappearance_step" in source
     assert "payload.rollouts" in source
+    assert "validateLearnedPayload" in source
+    assert "validateLearnedRollout" in source
+    assert "Couldn’t load learned rollouts" in source
     assert "selectLearnedRollout" in source
     assert '$("rolloutSelect").addEventListener("change"' in source
     assert "Actual world" in source

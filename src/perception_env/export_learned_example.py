@@ -33,6 +33,7 @@ def _rollout_payload(
 ) -> dict[str, object]:
     prediction_path = model1_run / "evaluation" / "records" / example_id / "arrays.npz"
     truth_path = model1_run / "data" / "records" / example_id / "arrays.npz"
+    metadata_path = truth_path.with_name("metadata.json")
     with np.load(prediction_path, allow_pickle=False) as archive:
         pre = archive["pre_belief"].astype(np.float32)
         post = archive["post_belief"].astype(np.float32)
@@ -41,6 +42,10 @@ def _rollout_payload(
     with np.load(truth_path, allow_pickle=False) as archive:
         frames = archive["frames"].astype(np.uint8)
         world_flat = archive["world_flat"].astype(float)
+    metadata = json.loads(metadata_path.read_text())
+    reappearance_step = int(metadata["reappearance_step"])
+    if not 0 <= reappearance_step < len(frames):
+        raise ValueError("reappearance step must index a ground-truth frame")
 
     event_stack = np.stack((pre, post, post - pre), axis=0)
     beliefs = np.repeat(event_stack[None, None], 4, axis=1)
@@ -56,6 +61,7 @@ def _rollout_payload(
             "width": int(frames.shape[2]),
             "height": int(frames.shape[1]),
             "frame_count": int(frames.shape[0]),
+            "reappearance_step": reappearance_step,
             "frames_base64": _encoded_u8(frames),
             "world_flat": world_flat.tolist(),
             "target_positions": target_positions[target_mask].tolist(),

@@ -432,8 +432,8 @@
 
     function drawLearnedBelief() {
       const model = learnedData.model1;
-      const values = learnedFrame < learnedData.ground_truth.frame_count / 2
-        ? learnedData.preBelief : learnedData.postBelief;
+      const postObservation = learnedFrame >= learnedData.ground_truth.reappearance_step;
+      const values = postObservation ? learnedData.postBelief : learnedData.preBelief;
       const image = beliefCtx.createImageData(model.width, model.height);
       values.forEach((value, index) => {
         const normalized = value / 255;
@@ -483,8 +483,8 @@
       return slot.parameters.map(index => Number(flat[index]).toFixed(2)).join(" · ");
     }
 
-    function renderWorldComparison(actual, predicted) {
-      $("comparisonRows").replaceChildren(...worldSlots.map(slot => {
+    function worldComparisonElements(actual, predicted) {
+      return worldSlots.map(slot => {
         const row = document.createElement("div");
         row.className = "comparison-row";
         [slot.name, worldSlotValue(actual, slot), worldSlotValue(predicted, slot)].forEach(value => {
@@ -493,27 +493,81 @@
           row.append(cell);
         });
         return row;
-      }));
+      });
     }
 
-    function prepareLearnedRollout(rollout) {
+    function validateWorldVector(value, name) {
+      if (!Array.isArray(value) || value.length !== 12 || !value.every(Number.isFinite)) {
+        throw new Error(`${name} must be a finite 12-value world vector`);
+      }
+    }
+
+    function validateLearnedRollout(rollout) {
+      if (!rollout || typeof rollout !== "object" || typeof rollout.example_id !== "string") {
+        throw new Error("rollout must have an example ID");
+      }
+      const truth = rollout.ground_truth;
+      const model1 = rollout.model1;
+      const model2 = rollout.model2;
+      if (!truth || !model1 || !model2) throw new Error("rollout is missing a required model stage");
+      const truthDimensions = [truth.width, truth.height, truth.frame_count];
+      if (!truthDimensions.every(value => Number.isInteger(value) && value > 0)) {
+        throw new Error("ground-truth dimensions must be positive integers");
+      }
+      if (!Number.isInteger(truth.reappearance_step)
+          || truth.reappearance_step < 0
+          || truth.reappearance_step >= truth.frame_count) {
+        throw new Error("reappearance step must index the ground-truth clip");
+      }
+      if (![model1.width, model1.height].every(value => Number.isInteger(value) && value > 0)) {
+        throw new Error("belief dimensions must be positive integers");
+      }
+      validateWorldVector(truth.world_flat, "actual world");
+      validateWorldVector(model2.predicted_world_flat, "predicted world");
+      for (const value of [truth.frames_base64, model1.pre_belief_u8, model1.post_belief_u8]) {
+        if (typeof value !== "string" || !value) throw new Error("rollout image data is missing");
+      }
+      const frameBytes = decodeBytes(truth.frames_base64);
+      const preBelief = decodeBytes(model1.pre_belief_u8);
+      const postBelief = decodeBytes(model1.post_belief_u8);
+      if (frameBytes.length !== truth.width * truth.height * truth.frame_count) {
+        throw new Error("ground-truth byte length does not match its dimensions");
+      }
+      if (preBelief.length !== model1.width * model1.height
+          || postBelief.length !== model1.width * model1.height) {
+        throw new Error("belief byte length does not match its dimensions");
+      }
       return {
         ...rollout,
-        frameBytes: decodeBytes(rollout.ground_truth.frames_base64),
-        preBelief: decodeBytes(rollout.model1.pre_belief_u8),
-        postBelief: decodeBytes(rollout.model1.post_belief_u8)
+        frameBytes,
+        preBelief,
+        postBelief
       };
     }
 
+    function validateLearnedPayload(payload) {
+      if (!payload || payload.schema_version !== "learned-demo-v2"
+          || !Array.isArray(payload.rollouts) || !payload.rollouts.length) {
+        throw new Error("learned rollout payload must use the nonempty v2 schema");
+      }
+      return payload.rollouts.map(validateLearnedRollout);
+    }
+
     function selectLearnedRollout(index) {
-      learnedIndex = Number(index);
-      learnedData = learnedRollouts[learnedIndex];
+      const candidateIndex = Number(index);
+      if (!Number.isInteger(candidateIndex) || !learnedRollouts[candidateIndex]) {
+        throw new Error("learned rollout selection is out of range");
+      }
+      const candidate = learnedRollouts[candidateIndex];
+      const comparison = worldComparisonElements(
+        candidate.ground_truth.world_flat,
+        candidate.model2.predicted_world_flat
+      );
+      learnedIndex = candidateIndex;
+      learnedData = candidate;
       learnedFrame = 0;
       learnedAccumulator = 0;
-      renderWorldComparison(
-        learnedData.ground_truth.world_flat,
-        learnedData.model2.predicted_world_flat
-      );
+      $("comparisonRows").replaceChildren(...comparison);
       draw();
     }
 
@@ -546,8 +600,8 @@
         $("operatorReadout").textContent = learnedWorldSummary(
           learnedData.model2.predicted_world_flat
         );
-        $("beliefPhase").textContent = learnedFrame < count / 2
-          ? "pre-belief" : "post-belief after observation";
+        $("beliefPhase").textContent = learnedFrame >= learnedData.ground_truth.reappearance_step
+          ? "post-belief after observation" : "pre-belief";
         $("truthPhase").textContent = `held-out rollout ${learnedIndex + 1} of ${learnedRollouts.length}`;
         $("simulationMode").classList.remove("active");
         $("runLearned").classList.add("active");
@@ -630,16 +684,26 @@
       setControlsDisabled(false); resetSimulation();
     });
     $("runLearned").addEventListener("click", async () => {
-      if (!learnedRollouts.length) {
-        const payload = await fetch("learned-example.json").then(response => response.json());
-        learnedRollouts = payload.rollouts.map(prepareLearnedRollout);
-        $("rolloutSelect").replaceChildren(...learnedRollouts.map((rollout, index) => {
-          const option = document.createElement("option");
-          option.value = String(index);
-          option.textContent = `Rollout ${index + 1} · ${rollout.example_id}`;
-          return option;
-        }));
-        selectLearnedRollout(0);
+      try {
+        if (!learnedRollouts.length) {
+          const response = await fetch("learned-example.json");
+          if (!response.ok) throw new Error(`learned rollout request failed: ${response.status}`);
+          const payload = await response.json();
+          const prepared = validateLearnedPayload(payload);
+          const options = prepared.map((rollout, index) => {
+            const option = document.createElement("option");
+            option.value = String(index);
+            option.textContent = `Rollout ${index + 1} · ${rollout.example_id}`;
+            return option;
+          });
+          learnedRollouts = prepared;
+          $("rolloutSelect").replaceChildren(...options);
+          selectLearnedRollout(0);
+        }
+      } catch (error) {
+        learnedPlaying = false;
+        $("modeContext").textContent = "Couldn’t load learned rollouts. Open the demo from the local server and try again.";
+        return;
       }
       playing = false; learnedMode = true; learnedPlaying = true;
       learnedFrame = 0; learnedAccumulator = 0;
@@ -647,7 +711,12 @@
       draw();
     });
     $("rolloutSelect").addEventListener("change", event => {
-      selectLearnedRollout(event.target.value);
+      try {
+        selectLearnedRollout(event.target.value);
+      } catch (error) {
+        event.target.value = String(learnedIndex);
+        $("modeContext").textContent = "Couldn’t select that rollout; the previous valid rollout is still shown.";
+      }
     });
 
     resetSimulation();

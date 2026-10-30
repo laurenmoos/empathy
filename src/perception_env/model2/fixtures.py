@@ -121,6 +121,7 @@ def build_fixture_event(
         raise ValueError("empty_oracle_posterior")
     pre = superpose(pre_paths, np.ones(len(pre_paths)), render)
     post = superpose(post_paths, np.ones(len(post_paths)), render)
+    reappearance_state = trajectory.states[observed.step]
     provenance = {
         "ordinal": ordinal,
         "context_id": context,
@@ -136,6 +137,12 @@ def build_fixture_event(
         "reappearance_step": observed.step,
         "reappearance_visible": bool(sequence.visible[observed.step]),
         "reappearance": [observed.x, observed.y],
+        "reappearance_state": [
+            reappearance_state.x,
+            reappearance_state.y,
+            reappearance_state.vx,
+            reappearance_state.vy,
+        ],
         "source": "oracle" if true_world == prior_world else "perturbed_prior_oracle_post",
     }
     return BeliefEvent(ordinal, pre, post), provenance
@@ -353,6 +360,21 @@ def generate_fixtures(config: FixtureConfig, output: Path) -> FixtureManifest:
         }
         for row in rows
     ]
+    privileged = {
+        "features": np.asarray(
+            [
+                [
+                    event["entry_state"]
+                    + event["reappearance_state"]
+                    + [event["query_step"] * config.dt]
+                    for event in row["events"]
+                ]
+                for row in rows
+            ],
+            dtype=np.float32,
+        ),
+        "history_mask": np.stack([h.mask for h in histories]),
+    }
     manifest = save_dataset(
         output,
         BeliefInputs(
@@ -368,10 +390,12 @@ def generate_fixtures(config: FixtureConfig, output: Path) -> FixtureManifest:
             "rejection_counts": dict(rejections),
             "world_attempts": attempts,
             "source": "privileged_oracle_bootstrap",
+            "privileged_features_hash": array_hash(privileged),
             "evaluation_hash": array_hash(evaluation_arrays),
             "evaluation_metadata_hash": hashlib.sha256(eval_json.encode()).hexdigest(),
         },
     )
+    np.savez_compressed(output / "privileged_features.npz", **privileged)
     np.savez_compressed(output / "evaluation.npz", **evaluation_arrays)
     (output / "evaluation.json").write_text(eval_json)
     return FixtureManifest(output, manifest["dataset_hash"], len(accepted), dict(rejections))

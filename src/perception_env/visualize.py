@@ -349,3 +349,45 @@ def render_belief_panel(
         "query_step": result.query_steps[-1],
     }
     return _save_visual(fig, Path(path), metadata)
+
+
+def render_dataset_contact_sheet(
+    records: list["BenchmarkRecord"], schema: WorldSchema, path: Path
+) -> VisualArtifact:
+    from .records import BenchmarkRecord
+
+    if not records or not all(isinstance(record, BenchmarkRecord) for record in records):
+        raise ValueError("records must be a nonempty list of BenchmarkRecord instances")
+    fig, axes = plt.subplots(len(records), 3, figsize=(10.5, 3.1 * len(records)), squeeze=False)
+    for row, record in enumerate(records):
+        world = record.world(schema)
+        active = [slot.name for slot in world.slots if slot.active]
+        axes[row, 0].axis("off")
+        axes[row, 0].set_title("World code", loc="left")
+        axes[row, 0].text(
+            0.0,
+            0.95,
+            f"{record.family_level} · seed {record.seed}\n"
+            + ("\n".join(active) if active else "constant motion"),
+            va="top",
+            family="monospace",
+        )
+        sequence = record.sequence()
+        middle = len(sequence.frames) // 2
+        axes[row, 1].imshow(sequence.frames[middle], cmap="gray", vmin=0, vmax=255)
+        axes[row, 1].set_title(f"Observed frame · t={middle}")
+        axes[row, 2].imshow(record.arrays["pre_belief"], cmap="magma", vmin=0, vmax=1)
+        axes[row, 2].set_title("Pre belief")
+        for column in (1, 2):
+            axes[row, column].set_xticks([])
+            axes[row, column].set_yticks([])
+    fig.suptitle("Reloaded benchmark records", weight="bold")
+    fig.tight_layout()
+    metadata: dict[str, Any] = {
+        "kind": "dataset_contact_sheet",
+        "source": "reloaded_records",
+        "record_ids": [record.record_id for record in records],
+        "family_levels": [record.family_level for record in records],
+        "panels_per_record": ["world code", "observed frame", "pre belief"],
+    }
+    return _save_visual(fig, Path(path), metadata)

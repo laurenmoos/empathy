@@ -1,0 +1,30 @@
+schema_version: v1
+family_version: v1
+invalid_rollout_policy: terminate_and_reject
+entry_uncertainty:
+  x_bounds: [0.18, 0.22]
+  y_bounds: [0.48, 0.52]
+  vx_bounds: [0.18, 0.22]
+  vy_bounds: [-0.02, 0.02]
+  resolution: [3, 3, 3, 3]
+operators:
+  vertical_acceleration:
+    a_y: {range: [-1.0, 1.0], neutral_interval: [-0.05, 0.05]}
+  horizontal_acceleration:
+    a_x: {range: [-1.0, 1.0], neutral_interval: [-0.05, 0.05]}
+  damping:
+    lambda: {range: [0.02, 1.0]}
+  vertical_wall:
+    position: {range: [0.25, 0.9]}
+    restitution: {range: [0.2, 1.0]}
+  horizontal_wall:
+    position: {range: [0.1, 0.75]}
+    restitution: {range: [0.2, 1.0]}
+levels:
+  W0: {allowed: [], max_active: 0, max_walls: 0}
+  W1: {allowed: [vertical_acceleration], max_active: 1, max_walls: 0}
+  W2: {allowed: [vertical_acceleration, horizontal_acceleration], max_active: 1, max_walls: 0}
+  W3: {allowed: [vertical_acceleration, horizontal_acceleration, damping], max_active: 2, max_walls: 0}
+  W4: {allowed: [vertical_acceleration, horizontal_acceleration, damping, vertical_wall, horizontal_wall], max_active: 3, max_walls: 1}
+  W5: {allowed: [vertical_acceleration, horizontal_acceleration, damping, vertical_wall, horizontal_wall], max_active: 5, max_walls: 2}
+

@@ -9,7 +9,7 @@ Open [`explorer.html`](explorer.html) directly in a browser. It is a self-contai
 ## Install and run
 
 ```bash
-uv sync --extra dev
+uv sync --extra dev --extra ml
 .venv/bin/perception-env demo \
   --config configs/world_families/v1.yaml \
   --seed 7 \
@@ -24,6 +24,39 @@ The other commands are:
 - `inspect`: regenerate a contact sheet from saved records without rerunning simulation;
 - `estimate-shattering`: rerun the search from a demo's saved label matrix;
 - `demo`: produce the complete benchmark and visual index.
+
+## Learned models
+
+The repository now contains two real PyTorch models rather than only visual stand-ins.
+Model 1 encodes an occlusion clip with a small CNN/GRU and predicts eight weighted hidden
+trajectories, which are differentiably rasterized into a belief superposition. Model 2 is a
+separate CNN whose production input is limited to four pre/post/difference belief events and a
+history mask; it predicts operator activity and normalized parameters.
+
+Run small CPU demonstrations with:
+
+```bash
+.venv/bin/perception-env model1 demo \
+  --config configs/model1/v1.yaml \
+  --family-config configs/world_families/v1.yaml \
+  --seed 7 --device cpu --quick \
+  --output artifacts/model1-learned-demo
+
+.venv/bin/perception-env model2 demo \
+  --config configs/model2/smoke_v1.yaml \
+  --seed 7 \
+  --output artifacts/model2-learned-demo
+
+.venv/bin/perception-env stream-demo \
+  --seed 7 --events 4 \
+  --output artifacts/streaming-demo
+```
+
+The first two commands train and evaluate the actual learned models. The quick streaming command
+exercises the production belief-only feedback and persistence contracts with deterministic fixture
+runtimes; adapters and checkpoints for the learned models are available, but a trained-checkpoint
+streaming command remains the next integration step. The smoke Model 2 run is a systems check, not
+a successful research result: its possibility agreement does not yet beat the constant baseline.
 
 ## World code
 

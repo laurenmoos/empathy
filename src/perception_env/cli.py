@@ -522,12 +522,30 @@ def _parser() -> argparse.ArgumentParser:
     demo.add_argument("--output", required=True)
     demo.add_argument("--quick", action="store_true")
     demo.add_argument("--force", action="store_true")
+
+    subparsers.add_parser("model1", help="train and inspect the trajectory-belief model")
+    subparsers.add_parser("model2", help="train and inspect the inverse-world model")
+
+    stream = subparsers.add_parser("stream-demo", help="render continual belief revision")
+    stream.add_argument("--seed", type=int, default=7)
+    stream.add_argument("--events", type=int, default=4)
+    stream.add_argument("--output", required=True)
+    stream.add_argument("--force", action="store_true")
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == "model1":
+        from .model1.cli import main as model1_main
+
+        return model1_main(arguments[1:])
+    if arguments and arguments[0] == "model2":
+        from .model2.cli import main as model2_main
+
+        return model2_main(arguments[1:])
     parser = _parser()
-    args = parser.parse_args(argv)
+    args = parser.parse_args(arguments)
     try:
         if args.command == "sample":
             sample_run(
@@ -550,6 +568,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                 force=args.force,
                 quick=args.quick,
             )
+        elif args.command == "stream-demo":
+            from .streaming_demo import run_quick_streaming_demo
+
+            output = Path(args.output)
+            if output.exists() and args.force:
+                if output.resolve() in {Path.cwd().resolve(), Path("/").resolve()}:
+                    raise ValueError("refusing to replace a broad output directory")
+                shutil.rmtree(output)
+            run_quick_streaming_demo(output, seed=args.seed, event_count=args.events)
     except (FileNotFoundError, FileExistsError, ValueError, KeyError) as error:
         print(f"perception-env: {error}", file=sys.stderr)
         return 2

@@ -6,6 +6,7 @@ import base64
 import hashlib
 import json
 from pathlib import Path
+from typing import Sequence
 
 import numpy as np
 import torch
@@ -24,19 +25,14 @@ def _hash(path: Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def export_learned_example(
+def _rollout_payload(
     model1_run: Path,
-    model2_run: Path,
-    output: Path,
-    *,
-    example_id: str = "test-000000",
-) -> Path:
-    """Connect saved Model 1 beliefs to the trained Model 2 checkpoint."""
-    model1_run = Path(model1_run)
-    model2_run = Path(model2_run)
+    checkpoint: Path,
+    model: torch.nn.Module,
+    example_id: str,
+) -> dict[str, object]:
     prediction_path = model1_run / "evaluation" / "records" / example_id / "arrays.npz"
     truth_path = model1_run / "data" / "records" / example_id / "arrays.npz"
-    checkpoint = model2_run / "training" / "best.pt"
     with np.load(prediction_path, allow_pickle=False) as archive:
         pre = archive["pre_belief"].astype(np.float32)
         post = archive["post_belief"].astype(np.float32)
@@ -49,14 +45,12 @@ def export_learned_example(
     event_stack = np.stack((pre, post, post - pre), axis=0)
     beliefs = np.repeat(event_stack[None, None], 4, axis=1)
     inputs = BeliefInputs(beliefs, np.ones((1, 4), dtype=bool))
-    model = load_model(checkpoint)
     model_prediction = predict(model, inputs)
     decoded = decode_prediction(model_prediction, WorldSchema.v1())
     probabilities = torch.sigmoid(model_prediction.activity_logits)[0].numpy()
     parameters = model_prediction.normalized_parameters[0].numpy()
 
-    payload = {
-        "schema_version": "learned-demo-v1",
+    return {
         "example_id": example_id,
         "ground_truth": {
             "width": int(frames.shape[2]),
@@ -86,6 +80,47 @@ def export_learned_example(
                 "in this compact example."
             ),
         },
+    }
+
+
+def export_learned_examples(
+    model1_run: Path,
+    model2_run: Path,
+    output: Path,
+    example_ids: Sequence[str],
+) -> Path:
+    """Export an ordered bank of held-out learned rollouts."""
+    if not example_ids:
+        raise ValueError("at least one example ID is required")
+    model1_run = Path(model1_run)
+    checkpoint = Path(model2_run) / "training" / "best.pt"
+    model = load_model(checkpoint)
+    payload = {
+        "schema_version": "learned-demo-v2",
+        "rollouts": [
+            _rollout_payload(model1_run, checkpoint, model, example_id)
+            for example_id in example_ids
+        ],
+    }
+    output = Path(output)
+    output.write_text(json.dumps(payload, separators=(",", ":")))
+    return output
+
+
+def export_learned_example(
+    model1_run: Path,
+    model2_run: Path,
+    output: Path,
+    *,
+    example_id: str = "test-000000",
+) -> Path:
+    """Export one rollout in the original v1 envelope."""
+    model1_run = Path(model1_run)
+    checkpoint = Path(model2_run) / "training" / "best.pt"
+    model = load_model(checkpoint)
+    payload = {
+        "schema_version": "learned-demo-v1",
+        **_rollout_payload(model1_run, checkpoint, model, example_id),
     }
     output = Path(output)
     output.write_text(json.dumps(payload, separators=(",", ":")))

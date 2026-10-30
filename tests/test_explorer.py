@@ -99,13 +99,15 @@ def test_explorer_is_a_self_contained_parameter_interface() -> None:
 def test_learned_example_connects_ground_truth_model1_and_model2() -> None:
     payload = json.loads(LEARNED_EXAMPLE.read_text())
 
-    assert payload["schema_version"] == "learned-demo-v1"
-    assert payload["ground_truth"]["frame_count"] > 1
-    assert payload["ground_truth"]["frames_base64"]
-    assert len(payload["model1"]["pre_belief_u8"]) > 100
-    assert len(payload["model1"]["post_belief_u8"]) > 100
-    assert len(payload["model2"]["predicted_world_flat"]) == 12
-    assert len(payload["ground_truth"]["world_flat"]) == 12
+    assert payload["schema_version"] == "learned-demo-v2"
+    assert len(payload["rollouts"]) >= 2
+    for rollout in payload["rollouts"]:
+        assert rollout["ground_truth"]["frame_count"] > 1
+        assert rollout["ground_truth"]["frames_base64"]
+        assert len(rollout["model1"]["pre_belief_u8"]) > 100
+        assert len(rollout["model1"]["post_belief_u8"]) > 100
+        assert len(rollout["model2"]["predicted_world_flat"]) == 12
+        assert len(rollout["ground_truth"]["world_flat"]) == 12
 
 
 def test_learned_square_frames_preserve_their_aspect_ratio() -> None:

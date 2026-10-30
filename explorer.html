@@ -27,17 +27,14 @@
     header {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-start;
       gap: 2rem;
       padding: 1rem 1.4rem;
       border-bottom: 1px solid var(--line);
     }
     h1 { margin: 0; font-size: 1.35rem; letter-spacing: -0.03em; }
-    .status { text-align: right; font: 600 .72rem/1 ui-monospace, monospace; color: var(--aqua); }
-    .status span + span::before { content: " · "; color: var(--muted); }
     main { display: grid; grid-template-columns: minmax(16rem, 19rem) 1fr; min-height: calc(100vh - 3.8rem); }
     aside { padding: 1rem; border-right: 1px solid var(--line); background: rgba(4, 11, 13, .35); }
-    .section-title { padding: 0 .25rem .55rem; color: var(--muted); font-size: .68rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
     .controls { display: grid; gap: 0; }
     .card {
       padding: .85rem .25rem 1rem;
@@ -103,11 +100,9 @@
 <body>
   <header>
     <h1>Perception environment</h1>
-    <div class="status"><span id="runState">READY</span><span id="visibilityState">VISIBLE</span></div>
   </header>
   <main>
     <aside>
-      <div class="section-title">Parameters</div>
       <div class="controls">
         <section class="card run-card">
           <div class="actions">
@@ -263,10 +258,6 @@
       draw();
     }
 
-    function isHidden(s, p) {
-      return s.x >= p.occluderLeft && s.x <= p.occluderRight && s.y >= 0.08 && s.y <= 0.92;
-    }
-
     function worldPoint(canvas, s) {
       const pad = canvas.width * 0.04;
       return {x: pad + s.x * (canvas.width - 2 * pad), y: pad + (1 - s.y) * (canvas.height - 2 * pad)};
@@ -380,9 +371,6 @@
         output.textContent = value.toFixed(2) + suffix;
       });
       const p = params();
-      $("runState").textContent = playing ? "RUNNING" : stepCount === 0 ? "READY" : "PAUSED";
-      $("visibilityState").textContent = isHidden(state, p) ? "HIDDEN — BELIEF ACTIVE" : "VISIBLE";
-      $("visibilityState").style.color = isHidden(state, p) ? "var(--violet)" : "var(--aqua)";
       $("timeReadout").textContent = `${(stepCount * dt).toFixed(1)} s`;
       $("stateReadout").textContent = `x ${state.x.toFixed(2)} · y ${state.y.toFixed(2)}`;
       $("operatorReadout").textContent = operatorNames(p);

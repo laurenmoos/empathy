@@ -460,3 +460,80 @@ def render_shattering_matrix(
         "metric_name": estimate.metric_name,
     }
     return _save_visual(fig, Path(path), metadata)
+
+
+def render_equivalence_gallery(
+    report: "IdentifiabilityReport", path: Path
+) -> VisualArtifact:
+    from .identifiability import IdentifiabilityReport
+
+    if not isinstance(report, IdentifiabilityReport):
+        raise TypeError("report must be an IdentifiabilityReport")
+    rows = len(report.worlds)
+    fig, axes = plt.subplots(rows, 2, figsize=(8.5, max(2.4 * rows, 3.5)), squeeze=False)
+    class_by_world = {
+        index: equivalence_class
+        for equivalence_class in report.classes
+        for index in equivalence_class.world_indices
+    }
+    schema = WorldSchema.v1()
+    for row, world in enumerate(report.worlds):
+        equivalence_class = class_by_world[row]
+        code_ax, raster_ax = axes[row]
+        code_ax.axis("off")
+        active_lines: list[str] = []
+        for spec, slot in zip(schema.specs, world.slots):
+            if slot.active:
+                parameters = slot.parameter_dict(spec)
+                active_lines.append(
+                    f"{slot.name}: "
+                    + ", ".join(f"{name}={value:.3f}" for name, value in parameters.items())
+                )
+        code_ax.set_title(
+            f"World {row} · {equivalence_class.status}",
+            loc="left",
+            color="#2d8c5a" if equivalence_class.status == "identifiable" else "#b46b22",
+        )
+        code_ax.text(
+            0.0,
+            0.88,
+            "\n".join(active_lines) if active_lines else "constant motion",
+            va="top",
+            family="monospace",
+            fontsize=9,
+        )
+        code_ax.text(
+            0.0,
+            0.18,
+            f"labels: {list(equivalence_class.label_pattern)}\n"
+            f"equivalent worlds: {list(equivalence_class.world_indices)}",
+            va="top",
+            fontsize=8,
+        )
+        if report.possibility_rasters is None:
+            raster_ax.imshow(np.zeros((8, 8)), cmap="gray", vmin=0, vmax=1)
+            raster_ax.text(3.5, 3.5, "no raster", ha="center", va="center", color="white")
+        else:
+            raster_ax.imshow(report.possibility_rasters[row], cmap="magma", vmin=0, vmax=1)
+        raster_ax.set_title("Possibility raster")
+        raster_ax.set_xticks([])
+        raster_ax.set_yticks([])
+    fig.suptitle("Perceptually equivalent worlds", weight="bold")
+    fig.tight_layout()
+    metadata: dict[str, Any] = {
+        "kind": "equivalence_gallery",
+        "panels": ["world code", "possibility raster"],
+        "class_sizes": [len(item.world_indices) for item in report.classes],
+        "statuses": [item.status for item in report.classes],
+        "held_out_label_agreement": all(
+            len(
+                {
+                    tuple(report.labels.values[index].tolist())
+                    for index in item.world_indices
+                }
+            )
+            == 1
+            for item in report.classes
+        ),
+    }
+    return _save_visual(fig, Path(path), metadata)

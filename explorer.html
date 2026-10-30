@@ -135,8 +135,8 @@
       <h2>Set the world</h2>
       <p class="intro">Choose the forces, then let the two models infer this world from the occluded rollout.</p>
       <label class="control">
-        <span class="control-line"><span>Gravity · down ↔ up</span><output id="gravityValue">−0.10</output></span>
-        <input id="gravity" type="range" min="-0.30" max="0.30" step="0.05" value="-0.10">
+        <span class="control-line"><span>Gravity · down ↔ up</span><output id="gravityValue">−0.06</output></span>
+        <input id="gravity" type="range" min="-0.30" max="0.30" step="0.02" value="-0.06">
       </label>
       <label class="control">
         <span class="control-line"><span>Wind · left ↔ right</span><output id="windValue">0.00</output></span>
@@ -328,7 +328,10 @@
     }
 
     function drawLearnedWorld() {
-      if (!learnedData) return;
+      if (!learnedData) {
+        clearWorldCanvas();
+        return;
+      }
       const truth = learnedData.ground_truth;
       const frameSize = truth.width * truth.height;
       const offset = learnedFrame * frameSize;
@@ -343,6 +346,13 @@
       worldCtx.imageSmoothingQuality = "high";
       worldCtx.drawImage(buffer, left, top, side, side);
       drawBeliefOverlay(left, top, side);
+    }
+
+    function clearWorldCanvas() {
+      worldCtx.fillStyle = "#05090b";
+      worldCtx.fillRect(0, 0, worldCanvas.width, worldCanvas.height);
+      $("truthPhase").textContent = "waiting for a run";
+      $("timeReadout").textContent = "—";
     }
 
     function updateOutputs() {
@@ -394,11 +404,12 @@
       const serial = ++requestSerial;
       const parameters = selectedParameters();
       playing = false;
+      learnedData = null;
       statusOverride = "Running the simulation, Model 1, and Model 2…";
       $("runInference").disabled = true;
       $("operatorReadout").textContent = "Guessing…";
       $("comparisonRows").replaceChildren();
-      updateOutputs();
+      draw();
       try {
         const response = await fetch("/api/infer", {
           method: "POST",
@@ -457,12 +468,15 @@
     }
     ["gravity", "wind", "damping"].forEach(id => {
       $(id).addEventListener("input", () => {
+        requestSerial += 1;
         showControlValue(id);
         playing = false;
+        learnedData = null;
         statusOverride = "Parameters changed. Run again to update the beliefs and guess.";
         $("operatorReadout").textContent = "Run to update";
         $("comparisonRows").replaceChildren();
-        updateOutputs();
+        $("runInference").disabled = false;
+        draw();
       });
       showControlValue(id);
     });

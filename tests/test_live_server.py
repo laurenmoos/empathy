@@ -1,13 +1,11 @@
 import json
-import threading
+from http import HTTPStatus
 from pathlib import Path
-from urllib.error import HTTPError
-from urllib.request import Request, urlopen
 
 import pytest
 
 from perception_env.live_inference import LiveInferenceError
-from perception_env.live_server import create_server
+from perception_env.live_server import create_server, process_inference_request
 
 
 class FakeResult:
@@ -26,40 +24,13 @@ class FakeEngine:
         return FakeResult()
 
 
-@pytest.fixture
-def running_server(tmp_path: Path):
-    (tmp_path / "explorer.html").write_text("<h1>demo</h1>")
+def test_inference_request_runs_injected_engine_without_a_socket() -> None:
     engine = FakeEngine()
-    server = create_server("127.0.0.1", 0, tmp_path, engine)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        yield f"http://127.0.0.1:{server.server_port}", engine
-    finally:
-        server.shutdown()
-        thread.join(timeout=2)
-        server.server_close()
-
-
-def _post(url: str, payload: bytes):
-    request = Request(
-        f"{url}/api/infer",
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    return urlopen(request)
-
-
-def test_serves_demo_and_runs_injected_engine(running_server) -> None:
-    url, engine = running_server
-
-    with urlopen(f"{url}/") as response:
-        assert response.read() == b"<h1>demo</h1>"
     body = json.dumps({"gravity": -0.1, "wind": 0.2, "damping": 0.3}).encode()
-    with _post(url, body) as response:
-        payload = json.load(response)
 
+    status, payload = process_inference_request(engine, body)
+
+    assert status is HTTPStatus.OK
     assert payload == {"schema_version": "live-inference-v1", "ok": True}
     assert engine.calls[0].gravity == pytest.approx(-0.1)
     assert engine.calls[0].wind == pytest.approx(0.2)
@@ -69,21 +40,27 @@ def test_serves_demo_and_runs_injected_engine(running_server) -> None:
 @pytest.mark.parametrize(
     ("body", "status", "message"),
     [
-        (b"not json", 400, "valid JSON"),
-        (json.dumps({"gravity": 0, "wind": 0}).encode(), 400, "damping"),
+        (b"not json", HTTPStatus.BAD_REQUEST, "valid JSON"),
+        (json.dumps({"gravity": 0, "wind": 0}).encode(), HTTPStatus.BAD_REQUEST, "damping"),
         (
             json.dumps({"gravity": 0, "wind": -1, "damping": 0}).encode(),
-            422,
+            HTTPStatus.UNPROCESSABLE_ENTITY,
             "reappearance",
+        ),
+        (
+            json.dumps({"gravity": True, "wind": 0, "damping": 0}).encode(),
+            HTTPStatus.UNPROCESSABLE_ENTITY,
+            "booleans",
         ),
     ],
 )
-def test_inference_errors_are_actionable(running_server, body, status, message) -> None:
-    url, _ = running_server
+def test_inference_errors_are_actionable(body, status, message) -> None:
+    returned_status, payload = process_inference_request(FakeEngine(), body)
 
-    with pytest.raises(HTTPError) as caught:
-        _post(url, body)
-
-    assert caught.value.code == status
-    payload = json.loads(caught.value.read())
+    assert returned_status is status
     assert message in payload["error"]
+
+
+def test_server_validates_demo_root_before_binding(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError, match="explorer.html"):
+        create_server("127.0.0.1", 0, tmp_path, FakeEngine())

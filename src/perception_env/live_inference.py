@@ -17,6 +17,7 @@ from .model1.config import Model1Config
 from .model1.data import Model1ExampleRecord, collate_model1
 from .model1.rasterize import rasterize_mixture
 from .model1.train import load_checkpoint
+from .model2.adapters import Model1BeliefPacket, adapt_model1_events
 from .model2.contracts import BeliefInputs, WorldPrediction
 from .model2.decode import decode_prediction
 from .model2.train import load_model as load_model2
@@ -38,6 +39,12 @@ class LiveParameters:
 
     def __post_init__(self) -> None:
         values = (self.gravity, self.wind, self.damping)
+        if any(
+            isinstance(value, (bool, np.bool_))
+            or not isinstance(value, (int, float, np.integer, np.floating))
+            for value in values
+        ):
+            raise ValueError("live parameters must be numbers, not booleans")
         if not all(np.isfinite(value) for value in values):
             raise ValueError("live parameters must be finite")
         if not -1.0 <= self.gravity <= 1.0 or not -1.0 <= self.wind <= 1.0:
@@ -144,6 +151,10 @@ class LiveInferenceEngine:
         world = world_from_parameters(parameters)
         simulation = SimulationConfig(dt=0.1, steps=40, seed=0)
         trajectory = rollout(BallState(0.1, 0.5, 0.18, 0.0), world, simulation)
+        if not trajectory.valid:
+            raise LiveInferenceError(
+                f"world trajectory is invalid: {trajectory.termination_reason.value}"
+            )
         dataset = self.model1_config.dataset
         render_config = RenderConfig(
             width=dataset.frame_size,
@@ -201,9 +212,16 @@ class LiveInferenceEngine:
             ).collapsed[0]
             pre_array = pre.cpu().numpy().astype(np.float32)
             post_array = post.cpu().numpy().astype(np.float32)
-            event = np.stack((pre_array, post_array, post_array - pre_array), axis=0)
-            beliefs = np.repeat(event[None, None], 4, axis=1)
-            inputs = BeliefInputs(beliefs, np.ones((1, 4), dtype=bool))
+            inputs: BeliefInputs = adapt_model1_events(
+                [
+                    Model1BeliefPacket(
+                        episode_id="live",
+                        event_ordinal=record.reappearance_step,
+                        pre_belief=pre_array,
+                        post_belief=post_array,
+                    )
+                ]
+            )
             prediction = self.model2_predict(inputs)
             guessed = decode_prediction(prediction, WorldSchema.v1()).flat[0].astype(np.float32)
         return LiveInferenceResult(

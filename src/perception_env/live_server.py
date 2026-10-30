@@ -12,6 +12,26 @@ from typing import Any
 from .live_inference import LiveInferenceEngine, LiveInferenceError, LiveParameters
 
 
+def process_inference_request(
+    engine: LiveInferenceEngine, body: bytes
+) -> tuple[HTTPStatus, dict[str, Any]]:
+    """Validate one JSON request and return its HTTP status and response payload."""
+    try:
+        payload = json.loads(body)
+    except (ValueError, UnicodeDecodeError):
+        return HTTPStatus.BAD_REQUEST, {"error": "request body must be valid JSON"}
+    required = {"gravity", "wind", "damping"}
+    if not isinstance(payload, dict) or set(payload) != required:
+        names = ", ".join(sorted(required))
+        return HTTPStatus.BAD_REQUEST, {"error": f"request must contain exactly: {names}"}
+    try:
+        parameters = LiveParameters(**payload)
+        result = engine.infer(parameters)
+    except (LiveInferenceError, TypeError, ValueError) as error:
+        return HTTPStatus.UNPROCESSABLE_ENTITY, {"error": str(error)}
+    return HTTPStatus.OK, result.to_payload()
+
+
 class _LiveDemoHandler(SimpleHTTPRequestHandler):
     engine: LiveInferenceEngine
 
@@ -30,25 +50,11 @@ class _LiveDemoHandler(SimpleHTTPRequestHandler):
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            payload = json.loads(self.rfile.read(length))
-        except (ValueError, UnicodeDecodeError):
-            self._json(HTTPStatus.BAD_REQUEST, {"error": "request body must be valid JSON"})
+        except ValueError:
+            self._json(HTTPStatus.BAD_REQUEST, {"error": "Content-Length must be an integer"})
             return
-        required = {"gravity", "wind", "damping"}
-        if not isinstance(payload, dict) or set(payload) != required:
-            names = ", ".join(sorted(required))
-            self._json(
-                HTTPStatus.BAD_REQUEST,
-                {"error": f"request must contain exactly: {names}"},
-            )
-            return
-        try:
-            parameters = LiveParameters(**payload)
-            result = self.engine.infer(parameters)
-        except (LiveInferenceError, TypeError, ValueError) as error:
-            self._json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": str(error)})
-            return
-        self._json(HTTPStatus.OK, result.to_payload())
+        status, payload = process_inference_request(self.engine, self.rfile.read(length))
+        self._json(status, payload)
 
     def do_GET(self) -> None:  # noqa: N802
         if self.path == "/":

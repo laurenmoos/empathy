@@ -600,7 +600,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 model1_checkpoint=Path(args.model1_checkpoint),
                 model2_checkpoint=Path(args.model2_checkpoint),
             )
-    except (FileNotFoundError, FileExistsError, ValueError, KeyError) as error:
+    except (OSError, ValueError, KeyError) as error:
         print(f"perception-env: {error}", file=sys.stderr)
         return 2
     return 0

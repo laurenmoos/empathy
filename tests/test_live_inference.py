@@ -44,6 +44,11 @@ def test_world_from_parameters_canonicalizes_neutral_values() -> None:
     assert np.allclose(world.to_flat(schema)[:6], [1, 0.3, 0, 0, 0, 0])
 
 
+def test_live_parameters_reject_boolean_values() -> None:
+    with pytest.raises(ValueError, match="numbers"):
+        LiveParameters(gravity=True, wind=0.0, damping=0.0)
+
+
 def test_live_inference_passes_only_beliefs_to_model2_and_returns_both_worlds() -> None:
     config = load_model1_config(ROOT / "configs" / "model1" / "v1.yaml")
     captured: list[BeliefInputs] = []
@@ -55,11 +60,12 @@ def test_live_inference_passes_only_beliefs_to_model2_and_returns_both_worlds() 
 
     engine = LiveInferenceEngine(FakeModel1(), config, model2_predict)
 
-    result = engine.infer(LiveParameters(gravity=-0.1, wind=0.0, damping=0.0))
+    result = engine.infer(LiveParameters(gravity=-0.06, wind=0.0, damping=0.0))
 
     assert len(captured) == 1
     assert captured[0].beliefs.shape == (1, 4, 3, 64, 64)
-    assert captured[0].history_mask.tolist() == [[True, True, True, True]]
+    assert captured[0].history_mask.tolist() == [[False, False, False, True]]
+    assert not captured[0].beliefs[0, :3].any()
     assert result.ground_truth_flat.shape == (12,)
     assert result.guessed_flat.shape == (12,)
     assert result.ground_truth_flat[0] == 1
@@ -69,7 +75,7 @@ def test_live_inference_passes_only_beliefs_to_model2_and_returns_both_worlds() 
     actual_gravity = payload["ground_truth"]["operators"]["vertical_acceleration"][
         "parameters"
     ]["a_y"]
-    assert actual_gravity == pytest.approx(-0.1)
+    assert actual_gravity == pytest.approx(-0.06)
     assert "frames" not in captured[0].__dict__
 
 
@@ -83,3 +89,15 @@ def test_live_inference_rejects_world_without_valid_reappearance() -> None:
 
     with pytest.raises(LiveInferenceError, match="reappearance|bounds"):
         engine.infer(LiveParameters(gravity=0.0, wind=-1.0, damping=0.0))
+
+
+def test_live_inference_rejects_trajectory_that_exits_after_reappearance() -> None:
+    config = load_model1_config(ROOT / "configs" / "model1" / "v1.yaml")
+    engine = LiveInferenceEngine(
+        FakeModel1(),
+        config,
+        lambda _: WorldPrediction(torch.zeros((1, 5)), torch.zeros((1, 7))),
+    )
+
+    with pytest.raises(LiveInferenceError, match="out_of_bounds"):
+        engine.infer(LiveParameters(gravity=-0.3, wind=0.1, damping=0.0))

@@ -78,6 +78,9 @@ def test_live_request_has_loading_error_and_comparison_states() -> None:
     assert "payload.error" in source
     assert '$("runInference").disabled = true' in source
     assert '$("runInference").disabled = false' in source
+    assert "requestSerial += 1;" in source
+    assert "learnedData = null;" in source
+    assert "clearWorldCanvas" in source
     assert "Ground-truth parameters" in source
     assert "Guessed parameters" in source
     assert 'return "inactive"' in source

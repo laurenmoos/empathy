@@ -66,6 +66,12 @@
     button.primary { background: var(--aqua); color: #06201d; border-color: transparent; }
     .actions { display: grid; grid-template-columns: 1.35fr 1fr; gap: .45rem; }
     .visuals { padding: 1.2rem; display: grid; grid-template-columns: 1.15fr .85fr; gap: 1rem; align-content: start; }
+    .model-map { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; align-items: center; gap: .65rem; padding: .7rem .85rem; border: 1px solid var(--line); border-radius: 12px; }
+    .model-map div { min-width: 0; }
+    .model-map strong { display: block; font-size: .78rem; }
+    .model-map span { color: var(--muted); font-size: .7rem; }
+    .model-map .arrow { color: var(--aqua); font-size: 1rem; }
+    .model-note { grid-column: 1 / -1; margin: -.55rem 0 0; color: var(--muted); font-size: .68rem; }
     figure { margin: 0; padding: .8rem; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); overflow: hidden; }
     figure:first-child { grid-column: 1 / -1; }
     figcaption { display: flex; justify-content: space-between; align-items: baseline; padding: .15rem .25rem .75rem; }
@@ -92,6 +98,8 @@
       .controls, .visuals { grid-template-columns: 1fr; }
       figure:first-child { grid-column: auto; }
       aside, .visuals { padding: .75rem; }
+      .model-map { grid-template-columns: 1fr; }
+      .model-map .arrow { transform: rotate(90deg); justify-self: center; }
     }
   </style>
 </head>
@@ -131,8 +139,16 @@
     </aside>
 
     <section class="visuals">
+      <div class="model-map" aria-label="Ground truth and model flow">
+        <div><strong>Ground truth</strong><span>actual physics and occlusion</span></div>
+        <span class="arrow">→</span>
+        <div><strong>Model 1</strong><span>possible hidden paths</span></div>
+        <span class="arrow">→</span>
+        <div><strong>Model 2</strong><span>guessed forces and rules</span></div>
+      </div>
+      <p class="model-note">This explorer uses simulator-generated stand-ins for the two model outputs; trained CNNs are not running here yet.</p>
       <figure>
-        <figcaption><strong>Observed world</strong><span>The gray box is the occluder</span></figcaption>
+        <figcaption><strong>Ground truth simulation</strong><span>hidden from the models behind the gray occluder</span></figcaption>
         <canvas id="worldCanvas" width="1200" height="525"></canvas>
         <div class="legend">
           <span><i class="dot" style="background:var(--coral)"></i>ball</span>
@@ -141,7 +157,7 @@
         </div>
       </figure>
       <figure>
-        <figcaption><strong>Superposition of possible paths</strong><span>entry uncertainty only</span></figcaption>
+        <figcaption><strong>Model 1 · Path beliefs</strong><span>superposition of possible hidden trajectories</span></figcaption>
         <canvas id="beliefCanvas" width="600" height="600"></canvas>
         <div class="legend">
           <span><i class="dot" style="background:var(--violet)"></i>possible path</span>
@@ -151,7 +167,7 @@
       <section class="readout" aria-label="Current world readout">
         <div class="metric"><small>Elapsed</small><b id="timeReadout">0.0 s</b></div>
         <div class="metric"><small>Ball position</small><b id="stateReadout">12% across · 55% high</b></div>
-        <div class="metric full"><small>Forces on the ball</small><b id="operatorReadout">none</b></div>
+        <div class="metric full"><small>Model 2 · World guess</small><b id="operatorReadout">Forces on the ball: none</b></div>
       </section>
     </section>
   </main>
@@ -365,7 +381,7 @@
       const p = params();
       $("timeReadout").textContent = `${(stepCount * dt).toFixed(1)} s`;
       $("stateReadout").textContent = `${Math.round(state.x * 100)}% across · ${Math.round(state.y * 100)}% high`;
-      $("operatorReadout").textContent = forceSummary(p);
+      $("operatorReadout").textContent = `Forces on the ball: ${forceSummary(p)}`;
       $("runSimulation").textContent = playing
         ? "Pause"
         : stepCount === 0 ? "Run simulation" : "Resume simulation";

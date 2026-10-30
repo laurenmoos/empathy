@@ -78,6 +78,10 @@ def test_explorer_is_a_self_contained_parameter_interface() -> None:
     assert "Forces on the ball" in source
     assert "right wall" in source
     assert "floor" in source
+    assert "Ground truth" in source
+    assert "Model 1" in source
+    assert "Model 2" in source
+    assert "simulator-generated stand-ins" in source
     assert "Adjust the controls below" not in source
     assert "Set the physical parameters, then run" not in source
     assert '<br><span id="visibilityState">' not in source

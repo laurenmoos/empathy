@@ -1,0 +1,37 @@
+schema_version: model1-v1
+dataset:
+  frame_size: 64
+  clip_steps: 16
+  prediction_steps: 12
+  levels: [W0, W1, W2, W3, W4]
+  counts: [256, 64, 64]
+  quick_counts: [16, 8, 8]
+  max_attempts: 5000
+  velocity_bounds: [-4.0, 4.0]
+  initial_state:
+    x: [0.08, 0.12]
+    y: [0.4, 0.6]
+    vx: [0.16, 0.2]
+    vy: [-0.03, 0.03]
+  occluder: {x_min: 0.35, x_max: 0.55, y_min: 0.05, y_max: 0.95}
+model:
+  modes: 8
+  hidden_size: 64
+  frame_channels: [8, 16, 32]
+loss:
+  trajectory_weight: 1.0
+  mode_weight: 0.2
+  state_weight: 0.25
+  pre_belief_weight: 0.2
+  post_belief_weight: 0.2
+training:
+  seed: 7
+  batch_size: 32
+  epochs: 20
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  gradient_clip: 1.0
+evaluation:
+  calibration_radius: 0.05
+  calibration_bins: 10
+  mixture_sigma: 0.03

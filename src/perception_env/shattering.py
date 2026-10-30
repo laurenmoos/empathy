@@ -70,6 +70,28 @@ class RepeatedShatteringSummary:
     metric_name: str
 
 
+@dataclass(frozen=True)
+class ShatteringInterval:
+    lower: float | None
+    upper: float | None
+
+
+@dataclass(frozen=True)
+class ComplexityRecoveryEstimate:
+    true_dimensions: tuple[int, ...]
+    recovered_dimensions: tuple[int, ...]
+    true_median: float
+    recovered_median: float
+    true_interval: ShatteringInterval
+    recovered_interval: ShatteringInterval
+    ratio: float | None
+    ratio_interval: ShatteringInterval
+    ratio_status: str
+    label_agreement: float
+    metric_name: str
+    metadata: dict[str, Any]
+
+
 def build_label_matrix(
     worlds: Sequence[Any],
     probes: Sequence[Probe],
@@ -215,5 +237,119 @@ def repeat_shattering(
         seeds=seeds,
         dimensions=tuple(item.dimension for item in estimates),
         metric_name="context_conditioned" if same_context else "global_multi_context",
+    )
+
+
+def _canonical_matrix(matrix: LabelMatrix, world_ids: tuple[str, ...]) -> LabelMatrix:
+    if len(set(matrix.world_ids)) != len(matrix.world_ids):
+        raise ValueError("world identifiers must be unique")
+    index_by_id = {world_id: index for index, world_id in enumerate(matrix.world_ids)}
+    if set(index_by_id) != set(world_ids):
+        raise ValueError("true and recovered matrices must share world identifiers")
+    indices = [index_by_id[world_id] for world_id in world_ids]
+    return LabelMatrix(
+        matrix.values[indices],
+        world_ids,
+        matrix.probes,
+        dict(matrix.metadata),
+    )
+
+
+def _bootstrap_interval(
+    values: np.ndarray,
+    *,
+    seed: int,
+    samples: int,
+) -> ShatteringInterval:
+    if values.size == 0:
+        return ShatteringInterval(None, None)
+    rng = np.random.default_rng(seed)
+    bootstrap = np.empty(samples, dtype=np.float64)
+    for index in range(samples):
+        selected = rng.choice(values, size=values.size, replace=True)
+        bootstrap[index] = float(np.median(selected))
+    lower, upper = np.percentile(bootstrap, [2.5, 97.5])
+    return ShatteringInterval(
+        float(min(lower, values.min())),
+        float(max(upper, values.max())),
+    )
+
+
+def estimate_complexity_recovery(
+    true_matrix: LabelMatrix,
+    recovered_matrix: LabelMatrix,
+    *,
+    max_n: int,
+    budget: int,
+    search_seeds: tuple[int, ...],
+    bootstrap_seed: int,
+    bootstrap_samples: int,
+    same_context: bool = True,
+) -> ComplexityRecoveryEstimate:
+    """Pair empirical shattering estimates for true and recovered world banks."""
+    if not search_seeds:
+        raise ValueError("at least one search seed is required")
+    if bootstrap_samples < 1:
+        raise ValueError("bootstrap samples must be positive")
+    if true_matrix.probes != recovered_matrix.probes:
+        raise ValueError("true and recovered matrices must share probes")
+    world_ids = tuple(sorted(true_matrix.world_ids))
+    truth = _canonical_matrix(true_matrix, world_ids)
+    recovered = _canonical_matrix(recovered_matrix, world_ids)
+    true_estimates = tuple(
+        search_shattered_set(truth, max_n, budget, seed, same_context)
+        for seed in search_seeds
+    )
+    recovered_estimates = tuple(
+        search_shattered_set(recovered, max_n, budget, seed, same_context)
+        for seed in search_seeds
+    )
+    true_dimensions = tuple(item.dimension for item in true_estimates)
+    recovered_dimensions = tuple(item.dimension for item in recovered_estimates)
+    true_values = np.asarray(true_dimensions, dtype=np.float64)
+    recovered_values = np.asarray(recovered_dimensions, dtype=np.float64)
+    usable = true_values > 0
+    if usable.any():
+        ratios = recovered_values[usable] / true_values[usable]
+        ratio = float(np.median(ratios))
+        ratio_interval = _bootstrap_interval(
+            ratios, seed=bootstrap_seed, samples=bootstrap_samples
+        )
+        ratio_status = "defined"
+    else:
+        ratio = None
+        ratio_interval = ShatteringInterval(None, None)
+        ratio_status = "undefined_zero_true_dimension"
+    metadata = {
+        "algorithm": "paired_exhaustive_or_seeded_subset_search",
+        "budget": budget,
+        "max_n": max_n,
+        "search_seeds": list(search_seeds),
+        "bootstrap_seed": bootstrap_seed,
+        "bootstrap_samples": bootstrap_samples,
+        "interval_method": "paired_percentile_95_expanded_to_observed_range",
+        "operator_support": truth.metadata.get("operator_support", "unspecified"),
+        "uncertainty_grid": truth.metadata.get("uncertainty_grid", "unspecified"),
+        "tolerance": truth.metadata.get("tolerance", "unspecified"),
+        "world_count": len(world_ids),
+        "probe_count": len(truth.probes),
+    }
+    return ComplexityRecoveryEstimate(
+        true_dimensions=true_dimensions,
+        recovered_dimensions=recovered_dimensions,
+        true_median=float(np.median(true_values)),
+        recovered_median=float(np.median(recovered_values)),
+        true_interval=_bootstrap_interval(
+            true_values, seed=bootstrap_seed + 1, samples=bootstrap_samples
+        ),
+        recovered_interval=_bootstrap_interval(
+            recovered_values, seed=bootstrap_seed + 2, samples=bootstrap_samples
+        ),
+        ratio=ratio,
+        ratio_interval=ratio_interval,
+        ratio_status=ratio_status,
+        label_agreement=float((truth.values == recovered.values).mean()),
+        metric_name="context_conditioned" if same_context else "global_multi_context",
+        metadata=metadata,
     )
 

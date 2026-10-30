@@ -1,0 +1,12 @@
+version: coherence-v1
+metric: context_conditioned
+thresholds:
+  min_coherence: 0.90
+  min_shattering_ratio: 0.80
+search:
+  max_n: 5
+  budget: 1000
+  seeds: [7, 17, 29, 41, 53]
+uncertainty:
+  bootstrap_seed: 71
+  bootstrap_samples: 1000

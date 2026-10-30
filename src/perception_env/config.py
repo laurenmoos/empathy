@@ -21,9 +21,12 @@ class RenderConfig:
     width: int = 64
     height: int = 64
     ball_radius: int = 2
+    min_hidden_steps: int = 2
 
     def __post_init__(self) -> None:
         if self.width < 8 or self.height < 8:
             raise ValueError("render dimensions must be at least 8 pixels")
         if self.ball_radius < 1:
             raise ValueError("ball_radius must be positive")
+        if self.min_hidden_steps < 1:
+            raise ValueError("min_hidden_steps must be positive")

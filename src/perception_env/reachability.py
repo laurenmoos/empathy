@@ -43,6 +43,7 @@ class EntryStateGrid:
             for bounds, count in zip(
                 (self.x_bounds, self.y_bounds, self.vx_bounds, self.vy_bounds),
                 self.resolution,
+                strict=True,
             )
         ]
         return tuple(BallState(*(float(value) for value in values)) for values in product(*axes))

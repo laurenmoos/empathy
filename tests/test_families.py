@@ -5,7 +5,6 @@ import numpy as np
 from perception_env.families import load_family, sample_worlds
 from perception_env.world import WorldSchema
 
-
 CONFIG = Path("configs/world_families/v1.yaml")
 
 

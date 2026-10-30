@@ -83,7 +83,11 @@ def sample_worlds(family: WorldFamily, count: int, seed: int) -> list[WorldCode]
     for _ in range(count):
         while True:
             active_count = int(rng.integers(0, family.max_active + 1))
-            names = list(rng.choice(allowed, size=active_count, replace=False)) if active_count else []
+            names = (
+                list(rng.choice(allowed, size=active_count, replace=False))
+                if active_count
+                else []
+            )
             wall_count = sum(name in {"vertical_wall", "horizontal_wall"} for name in names)
             if wall_count <= family.max_walls:
                 break

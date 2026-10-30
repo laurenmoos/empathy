@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping
 
 import numpy as np
 
@@ -43,7 +43,10 @@ class OperatorSlot:
     parameters: tuple[float, ...]
 
     def parameter_dict(self, spec: OperatorSpec) -> dict[str, float]:
-        return {parameter.name: value for parameter, value in zip(spec.parameters, self.parameters)}
+        return {
+            parameter.name: value
+            for parameter, value in zip(spec.parameters, self.parameters, strict=True)
+        }
 
 
 @dataclass(frozen=True)
@@ -60,12 +63,14 @@ class WorldCode:
     def to_flat(self, schema: WorldSchema) -> np.ndarray:
         schema.validate(self)
         values: list[float] = []
-        for spec, slot in zip(schema.specs, self.slots):
+        for spec, slot in zip(schema.specs, self.slots, strict=True):
             values.append(float(slot.active))
             if slot.active:
                 values.extend(
                     parameter.normalize(value)
-                    for parameter, value in zip(spec.parameters, slot.parameters)
+                    for parameter, value in zip(
+                        spec.parameters, slot.parameters, strict=True
+                    )
                 )
             else:
                 values.extend(0.0 for _ in spec.parameters)
@@ -137,7 +142,7 @@ class WorldSchema:
                     f"{spec.name} parameters must be {sorted(expected)}, got {sorted(supplied)}"
                 )
             values = tuple(float(supplied[parameter.name]) for parameter in spec.parameters)
-            for parameter, value in zip(spec.parameters, values):
+            for parameter, value in zip(spec.parameters, values, strict=True):
                 parameter.validate(value, active=True)
             slots.append(OperatorSlot(spec.name, True, values))
         world = WorldCode(self.version, tuple(slots))
@@ -161,7 +166,9 @@ class WorldSchema:
                     raise ValueError(f"normalized parameters for {spec.name} must lie in [0, 1]")
                 parameters = tuple(
                     round(parameter.denormalize(float(value)), 12)
-                    for parameter, value in zip(spec.parameters, normalized)
+                    for parameter, value in zip(
+                        spec.parameters, normalized, strict=True
+                    )
                 )
             else:
                 parameters = tuple(0.0 for _ in spec.parameters)
@@ -177,12 +184,14 @@ class WorldSchema:
             )
         if tuple(slot.name for slot in world.slots) != self.slot_names:
             raise ValueError("world slots do not match schema order")
-        for spec, slot in zip(self.specs, world.slots):
+        for spec, slot in zip(self.specs, world.slots, strict=True):
             if len(slot.parameters) != len(spec.parameters):
                 raise ValueError(f"wrong parameter width for {slot.name}")
             if not slot.active and any(value != 0.0 for value in slot.parameters):
                 raise ValueError(f"inactive {slot.name} must use canonical zero parameters")
             if slot.active:
-                for parameter, value in zip(spec.parameters, slot.parameters):
+                for parameter, value in zip(
+                    spec.parameters, slot.parameters, strict=True
+                ):
                     parameter.validate(value, active=True)
 

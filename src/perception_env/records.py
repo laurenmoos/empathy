@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 import numpy as np
 
@@ -193,7 +194,10 @@ class Model2InputRecord:
             raise ValueError(f"missing Model 2 fields: {sorted(missing)}")
         arrays = {name: np.asarray(values[name]) for name in allowed}
         belief_shape = arrays["pre_belief"].shape
-        if arrays["post_belief"].shape != belief_shape or arrays["belief_difference"].shape != belief_shape:
+        if (
+            arrays["post_belief"].shape != belief_shape
+            or arrays["belief_difference"].shape != belief_shape
+        ):
             raise ValueError("belief-history fields must have the same shape")
         return cls(**arrays)
 

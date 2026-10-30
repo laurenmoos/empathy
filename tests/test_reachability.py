@@ -1,7 +1,12 @@
 import numpy as np
 
 from perception_env.config import RenderConfig, SimulationConfig
-from perception_env.reachability import EntryStateGrid, Probe, enumerate_reachable, rasterize_endpoints
+from perception_env.reachability import (
+    EntryStateGrid,
+    Probe,
+    enumerate_reachable,
+    rasterize_endpoints,
+)
 from perception_env.world import WorldSchema
 
 

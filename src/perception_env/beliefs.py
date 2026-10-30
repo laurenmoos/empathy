@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 import numpy as np
 
@@ -34,7 +34,7 @@ def superpose(
         raise ValueError("weights must be finite, nonnegative, and have positive mass")
     density = np.zeros((render.height, render.width), dtype=np.float64)
     normalized = weights / weights.sum()
-    for trajectory, weight in zip(trajectories, normalized):
+    for trajectory, weight in zip(trajectories, normalized, strict=True):
         density[_trajectory_mask(trajectory, render)] += weight
     return density.astype(np.float32)
 

@@ -5,15 +5,22 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
 
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-
 from .world import WorldCode, WorldSchema
+
+if TYPE_CHECKING:
+    from .beliefs import BeliefEvent
+    from .config import RenderConfig
+    from .identifiability import IdentifiabilityReport
+    from .reachability import ReachabilityResult
+    from .records import BenchmarkRecord
+    from .render import RenderedSequence
+    from .shattering import ShatteringEstimate
+    from .simulate import Trajectory
 
 
 @dataclass(frozen=True)
@@ -39,7 +46,7 @@ def render_world_card(
     schema.validate(world)
     rows: list[list[str]] = []
     slot_metadata: list[dict[str, Any]] = []
-    for spec, slot in zip(schema.specs, world.slots):
+    for spec, slot in zip(schema.specs, world.slots, strict=True):
         parameters = slot.parameter_dict(spec)
         rows.append(
             [
@@ -76,7 +83,7 @@ def render_world_card(
 
 
 def render_trajectory_strip(
-    trajectory: "Trajectory", world: WorldCode, schema: WorldSchema, path: Path
+    trajectory: Trajectory, world: WorldCode, schema: WorldSchema, path: Path
 ) -> VisualArtifact:
     from .simulate import Trajectory
 
@@ -109,7 +116,7 @@ def render_trajectory_strip(
     summary_ax.axis("off")
     summary_ax.set_title("Operator summary", loc="left", weight="bold")
     lines = [f"seed: {trajectory.seed}", f"valid: {trajectory.valid}"]
-    for spec, slot in zip(schema.specs, world.slots):
+    for spec, slot in zip(schema.specs, world.slots, strict=True):
         if slot.active:
             values = slot.parameter_dict(spec)
             lines.append(
@@ -134,7 +141,7 @@ def render_trajectory_strip(
 
 
 def render_observation_strip(
-    sequence: "RenderedSequence", path: Path
+    sequence: RenderedSequence, path: Path
 ) -> VisualArtifact:
     from .events import extract_reappearance
     from .render import RenderedSequence, _hidden_runs
@@ -212,7 +219,7 @@ def render_observation_strip(
 
 
 def render_operator_comparison(
-    trajectories: list["Trajectory"],
+    trajectories: list[Trajectory],
     worlds: list[WorldCode],
     schema: WorldSchema,
     *,
@@ -233,7 +240,9 @@ def render_operator_comparison(
 
     fig, ax = plt.subplots(figsize=(6.0, 5.0))
     colors = plt.cm.viridis(np.linspace(0.15, 0.9, len(trajectories)))
-    for trajectory, value, color in zip(trajectories, parameter_values, colors):
+    for trajectory, value, color in zip(
+        trajectories, parameter_values, colors, strict=True
+    ):
         xs = [state.x for state in trajectory.states]
         ys = [state.y for state in trajectory.states]
         ax.plot(xs, ys, marker="o", markersize=3, color=color, label=f"{value:.3f}")
@@ -254,15 +263,14 @@ def render_operator_comparison(
 
 
 def render_belief_panel(
-    result: "ReachabilityResult",
-    event: "BeliefEvent",
-    render: "RenderConfig",
+    result: ReachabilityResult,
+    event: BeliefEvent,
+    render: RenderConfig,
     path: Path,
     *,
     true_endpoint: tuple[float, float] | None = None,
 ) -> VisualArtifact:
     from .beliefs import BeliefEvent
-    from .config import RenderConfig
     from .reachability import ReachabilityResult, rasterize_endpoints
 
     if not isinstance(result, ReachabilityResult) or not isinstance(event, BeliefEvent):
@@ -352,7 +360,7 @@ def render_belief_panel(
 
 
 def render_dataset_contact_sheet(
-    records: list["BenchmarkRecord"], schema: WorldSchema, path: Path
+    records: list[BenchmarkRecord], schema: WorldSchema, path: Path
 ) -> VisualArtifact:
     from .records import BenchmarkRecord
 
@@ -394,7 +402,7 @@ def render_dataset_contact_sheet(
 
 
 def render_shattering_matrix(
-    estimate: "ShatteringEstimate", path: Path
+    estimate: ShatteringEstimate, path: Path
 ) -> VisualArtifact:
     from .shattering import ShatteringEstimate, count_labelings
 
@@ -463,7 +471,7 @@ def render_shattering_matrix(
 
 
 def render_equivalence_gallery(
-    report: "IdentifiabilityReport", path: Path
+    report: IdentifiabilityReport, path: Path
 ) -> VisualArtifact:
     from .identifiability import IdentifiabilityReport
 
@@ -482,7 +490,7 @@ def render_equivalence_gallery(
         code_ax, raster_ax = axes[row]
         code_ax.axis("off")
         active_lines: list[str] = []
-        for spec, slot in zip(schema.specs, world.slots):
+        for spec, slot in zip(schema.specs, world.slots, strict=True):
             if slot.active:
                 parameters = slot.parameter_dict(spec)
                 active_lines.append(

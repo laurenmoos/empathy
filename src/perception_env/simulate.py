@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 from .config import SimulationConfig
 from .operators import acceleration, damping_factor, reflect_crossing
@@ -18,7 +18,7 @@ class BallState:
     vy: float
 
 
-class TerminationReason(str, Enum):
+class TerminationReason(StrEnum):
     COMPLETED = "completed"
     OUT_OF_BOUNDS = "out_of_bounds"
 

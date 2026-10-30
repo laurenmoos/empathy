@@ -8,7 +8,10 @@ from perception_env.visualize import render_shattering_matrix
 
 
 def test_shattering_matrix_groups_rows_and_highlights_selected_probes(tmp_path) -> None:
-    values = np.asarray([list(bits) for bits in product([0, 1], repeat=3)] + [[0, 0, 0]], dtype=bool)
+    values = np.asarray(
+        [list(bits) for bits in product([0, 1], repeat=3)] + [[0, 0, 0]],
+        dtype=bool,
+    )
     labels = LabelMatrix(
         values=values,
         world_ids=tuple(f"world-{index}" for index in range(len(values))),

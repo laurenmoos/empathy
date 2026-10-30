@@ -251,3 +251,101 @@ def render_operator_comparison(
         "seed": trajectories[0].seed,
     }
     return _save_visual(fig, Path(path), metadata)
+
+
+def render_belief_panel(
+    result: "ReachabilityResult",
+    event: "BeliefEvent",
+    render: "RenderConfig",
+    path: Path,
+    *,
+    true_endpoint: tuple[float, float] | None = None,
+) -> VisualArtifact:
+    from .beliefs import BeliefEvent
+    from .config import RenderConfig
+    from .reachability import ReachabilityResult, rasterize_endpoints
+
+    if not isinstance(result, ReachabilityResult) or not isinstance(event, BeliefEvent):
+        raise TypeError("result and event must use reachability and belief record types")
+    if event.pre.shape != (render.height, render.width):
+        raise ValueError("belief image shape must match render configuration")
+
+    occupancy_stack = rasterize_endpoints(result, render)
+    occupancy = occupancy_stack[-1] if len(occupancy_stack) else np.zeros(event.pre.shape, bool)
+    endpoints = result.endpoints[result.query_steps[-1]]
+    fig, axes = plt.subplots(2, 4, figsize=(13.0, 6.6))
+    axes_flat = axes.ravel()
+
+    paths_ax = axes_flat[0]
+    for trajectory in result.trajectories:
+        xs = [state.x for state in trajectory.states]
+        ys = [state.y for state in trajectory.states]
+        paths_ax.plot(xs, ys, alpha=0.3, linewidth=1)
+    paths_ax.set(xlim=(0, 1), ylim=(0, 1), title="Sampled paths", xlabel="x", ylabel="y")
+
+    endpoint_ax = axes_flat[1]
+    endpoint_ax.scatter(
+        [state.x for state in endpoints],
+        [state.y for state in endpoints],
+        s=18,
+        color="#315b7d",
+    )
+    endpoint_ax.set(xlim=(0, 1), ylim=(0, 1), title="Endpoint scatter", xlabel="x", ylabel="y")
+
+    axes_flat[2].imshow(occupancy, cmap="gray", vmin=0, vmax=1)
+    axes_flat[2].set_title("Binary occupancy")
+    axes_flat[3].imshow(event.pre, cmap="magma", vmin=0, vmax=1)
+    axes_flat[3].set_title("Pre belief")
+    axes_flat[4].imshow(event.post, cmap="magma", vmin=0, vmax=1)
+    axes_flat[4].set_title("Post belief")
+    difference_limit = max(float(np.max(np.abs(event.difference))), 1.0e-6)
+    axes_flat[5].imshow(
+        event.difference,
+        cmap="coolwarm",
+        vmin=-difference_limit,
+        vmax=difference_limit,
+    )
+    axes_flat[5].set_title("Belief difference")
+
+    diagnostic_ax = axes_flat[6]
+    diagnostic_ax.imshow(event.post, cmap="gray", vmin=0, vmax=1)
+    if true_endpoint is not None:
+        column = true_endpoint[0] * (render.width - 1)
+        row = (1.0 - true_endpoint[1]) * (render.height - 1)
+        diagnostic_ax.scatter([column], [row], marker="x", color="#31d27c", s=75)
+    diagnostic_ax.set_title("First-order diagnostic")
+    axes_flat[7].axis("off")
+    axes_flat[7].text(
+        0.0,
+        1.0,
+        "Model 2 receives only:\n• pre belief\n• post belief\n• belief difference",
+        va="top",
+        fontsize=10,
+    )
+    for ax in axes_flat[2:7]:
+        ax.set_xticks([])
+        ax.set_yticks([])
+    fig.suptitle("Reachability and second-order belief representation", weight="bold")
+    fig.tight_layout()
+
+    metadata: dict[str, Any] = {
+        "kind": "belief_panel",
+        "panels": [
+            "sampled paths",
+            "endpoint scatter",
+            "binary occupancy",
+            "pre belief",
+            "post belief",
+            "belief difference",
+            "first-order diagnostic",
+        ],
+        "model2_channels": [
+            "pre_belief",
+            "post_belief",
+            "belief_difference",
+        ],
+        "first_order_excluded": True,
+        "endpoint_count": len(endpoints),
+        "query_step": result.query_steps[-1],
+    }
+    return _save_visual(fig, Path(path), metadata)

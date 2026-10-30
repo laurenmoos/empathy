@@ -49,6 +49,7 @@
       box-shadow: 0 14px 35px rgba(0,0,0,.16);
     }
     .card h2 { margin: 0 0 .8rem; font-size: .72rem; letter-spacing: .13em; text-transform: uppercase; color: var(--muted); }
+    .hint { margin: -.25rem 0 .85rem; color: var(--muted); font-size: .76rem; line-height: 1.45; }
     label { display: grid; grid-template-columns: 1fr auto; gap: .25rem .75rem; margin-top: .72rem; font-size: .82rem; }
     label:first-of-type { margin-top: 0; }
     output { color: var(--aqua); font: 600 .75rem ui-monospace, monospace; }
@@ -102,7 +103,7 @@
   <header>
     <div>
       <h1>Perception environment</h1>
-      <p>Change the world, then watch the visible ball and the hidden-path superposition update together.</p>
+      <p>Move any slider to set the physics. Changes apply immediately and restart the ball so the result is easy to compare.</p>
     </div>
     <div class="status"><span id="runState">RUNNING</span><br><span id="visibilityState">VISIBLE</span></div>
   </header>
@@ -110,8 +111,10 @@
     <aside>
       <div class="controls">
         <section class="card">
-          <h2>World preset</h2>
-          <select id="preset" aria-label="World preset">
+          <h2>Start with an example (optional)</h2>
+          <p class="hint">Examples only fill in the controls below. Change any control to create custom settings.</p>
+          <select id="preset" aria-label="Starting example">
+            <option value="custom">Custom settings</option>
             <option value="constant">Constant motion</option>
             <option value="gravity">Gravity</option>
             <option value="wind">Wind</option>
@@ -125,34 +128,37 @@
         </section>
 
         <section class="card">
-          <h2>Forces</h2>
-          <label>Wind · a<sub>x</sub><output data-for="wind"></output><input id="wind" type="range" min="-0.5" max="0.5" step="0.01" value="0"></label>
-          <label>Gravity · a<sub>y</sub><output data-for="gravity"></output><input id="gravity" type="range" min="-0.8" max="0.4" step="0.01" value="0"></label>
+          <h2>Set the forces</h2>
+          <p class="hint">Zero turns a force off. Negative and positive values select the direction.</p>
+          <label>Wind · left ↔ right<output data-for="wind"></output><input id="wind" type="range" min="-0.5" max="0.5" step="0.01" value="0"></label>
+          <label>Gravity · down ↔ up<output data-for="gravity"></output><input id="gravity" type="range" min="-0.8" max="0.4" step="0.01" value="0"></label>
           <label>Damping · λ<output data-for="damping"></output><input id="damping" type="range" min="0" max="1" step="0.01" value="0"></label>
         </section>
 
         <section class="card">
-          <h2>Vertical wall</h2>
+          <h2>Add a vertical wall</h2>
+          <p class="hint">Enable it first, then set its horizontal position and bounciness.</p>
           <label class="check">Enabled<input id="verticalWallEnabled" type="checkbox"></label>
           <label>Position · x<output data-for="verticalWallPosition"></output><input id="verticalWallPosition" type="range" min="0.2" max="0.95" step="0.01" value="0.72"></label>
           <label>Restitution<output data-for="verticalRestitution"></output><input id="verticalRestitution" type="range" min="0" max="1" step="0.01" value="0.8"></label>
         </section>
 
         <section class="card">
-          <h2>Horizontal wall</h2>
+          <h2>Add a horizontal wall</h2>
+          <p class="hint">Enable it first, then set its vertical position and bounciness.</p>
           <label class="check">Enabled<input id="horizontalWallEnabled" type="checkbox"></label>
           <label>Position · y<output data-for="horizontalWallPosition"></output><input id="horizontalWallPosition" type="range" min="0.05" max="0.9" step="0.01" value="0.18"></label>
           <label>Restitution<output data-for="horizontalRestitution"></output><input id="horizontalRestitution" type="range" min="0" max="1" step="0.01" value="0.75"></label>
         </section>
 
         <section class="card">
-          <h2>Ball entry</h2>
+          <h2>Set the ball entry</h2>
           <label>Initial y<output data-for="initialY"></output><input id="initialY" type="range" min="0.15" max="0.85" step="0.01" value="0.55"></label>
           <label>Initial v<sub>x</sub><output data-for="initialVx"></output><input id="initialVx" type="range" min="0.08" max="0.55" step="0.01" value="0.28"></label>
         </section>
 
         <section class="card">
-          <h2>Occluder</h2>
+          <h2>Set the gray occluder</h2>
           <label>Left edge<output data-for="occluderLeft"></output><input id="occluderLeft" type="range" min="0.2" max="0.65" step="0.01" value="0.38"></label>
           <label>Right edge<output data-for="occluderRight"></output><input id="occluderRight" type="range" min="0.35" max="0.85" step="0.01" value="0.58"></label>
         </section>
@@ -387,7 +393,13 @@
     function updateOutputs() {
       numericIds.forEach(id => {
         const output = document.querySelector(`output[data-for="${id}"]`);
-        if (output) output.textContent = Number($(id).value).toFixed(2);
+        if (!output) return;
+        const value = Number($(id).value);
+        let suffix = "";
+        if (id === "wind") suffix = value < 0 ? " · left" : value > 0 ? " · right" : " · off";
+        if (id === "gravity") suffix = value < 0 ? " · down" : value > 0 ? " · up" : " · off";
+        if (id === "damping") suffix = value === 0 ? " · off" : " · slows ball";
+        output.textContent = value.toFixed(2) + suffix;
       });
       const p = params();
       $("runState").textContent = playing ? "RUNNING" : "PAUSED";
@@ -424,6 +436,7 @@
 
     function applyPreset(name) {
       const preset = presets[name];
+      if (!preset) return;
       for (const [id, value] of Object.entries(preset)) {
         if (id.endsWith("Enabled")) $(id).checked = value; else $(id).value = value;
       }
@@ -431,7 +444,7 @@
     }
 
     controlIds.forEach(id => $(id).addEventListener("input", () => {
-      $("preset").value = "constant";
+      $("preset").value = "custom";
       resetSimulation();
     }));
     $("preset").addEventListener("change", event => applyPreset(event.target.value));

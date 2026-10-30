@@ -48,6 +48,10 @@
       background: var(--panel);
       box-shadow: 0 14px 35px rgba(0,0,0,.16);
     }
+    .run-card {
+      background: linear-gradient(135deg, rgba(36, 75, 76, .72), rgba(23, 28, 49, .82));
+      border-color: rgba(99, 230, 213, .3);
+    }
     .card h2 { margin: 0 0 .8rem; font-size: .72rem; letter-spacing: .13em; text-transform: uppercase; color: var(--muted); }
     .hint { margin: -.25rem 0 .85rem; color: var(--muted); font-size: .76rem; line-height: 1.45; }
     label { display: grid; grid-template-columns: 1fr auto; gap: .25rem .75rem; margin-top: .72rem; font-size: .82rem; }
@@ -103,26 +107,18 @@
   <header>
     <div>
       <h1>Perception environment</h1>
-      <p>Move any slider to set the physics. Changes apply immediately and restart the ball so the result is easy to compare.</p>
+      <p>Set the physical parameters, then run the ball through the world and compare the observation with its possible hidden paths.</p>
     </div>
     <div class="status"><span id="runState">RUNNING</span><br><span id="visibilityState">VISIBLE</span></div>
   </header>
   <main>
     <aside>
       <div class="controls">
-        <section class="card">
-          <h2>Start with an example (optional)</h2>
-          <p class="hint">Examples only fill in the controls below. Change any control to create custom settings.</p>
-          <select id="preset" aria-label="Starting example">
-            <option value="custom">Custom settings</option>
-            <option value="constant">Constant motion</option>
-            <option value="gravity">Gravity</option>
-            <option value="wind">Wind</option>
-            <option value="wall">Bouncing wall</option>
-            <option value="complex">Combined world</option>
-          </select>
+        <section class="card run-card">
+          <h2>Set parameters, then run</h2>
+          <p class="hint">Adjust the controls below. The ball resets whenever a parameter changes, ready for a clean comparison.</p>
           <div class="actions">
-            <button class="primary" id="playPause">Pause</button>
+            <button class="primary" id="runSimulation">Run simulation</button>
             <button id="reset">Reset</button>
           </div>
         </section>
@@ -205,21 +201,13 @@
     const worldCtx = worldCanvas.getContext("2d");
     const beliefCtx = beliefCanvas.getContext("2d");
     const dt = 0.1;
-    let playing = true;
+    let playing = false;
     let accumulator = 0;
     let previousTimestamp = 0;
     let state;
     let trail = [];
     let stepCount = 0;
     let possiblePaths = [];
-
-    const presets = {
-      constant: {wind: 0, gravity: 0, damping: 0, verticalWallEnabled: false, horizontalWallEnabled: false},
-      gravity: {wind: 0, gravity: -0.25, damping: 0, verticalWallEnabled: false, horizontalWallEnabled: false},
-      wind: {wind: 0.18, gravity: 0, damping: 0, verticalWallEnabled: false, horizontalWallEnabled: false},
-      wall: {wind: 0, gravity: 0, damping: 0, verticalWallEnabled: true, verticalWallPosition: 0.68, verticalRestitution: 0.85, horizontalWallEnabled: false},
-      complex: {wind: 0.12, gravity: -0.2, damping: 0.08, verticalWallEnabled: true, verticalWallPosition: 0.76, verticalRestitution: 0.82, horizontalWallEnabled: true, horizontalWallPosition: 0.16, horizontalRestitution: 0.72}
-    };
 
     function params() {
       const p = Object.fromEntries(numericIds.map(id => [id, Number($(id).value)]));
@@ -402,14 +390,16 @@
         output.textContent = value.toFixed(2) + suffix;
       });
       const p = params();
-      $("runState").textContent = playing ? "RUNNING" : "PAUSED";
+      $("runState").textContent = playing ? "RUNNING" : stepCount === 0 ? "READY" : "PAUSED";
       $("visibilityState").textContent = isHidden(state, p) ? "HIDDEN — BELIEF ACTIVE" : "VISIBLE";
       $("visibilityState").style.color = isHidden(state, p) ? "var(--violet)" : "var(--aqua)";
       $("timeReadout").textContent = `${(stepCount * dt).toFixed(1)} s`;
       $("stateReadout").textContent = `x ${state.x.toFixed(2)} · y ${state.y.toFixed(2)}`;
       $("operatorReadout").textContent = operatorNames(p);
       $("vectorReadout").textContent = `[${p.wind.toFixed(2)}, ${p.gravity.toFixed(2)}, ${p.damping.toFixed(2)}]`;
-      $("playPause").textContent = playing ? "Pause" : "Play";
+      $("runSimulation").textContent = playing
+        ? "Pause"
+        : stepCount === 0 ? "Run simulation" : "Resume simulation";
     }
 
     function draw() { drawWorld(); drawBelief(); updateOutputs(); }
@@ -434,24 +424,14 @@
       requestAnimationFrame(animate);
     }
 
-    function applyPreset(name) {
-      const preset = presets[name];
-      if (!preset) return;
-      for (const [id, value] of Object.entries(preset)) {
-        if (id.endsWith("Enabled")) $(id).checked = value; else $(id).value = value;
-      }
-      resetSimulation();
-    }
-
     controlIds.forEach(id => $(id).addEventListener("input", () => {
-      $("preset").value = "custom";
+      playing = false;
       resetSimulation();
     }));
-    $("preset").addEventListener("change", event => applyPreset(event.target.value));
-    $("reset").addEventListener("click", resetSimulation);
-    $("playPause").addEventListener("click", () => { playing = !playing; updateOutputs(); });
+    $("reset").addEventListener("click", () => { playing = false; resetSimulation(); });
+    $("runSimulation").addEventListener("click", () => { playing = !playing; updateOutputs(); });
 
-    applyPreset("constant");
+    resetSimulation();
     requestAnimationFrame(animate);
   </script>
 </body>

@@ -36,8 +36,7 @@ def test_explorer_is_a_self_contained_parameter_interface() -> None:
     source, parser = parsed_explorer()
 
     required_controls = {
-        "preset",
-        "playPause",
+        "runSimulation",
         "reset",
         "wind",
         "gravity",
@@ -57,10 +56,12 @@ def test_explorer_is_a_self_contained_parameter_interface() -> None:
     assert parser.canvases == {"worldCanvas", "beliefCanvas"}
     assert not parser.external_urls
     assert "requestAnimationFrame" in source
-    assert "Start with an example (optional)" in source
-    assert "Custom settings" in source
-    assert "Changes apply immediately" in source
-    assert '$("preset").value = "custom"' in source
+    assert "Set parameters, then run" in source
+    assert "Run simulation" in source
+    assert "Start with an example" not in source
+    assert 'id="preset"' not in source
+    assert "const presets" not in source
+    assert "playing = false" in source
 
 
 def test_explorer_exposes_the_same_operator_update_order_as_the_simulator() -> None:

@@ -21,46 +21,45 @@
       margin: 0;
       min-height: 100vh;
       color: var(--ink);
-      background:
-        radial-gradient(circle at 75% 8%, rgba(89, 67, 158, 0.22), transparent 35rem),
-        radial-gradient(circle at 5% 90%, rgba(30, 125, 119, 0.18), transparent 36rem),
-        #091013;
+      background: #091013;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
     header {
       display: flex;
-      align-items: end;
+      align-items: center;
       justify-content: space-between;
       gap: 2rem;
-      padding: 2rem 2.25rem 1.35rem;
+      padding: 1rem 1.4rem;
       border-bottom: 1px solid var(--line);
     }
-    h1 { margin: 0; font-size: clamp(1.5rem, 3vw, 2.5rem); letter-spacing: -0.04em; }
-    header p { margin: .5rem 0 0; color: var(--muted); max-width: 44rem; }
-    .status { text-align: right; font: 600 .78rem/1.5 ui-monospace, monospace; color: var(--aqua); }
-    main { display: grid; grid-template-columns: minmax(17rem, 21rem) 1fr; min-height: calc(100vh - 7.5rem); }
-    aside { padding: 1.2rem; border-right: 1px solid var(--line); background: rgba(4, 11, 13, .52); }
-    .controls { display: grid; gap: .85rem; }
+    h1 { margin: 0; font-size: 1.35rem; letter-spacing: -0.03em; }
+    .status { text-align: right; font: 600 .72rem/1 ui-monospace, monospace; color: var(--aqua); }
+    .status span + span::before { content: " · "; color: var(--muted); }
+    main { display: grid; grid-template-columns: minmax(16rem, 19rem) 1fr; min-height: calc(100vh - 3.8rem); }
+    aside { padding: 1rem; border-right: 1px solid var(--line); background: rgba(4, 11, 13, .35); }
+    .section-title { padding: 0 .25rem .55rem; color: var(--muted); font-size: .68rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+    .controls { display: grid; gap: 0; }
     .card {
-      padding: 1rem;
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      background: var(--panel);
-      box-shadow: 0 14px 35px rgba(0,0,0,.16);
+      padding: .85rem .25rem 1rem;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
     }
     .run-card {
-      background: linear-gradient(135deg, rgba(36, 75, 76, .72), rgba(23, 28, 49, .82));
-      border-color: rgba(99, 230, 213, .3);
+      padding: 0 0 .85rem;
+      border: 0;
+      background: transparent;
     }
-    .card h2 { margin: 0 0 .8rem; font-size: .72rem; letter-spacing: .13em; text-transform: uppercase; color: var(--muted); }
-    .hint { margin: -.25rem 0 .85rem; color: var(--muted); font-size: .76rem; line-height: 1.45; }
+    .card h2 { margin: 0 0 .6rem; font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
     label { display: grid; grid-template-columns: 1fr auto; gap: .25rem .75rem; margin-top: .72rem; font-size: .82rem; }
     label:first-of-type { margin-top: 0; }
     output { color: var(--aqua); font: 600 .75rem ui-monospace, monospace; }
     input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: var(--aqua); }
     .check { display: flex; align-items: center; justify-content: space-between; }
     .check input { width: 1.1rem; height: 1.1rem; accent-color: var(--violet); }
-    select, button {
+    button {
       color: var(--ink);
       background: #18262a;
       border: 1px solid rgba(174, 217, 216, .22);
@@ -68,10 +67,9 @@
       padding: .65rem .75rem;
       font: inherit;
     }
-    select { width: 100%; }
     button { cursor: pointer; font-weight: 650; }
     button.primary { background: var(--aqua); color: #06201d; border-color: transparent; }
-    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: .55rem; margin-top: .65rem; }
+    .actions { display: grid; grid-template-columns: 1.35fr 1fr; gap: .45rem; }
     .visuals { padding: 1.2rem; display: grid; grid-template-columns: 1.15fr .85fr; gap: 1rem; align-content: start; }
     figure { margin: 0; padding: .8rem; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); overflow: hidden; }
     figure:first-child { grid-column: 1 / -1; }
@@ -88,15 +86,14 @@
     .legend { display: flex; flex-wrap: wrap; gap: .8rem; margin-top: .8rem; color: var(--muted); font-size: .75rem; }
     .dot { display: inline-block; width: .65rem; height: .65rem; border-radius: 50%; margin-right: .3rem; }
     @media (max-width: 900px) {
-      header { align-items: start; }
+      header { align-items: center; }
       main { grid-template-columns: 1fr; }
       aside { border-right: 0; border-bottom: 1px solid var(--line); }
       .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .controls .card:first-child { grid-column: 1 / -1; }
+      .controls .run-card { grid-column: 1 / -1; }
     }
     @media (max-width: 640px) {
-      header { padding: 1.3rem; display: block; }
-      .status { text-align: left; margin-top: .8rem; }
+      header { padding: .85rem 1rem; }
       .controls, .visuals { grid-template-columns: 1fr; }
       figure:first-child { grid-column: auto; }
       aside, .visuals { padding: .75rem; }
@@ -105,18 +102,14 @@
 </head>
 <body>
   <header>
-    <div>
-      <h1>Perception environment</h1>
-      <p>Set the physical parameters, then run the ball through the world and compare the observation with its possible hidden paths.</p>
-    </div>
-    <div class="status"><span id="runState">RUNNING</span><br><span id="visibilityState">VISIBLE</span></div>
+    <h1>Perception environment</h1>
+    <div class="status"><span id="runState">READY</span><span id="visibilityState">VISIBLE</span></div>
   </header>
   <main>
     <aside>
+      <div class="section-title">Parameters</div>
       <div class="controls">
         <section class="card run-card">
-          <h2>Set parameters, then run</h2>
-          <p class="hint">Adjust the controls below. The ball resets whenever a parameter changes, ready for a clean comparison.</p>
           <div class="actions">
             <button class="primary" id="runSimulation">Run simulation</button>
             <button id="reset">Reset</button>
@@ -124,37 +117,34 @@
         </section>
 
         <section class="card">
-          <h2>Set the forces</h2>
-          <p class="hint">Zero turns a force off. Negative and positive values select the direction.</p>
+          <h2>Forces</h2>
           <label>Wind · left ↔ right<output data-for="wind"></output><input id="wind" type="range" min="-0.5" max="0.5" step="0.01" value="0"></label>
           <label>Gravity · down ↔ up<output data-for="gravity"></output><input id="gravity" type="range" min="-0.8" max="0.4" step="0.01" value="0"></label>
           <label>Damping · λ<output data-for="damping"></output><input id="damping" type="range" min="0" max="1" step="0.01" value="0"></label>
         </section>
 
         <section class="card">
-          <h2>Add a vertical wall</h2>
-          <p class="hint">Enable it first, then set its horizontal position and bounciness.</p>
+          <h2>Vertical wall</h2>
           <label class="check">Enabled<input id="verticalWallEnabled" type="checkbox"></label>
           <label>Position · x<output data-for="verticalWallPosition"></output><input id="verticalWallPosition" type="range" min="0.2" max="0.95" step="0.01" value="0.72"></label>
           <label>Restitution<output data-for="verticalRestitution"></output><input id="verticalRestitution" type="range" min="0" max="1" step="0.01" value="0.8"></label>
         </section>
 
         <section class="card">
-          <h2>Add a horizontal wall</h2>
-          <p class="hint">Enable it first, then set its vertical position and bounciness.</p>
+          <h2>Horizontal wall</h2>
           <label class="check">Enabled<input id="horizontalWallEnabled" type="checkbox"></label>
           <label>Position · y<output data-for="horizontalWallPosition"></output><input id="horizontalWallPosition" type="range" min="0.05" max="0.9" step="0.01" value="0.18"></label>
           <label>Restitution<output data-for="horizontalRestitution"></output><input id="horizontalRestitution" type="range" min="0" max="1" step="0.01" value="0.75"></label>
         </section>
 
         <section class="card">
-          <h2>Set the ball entry</h2>
+          <h2>Ball</h2>
           <label>Initial y<output data-for="initialY"></output><input id="initialY" type="range" min="0.15" max="0.85" step="0.01" value="0.55"></label>
           <label>Initial v<sub>x</sub><output data-for="initialVx"></output><input id="initialVx" type="range" min="0.08" max="0.55" step="0.01" value="0.28"></label>
         </section>
 
         <section class="card">
-          <h2>Set the gray occluder</h2>
+          <h2>Occluder</h2>
           <label>Left edge<output data-for="occluderLeft"></output><input id="occluderLeft" type="range" min="0.2" max="0.65" step="0.01" value="0.38"></label>
           <label>Right edge<output data-for="occluderRight"></output><input id="occluderRight" type="range" min="0.35" max="0.85" step="0.01" value="0.58"></label>
         </section>

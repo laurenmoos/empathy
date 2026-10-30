@@ -56,12 +56,15 @@ def test_explorer_is_a_self_contained_parameter_interface() -> None:
     assert parser.canvases == {"worldCanvas", "beliefCanvas"}
     assert not parser.external_urls
     assert "requestAnimationFrame" in source
-    assert "Set parameters, then run" in source
+    assert "Parameters" in source
     assert "Run simulation" in source
     assert "Start with an example" not in source
     assert 'id="preset"' not in source
     assert "const presets" not in source
     assert "playing = false" in source
+    assert "Adjust the controls below" not in source
+    assert "Set the physical parameters, then run" not in source
+    assert '<br><span id="visibilityState">' not in source
 
 
 def test_explorer_exposes_the_same_operator_update_order_as_the_simulator() -> None:

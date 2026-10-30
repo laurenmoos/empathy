@@ -108,6 +108,14 @@ def test_learned_example_connects_ground_truth_model1_and_model2() -> None:
     assert len(payload["ground_truth"]["world_flat"]) == 12
 
 
+def test_learned_square_frames_preserve_their_aspect_ratio() -> None:
+    source, _ = parsed_explorer()
+
+    assert "const side = Math.min(worldCanvas.width, worldCanvas.height);" in source
+    assert "drawImage(buffer, 0, 0, worldCanvas.width, worldCanvas.height)" not in source
+    assert 'worldCtx.imageSmoothingQuality = "high";' in source
+
+
 def test_explorer_exposes_the_same_operator_update_order_as_the_simulator() -> None:
     source, _ = parsed_explorer()
 

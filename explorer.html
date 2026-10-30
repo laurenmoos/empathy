@@ -380,8 +380,14 @@
       const buffer = document.createElement("canvas");
       buffer.width = truth.width; buffer.height = truth.height;
       buffer.getContext("2d").putImageData(image, 0, 0);
-      worldCtx.imageSmoothingEnabled = false;
-      worldCtx.drawImage(buffer, 0, 0, worldCanvas.width, worldCanvas.height);
+      worldCtx.fillStyle = "#05090b";
+      worldCtx.fillRect(0, 0, worldCanvas.width, worldCanvas.height);
+      const side = Math.min(worldCanvas.width, worldCanvas.height);
+      const left = (worldCanvas.width - side) / 2;
+      const top = (worldCanvas.height - side) / 2;
+      worldCtx.imageSmoothingEnabled = true;
+      worldCtx.imageSmoothingQuality = "high";
+      worldCtx.drawImage(buffer, left, top, side, side);
     }
 
     function drawLearnedBelief() {

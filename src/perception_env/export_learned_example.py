@@ -43,9 +43,11 @@ def _rollout_payload(
         frames = archive["frames"].astype(np.uint8)
         world_flat = archive["world_flat"].astype(float)
     metadata = json.loads(metadata_path.read_text())
+    hidden_start = int(metadata["hidden_start"])
+    hidden_end = int(metadata["hidden_end"])
     reappearance_step = int(metadata["reappearance_step"])
-    if not 0 <= reappearance_step < len(frames):
-        raise ValueError("reappearance step must index a ground-truth frame")
+    if not 0 <= hidden_start <= hidden_end < reappearance_step < len(frames):
+        raise ValueError("hidden interval and reappearance must index the ground-truth clip")
 
     event_stack = np.stack((pre, post, post - pre), axis=0)
     beliefs = np.repeat(event_stack[None, None], 4, axis=1)
@@ -61,6 +63,8 @@ def _rollout_payload(
             "width": int(frames.shape[2]),
             "height": int(frames.shape[1]),
             "frame_count": int(frames.shape[0]),
+            "hidden_start": hidden_start,
+            "hidden_end": hidden_end,
             "reappearance_step": reappearance_step,
             "frames_base64": _encoded_u8(frames),
             "world_flat": world_flat.tolist(),

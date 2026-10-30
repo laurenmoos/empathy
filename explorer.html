@@ -9,12 +9,10 @@
       color-scheme: dark;
       --ink: #ecf6f5;
       --muted: #91a7aa;
-      --panel: rgba(16, 27, 31, 0.92);
-      --line: rgba(174, 217, 216, 0.16);
+      --panel: #101b1f;
+      --line: rgba(174, 217, 216, .16);
       --aqua: #63e6d5;
       --violet: #ad92ff;
-      --coral: #ff8b73;
-      --yellow: #f7d774;
     }
     * { box-sizing: border-box; }
     body {
@@ -24,451 +22,160 @@
       background: #091013;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-    header {
-      display: flex;
-      align-items: center;
-      justify-content: flex-start;
-      gap: 2rem;
-      padding: 1rem 1.4rem;
-      border-bottom: 1px solid var(--line);
+    header { padding: 1rem 1.4rem; border-bottom: 1px solid var(--line); }
+    h1 { margin: 0; font-size: 1.3rem; letter-spacing: -.03em; }
+    main {
+      display: grid;
+      grid-template-columns: minmax(15rem, 18rem) minmax(0, 1fr);
+      min-height: calc(100vh - 3.6rem);
     }
-    h1 { margin: 0; font-size: 1.35rem; letter-spacing: -0.03em; }
-    main { display: grid; grid-template-columns: minmax(16rem, 19rem) 1fr; min-height: calc(100vh - 3.8rem); }
-    aside { padding: 1rem; border-right: 1px solid var(--line); background: rgba(4, 11, 13, .35); }
-    .controls { display: grid; gap: 0; }
-    .card {
-      padding: .85rem .25rem 1rem;
-      border: 0;
-      border-bottom: 1px solid var(--line);
-      border-radius: 0;
-      background: transparent;
-      box-shadow: none;
+    aside {
+      padding: 1rem;
+      border-right: 1px solid var(--line);
+      background: rgba(4, 11, 13, .35);
     }
-    .run-card {
-      padding: 0 0 .85rem;
-      border: 0;
-      background: transparent;
-    }
-    .card h2 { margin: 0 0 .6rem; font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
-    label { display: grid; grid-template-columns: 1fr auto; gap: .25rem .75rem; margin-top: .72rem; font-size: .82rem; }
-    label:first-of-type { margin-top: 0; }
-    output { color: var(--aqua); font: 600 .75rem ui-monospace, monospace; }
-    input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: var(--aqua); }
-    input[type="range"]:disabled { opacity: .35; }
-    button {
+    h2 { margin: 0; font-size: 1rem; }
+    .intro { margin: .45rem 0 1rem; color: var(--muted); font-size: .78rem; line-height: 1.45; }
+    label { display: grid; gap: .35rem; color: var(--muted); font-size: .75rem; }
+    select, button {
+      width: 100%;
+      padding: .65rem .75rem;
       color: var(--ink);
       background: #18262a;
       border: 1px solid rgba(174, 217, 216, .22);
       border-radius: 9px;
-      padding: .65rem .75rem;
       font: inherit;
     }
-    button { cursor: pointer; font-weight: 650; }
-    button.primary { background: var(--aqua); color: #06201d; border-color: transparent; }
-    .actions { display: grid; gap: .55rem; }
-    .view-switch, .playback { display: grid; gap: .45rem; }
-    .view-switch { grid-template-columns: 1fr 1fr; }
-    .playback { grid-template-columns: 1.35fr 1fr; }
-    .mode-choice { text-align: left; }
-    .mode-choice strong, .mode-choice span { display: block; }
-    .mode-choice span { margin-top: .18rem; color: var(--muted); font-size: .67rem; font-weight: 450; }
-    .mode-choice.active { border-color: var(--aqua); box-shadow: inset 0 0 0 1px var(--aqua); }
-    .mode-choice.active span { color: #c5e1df; }
-    .mode-context { min-height: 2.2em; margin: 0; color: var(--muted); font-size: .72rem; line-height: 1.35; }
-    .rollout-picker { padding: .7rem; border: 1px solid var(--line); border-radius: 10px; background: rgba(16, 27, 31, .72); }
-    .rollout-picker label { margin: 0; }
-    select { grid-column: 1 / -1; width: 100%; margin-top: .35rem; padding: .5rem; color: var(--ink); background: #18262a; border: 1px solid var(--line); border-radius: 8px; }
-    [hidden] { display: none !important; }
-    .model-view main { grid-template-columns: minmax(14rem, 16rem) 1fr; }
-    .model-view .simulation-settings { display: none; }
-    .visuals { padding: 1.2rem; display: grid; grid-template-columns: 1.15fr .85fr; gap: 1rem; align-content: start; }
-    figure { margin: 0; padding: .8rem; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); overflow: hidden; }
-    figure:first-child { grid-column: 1 / -1; }
-    figcaption { display: flex; justify-content: space-between; align-items: baseline; padding: .15rem .25rem .75rem; }
-    figcaption strong { font-size: .95rem; }
-    canvas { display: block; width: 100%; aspect-ratio: 16 / 7; border-radius: 10px; background: #05090b; }
-    #beliefCanvas { aspect-ratio: 1 / 1; }
-    .truth-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: .6rem; margin-top: .8rem; }
-    .metric { padding: .85rem; background: rgba(5, 12, 14, .66); border: 1px solid var(--line); border-radius: 11px; }
-    .metric small { display: block; color: var(--muted); margin-bottom: .3rem; }
-    .metric b { font: 650 .86rem ui-monospace, monospace; }
-    .model-two { align-self: start; padding: 1rem; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
-    .model-two strong { display: block; font-size: .95rem; }
-    .model-two small { display: block; margin: .85rem 0 .25rem; color: var(--muted); }
-    .model-two b { font: 650 .9rem ui-monospace, monospace; }
-    .comparison { display: grid; gap: .45rem; margin-top: 1rem; }
-    .comparison-row { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: .5rem; align-items: center; padding: .5rem 0; border-top: 1px solid var(--line); font-size: .72rem; }
-    .comparison-row.heading { color: var(--muted); border-top: 0; padding-top: 0; }
-    .comparison-row span:not(:first-child) { font-family: ui-monospace, monospace; }
-    .legend { display: flex; flex-wrap: wrap; gap: .8rem; margin-top: .8rem; color: var(--muted); font-size: .75rem; }
-    .dot { display: inline-block; width: .65rem; height: .65rem; border-radius: 50%; margin-right: .3rem; }
-    @media (max-width: 900px) {
-      header { align-items: center; }
-      main, .model-view main { grid-template-columns: 1fr; }
-      aside { border-right: 0; border-bottom: 1px solid var(--line); }
-      .controls { grid-template-columns: 1fr; }
-      .controls .run-card { grid-column: 1 / -1; }
+    button { cursor: pointer; font-weight: 700; }
+    button.primary { color: #06201d; background: var(--aqua); border-color: transparent; }
+    .buttons { display: grid; grid-template-columns: 1.35fr 1fr; gap: .45rem; margin-top: .7rem; }
+    .status { min-height: 2.5em; margin: .7rem 0 0; color: var(--muted); font-size: .72rem; line-height: 1.35; }
+    .model-two {
+      margin-top: 1.2rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--line);
     }
-    @media (max-width: 640px) {
-      header { padding: .85rem 1rem; }
-      .controls, .visuals { grid-template-columns: 1fr; }
-      figure:first-child { grid-column: auto; }
-      aside, .visuals { padding: .75rem; }
+    .model-two > small { display: block; margin: .45rem 0 .25rem; color: var(--muted); }
+    .model-two > b { font: 650 .82rem ui-monospace, monospace; }
+    .comparison { margin-top: .8rem; }
+    .comparison-row {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 1fr;
+      gap: .35rem;
+      padding: .45rem 0;
+      border-top: 1px solid var(--line);
+      font-size: .68rem;
+    }
+    .comparison-row.heading { color: var(--muted); border-top: 0; }
+    .comparison-row span:not(:first-child) { font-family: ui-monospace, monospace; }
+    .stage { padding: 1.2rem; }
+    figure {
+      margin: 0;
+      padding: .9rem;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel);
+    }
+    figcaption {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: .1rem .2rem .75rem;
+      font-size: .9rem;
+    }
+    figcaption span { color: var(--muted); font-size: .75rem; }
+    canvas {
+      display: block;
+      width: 100%;
+      aspect-ratio: 16 / 8;
+      border-radius: 10px;
+      background: #05090b;
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-top: .75rem;
+      color: var(--muted);
+      font-size: .73rem;
+    }
+    .dot {
+      display: inline-block;
+      width: .65rem;
+      height: .65rem;
+      margin-right: .3rem;
+      border-radius: 50%;
+      vertical-align: -.05rem;
+    }
+    .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin-top: .75rem; }
+    .metric { padding: .75rem; border: 1px solid var(--line); border-radius: 10px; background: rgba(5, 12, 14, .6); }
+    .metric small { display: block; margin-bottom: .25rem; color: var(--muted); }
+    .metric b { font: 650 .8rem ui-monospace, monospace; }
+    @media (max-width: 820px) {
+      main { grid-template-columns: 1fr; }
+      aside { border-right: 0; border-bottom: 1px solid var(--line); }
+    }
+    @media (max-width: 560px) {
+      header, aside, .stage { padding: .75rem; }
+      .metrics { grid-template-columns: 1fr; }
+      figcaption { align-items: flex-start; flex-direction: column; gap: .2rem; }
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Perception environment</h1>
-  </header>
+  <header><h1>Perception environment</h1></header>
   <main>
     <aside>
-      <div class="controls">
-        <section class="card run-card">
-          <div class="actions">
-            <div class="view-switch" aria-label="Choose what to inspect">
-              <button class="mode-choice active" id="simulationMode">
-                <strong>Simulation view</strong>
-                <span>change forces and inspect the world</span>
-              </button>
-              <button class="mode-choice" id="runLearned">
-                <strong>Learned rollout</strong>
-                <span>watch truth, beliefs, and the world guess together</span>
-              </button>
-            </div>
-            <p class="mode-context" id="modeContext">You’re peeking directly into the world. The controls change its forces.</p>
-            <div class="rollout-picker" id="rolloutPicker" hidden>
-              <label>Held-out rollout<select id="rolloutSelect"></select></label>
-            </div>
-            <div class="playback">
-              <button class="primary" id="runSimulation">Play simulation</button>
-              <button id="reset">Reset</button>
-            </div>
-          </div>
-        </section>
-
-        <section class="card simulation-settings">
-          <h2>Forces</h2>
-          <label>Wind · left ↔ right<output data-for="wind"></output><input id="wind" type="range" min="-0.5" max="0.5" step="0.01" value="0"></label>
-          <label>Gravity · down ↔ up<output data-for="gravity"></output><input id="gravity" type="range" min="-0.8" max="0.4" step="0.01" value="0"></label>
-          <label>Damping · λ<output data-for="damping"></output><input id="damping" type="range" min="0" max="1" step="0.01" value="0"></label>
-        </section>
-
-        <section class="card simulation-settings">
-          <h2>Ball</h2>
-          <label>Initial y<output data-for="initialY"></output><input id="initialY" type="range" min="0.15" max="0.85" step="0.01" value="0.55"></label>
-          <label>Initial horizontal speed<output data-for="initialVx"></output><input id="initialVx" type="range" min="0.08" max="0.55" step="0.01" value="0.28"></label>
-        </section>
-
-        <section class="card simulation-settings">
-          <h2>Occluder</h2>
-          <label>Left edge<output data-for="occluderLeft"></output><input id="occluderLeft" type="range" min="0.2" max="0.65" step="0.01" value="0.38"></label>
-          <label>Right edge<output data-for="occluderRight"></output><input id="occluderRight" type="range" min="0.35" max="0.85" step="0.01" value="0.58"></label>
-        </section>
+      <h2>Learned rollout</h2>
+      <p class="intro">Watch the observed ball and Model 1’s possible hidden paths in the same scene.</p>
+      <label>Held-out rollout<select id="rolloutSelect"></select></label>
+      <div class="buttons">
+        <button class="primary" id="playback">Play rollout</button>
+        <button id="reset">Reset</button>
       </div>
-    </aside>
+      <p class="status" id="statusMessage">Loading learned rollouts…</p>
 
-    <section class="visuals">
-      <figure id="truthPanel">
-        <figcaption><strong>Ground truth</strong><span id="truthPhase"></span></figcaption>
-        <canvas id="worldCanvas" width="1200" height="525"></canvas>
-        <div class="legend" id="truthLegend">
-          <span><i class="dot" style="background:var(--coral)"></i>ball</span>
-          <span><i class="dot" style="background:var(--aqua)"></i>visible trajectory</span>
-          <span><i class="dot" style="background:var(--yellow)"></i>wall</span>
-        </div>
-        <div class="truth-metrics" aria-label="Ground truth state">
-          <div class="metric"><small>Elapsed</small><b id="timeReadout">0.0 s</b></div>
-          <div class="metric"><small>Ball position</small><b id="stateReadout">12% across · 55% high</b></div>
-        </div>
-      </figure>
-      <figure id="modelOnePanel" hidden>
-        <figcaption><strong>Model 1 · Belief superposition</strong><span id="beliefPhase"></span></figcaption>
-        <canvas id="beliefCanvas" width="600" height="600"></canvas>
-        <div class="legend">
-          <span><i class="dot" style="background:var(--violet)"></i>brighter = more rollouts agree</span>
-        </div>
-      </figure>
-      <section class="model-two" id="modelTwoPanel" aria-label="Model 2 output" hidden>
-        <strong>Model 2 · Second-order perception</strong>
+      <section class="model-two" id="modelTwoPanel" aria-label="Model 2 output">
+        <h2>Model 2 · Second-order perception</h2>
         <small>World guess · evaluation with normalized parameters</small>
-        <b id="operatorReadout">Forces on the ball: none</b>
+        <b id="operatorReadout">Waiting for beliefs</b>
         <div class="comparison">
           <div class="comparison-row heading"><span>Operator</span><span>Actual world</span><span>Model 2 guess</span></div>
           <div id="comparisonRows"></div>
         </div>
       </section>
+    </aside>
+
+    <section class="stage">
+      <figure id="truthPanel">
+        <figcaption>
+          <strong>Observed rollout + Model 1 beliefs</strong>
+          <span id="truthPhase">loading</span>
+        </figcaption>
+        <canvas id="worldCanvas" width="1200" height="600"></canvas>
+        <div class="legend" id="beliefLegend">
+          <span><i class="dot" style="background:white"></i>white = observed ball</span>
+          <span><i class="dot" style="background:var(--violet)"></i>purple = Model 1’s possible hidden paths</span>
+        </div>
+        <div class="metrics">
+          <div class="metric"><small>Playhead</small><b id="timeReadout">frame 1</b></div>
+          <div class="metric"><small>Belief state</small><b id="beliefPhase">pre-belief</b></div>
+        </div>
+      </figure>
     </section>
   </main>
 
   <script>
-    const $ = (id) => document.getElementById(id);
-    const controlIds = [
-      "wind", "gravity", "damping", "initialY", "initialVx", "occluderLeft", "occluderRight"
-    ];
-    const numericIds = controlIds.filter(id => !id.endsWith("Enabled"));
+    const $ = id => document.getElementById(id);
     const worldCanvas = $("worldCanvas");
-    const beliefCanvas = $("beliefCanvas");
     const worldCtx = worldCanvas.getContext("2d");
-    const beliefCtx = beliefCanvas.getContext("2d");
-    const dt = 0.1;
+    let learnedRollouts = [];
+    let learnedData = null;
+    let learnedIndex = 0;
+    let learnedFrame = 0;
     let playing = false;
     let accumulator = 0;
     let previousTimestamp = 0;
-    let state;
-    let trail = [];
-    let stepCount = 0;
-    let possiblePaths = [];
-    let learnedMode = false;
-    let learnedRollouts = [];
-    let learnedIndex = 0;
-    let learnedData = null;
-    let learnedFrame = 0;
-    let learnedAccumulator = 0;
-    let learnedPlaying = false;
-
-    function params() {
-      const p = Object.fromEntries(numericIds.map(id => [id, Number($(id).value)]));
-      p.verticalWallEnabled = true;
-      p.verticalWallPosition = 0.9;
-      p.verticalRestitution = 0.85;
-      p.horizontalWallEnabled = true;
-      p.horizontalWallPosition = 0.1;
-      p.horizontalRestitution = 0.75;
-      if (p.occluderRight < p.occluderLeft + 0.08) p.occluderRight = p.occluderLeft + 0.08;
-      return p;
-    }
-
-    function initialState(yOffset = 0, vxOffset = 0) {
-      const p = params();
-      return {x: 0.12, y: p.initialY + yOffset, vx: p.initialVx + vxOffset, vy: 0};
-    }
-
-    function advance(source, p) {
-      const next = {...source};
-      // 1. acceleration
-      next.vx += p.wind * dt;
-      next.vy += p.gravity * dt;
-      // 2. damping
-      const decay = Math.exp(-p.damping * dt);
-      next.vx *= decay;
-      next.vy *= decay;
-      // 3. position
-      next.x += next.vx * dt;
-      next.y += next.vy * dt;
-      // 4. collision resolution
-      if (p.verticalWallEnabled && ((source.x < p.verticalWallPosition && next.x >= p.verticalWallPosition) || (source.x > p.verticalWallPosition && next.x <= p.verticalWallPosition))) {
-        next.x = p.verticalWallPosition - (next.x - p.verticalWallPosition);
-        next.vx *= -p.verticalRestitution;
-      }
-      if (p.horizontalWallEnabled && ((source.y < p.horizontalWallPosition && next.y >= p.horizontalWallPosition) || (source.y > p.horizontalWallPosition && next.y <= p.horizontalWallPosition))) {
-        next.y = p.horizontalWallPosition - (next.y - p.horizontalWallPosition);
-        next.vy *= -p.horizontalRestitution;
-      }
-      return next;
-    }
-
-    function rebuildPossibilities() {
-      const p = params();
-      possiblePaths = [];
-      for (const dy of [-0.04, -0.02, 0, 0.02, 0.04]) {
-        for (const dvx of [-0.04, -0.02, 0, 0.02, 0.04]) {
-          let ghost = initialState(dy, dvx);
-          const path = [ghost];
-          for (let i = 0; i < 80; i++) {
-            ghost = advance(ghost, p);
-            path.push(ghost);
-            if (ghost.x < -0.1 || ghost.x > 1.1 || ghost.y < -0.1 || ghost.y > 1.1) break;
-          }
-          possiblePaths.push(path);
-        }
-      }
-    }
-
-    function resetSimulation() {
-      state = initialState();
-      trail = [state];
-      stepCount = 0;
-      accumulator = 0;
-      rebuildPossibilities();
-      updateOutputs();
-      draw();
-    }
-
-    function setControlsDisabled(disabled) {
-      controlIds.forEach(id => { $(id).disabled = disabled; });
-    }
-
-    function worldPoint(canvas, s) {
-      const pad = canvas.width * 0.04;
-      return {x: pad + s.x * (canvas.width - 2 * pad), y: pad + (1 - s.y) * (canvas.height - 2 * pad)};
-    }
-
-    function clear(ctx, canvas) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "#05090b";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.strokeStyle = "rgba(174,217,216,.08)";
-      ctx.lineWidth = 1;
-      for (let i = 1; i < 10; i++) {
-        ctx.beginPath(); ctx.moveTo(canvas.width * i / 10, 0); ctx.lineTo(canvas.width * i / 10, canvas.height); ctx.stroke();
-      }
-      for (let i = 1; i < 5; i++) {
-        ctx.beginPath(); ctx.moveTo(0, canvas.height * i / 5); ctx.lineTo(canvas.width, canvas.height * i / 5); ctx.stroke();
-      }
-    }
-
-    function strokePath(ctx, canvas, points, color, width) {
-      ctx.beginPath();
-      points.forEach((point, index) => {
-        const pixel = worldPoint(canvas, point);
-        if (index === 0) ctx.moveTo(pixel.x, pixel.y); else ctx.lineTo(pixel.x, pixel.y);
-      });
-      ctx.strokeStyle = color;
-      ctx.lineWidth = width;
-      ctx.stroke();
-    }
-
-    function drawWalls(ctx, canvas, p) {
-      ctx.save();
-      ctx.strokeStyle = "#f7d774";
-      ctx.lineWidth = 4;
-      ctx.setLineDash([12, 9]);
-      if (p.verticalWallEnabled) {
-        const wall = worldPoint(canvas, {x: p.verticalWallPosition, y: 0});
-        ctx.beginPath(); ctx.moveTo(wall.x, 0); ctx.lineTo(wall.x, canvas.height); ctx.stroke();
-      }
-      if (p.horizontalWallEnabled) {
-        const wall = worldPoint(canvas, {x: 0, y: p.horizontalWallPosition});
-        ctx.beginPath(); ctx.moveTo(0, wall.y); ctx.lineTo(canvas.width, wall.y); ctx.stroke();
-      }
-      ctx.setLineDash([]);
-      ctx.fillStyle = "rgba(247,215,116,.82)";
-      ctx.font = `${Math.max(12, canvas.width * .014)}px ui-monospace, monospace`;
-      const rightWall = worldPoint(canvas, {x: p.verticalWallPosition, y: 0});
-      const floor = worldPoint(canvas, {x: 0, y: p.horizontalWallPosition});
-      ctx.textAlign = "right";
-      ctx.fillText("right wall", rightWall.x - 8, 20);
-      ctx.textAlign = "left";
-      ctx.fillText("floor", 10, floor.y - 8);
-      ctx.restore();
-    }
-
-    function drawWorld() {
-      const p = params();
-      clear(worldCtx, worldCanvas);
-      drawWalls(worldCtx, worldCanvas, p);
-      strokePath(worldCtx, worldCanvas, trail, "rgba(99,230,213,.72)", 4);
-      const ball = worldPoint(worldCanvas, state);
-      worldCtx.beginPath();
-      worldCtx.arc(ball.x, ball.y, 12, 0, Math.PI * 2);
-      worldCtx.fillStyle = "#ff8b73";
-      worldCtx.shadowColor = "#ff8b73";
-      worldCtx.shadowBlur = 18;
-      worldCtx.fill();
-      worldCtx.shadowBlur = 0;
-      const left = worldPoint(worldCanvas, {x: p.occluderLeft, y: 0});
-      const right = worldPoint(worldCanvas, {x: p.occluderRight, y: 0});
-      const top = worldPoint(worldCanvas, {x: 0, y: .92});
-      const bottom = worldPoint(worldCanvas, {x: 0, y: .08});
-      const gradient = worldCtx.createLinearGradient(left.x, 0, right.x, 0);
-      gradient.addColorStop(0, "#293338"); gradient.addColorStop(.5, "#465158"); gradient.addColorStop(1, "#293338");
-      worldCtx.fillStyle = gradient;
-      worldCtx.fillRect(left.x, top.y, right.x - left.x, bottom.y - top.y);
-      worldCtx.strokeStyle = "rgba(255,255,255,.2)";
-      worldCtx.strokeRect(left.x, top.y, right.x - left.x, bottom.y - top.y);
-    }
-
-    function drawBelief() {
-      const p = params();
-      clear(beliefCtx, beliefCanvas);
-      drawWalls(beliefCtx, beliefCanvas, p);
-      possiblePaths.forEach((path, index) => {
-        const hue = 255 + (index % 5) * 7;
-        strokePath(beliefCtx, beliefCanvas, path, `hsla(${hue}, 95%, 75%, .10)`, 5);
-        const endpoint = worldPoint(beliefCanvas, path[path.length - 1]);
-        beliefCtx.fillStyle = "rgba(173,146,255,.22)";
-        beliefCtx.fillRect(endpoint.x - 3, endpoint.y - 3, 6, 6);
-      });
-      const ball = worldPoint(beliefCanvas, state);
-      beliefCtx.beginPath(); beliefCtx.arc(ball.x, ball.y, 7, 0, Math.PI * 2);
-      beliefCtx.fillStyle = "#ff8b73"; beliefCtx.fill();
-      const left = worldPoint(beliefCanvas, {x: p.occluderLeft, y: 0});
-      const right = worldPoint(beliefCanvas, {x: p.occluderRight, y: 0});
-      beliefCtx.fillStyle = "rgba(95,108,116,.16)";
-      beliefCtx.fillRect(left.x, 0, right.x - left.x, beliefCanvas.height);
-    }
-
-    function decodeBytes(encoded) {
-      const raw = atob(encoded);
-      return Uint8Array.from(raw, character => character.charCodeAt(0));
-    }
-
-    function drawLearnedWorld() {
-      const truth = learnedData.ground_truth;
-      const bytes = learnedData.frameBytes;
-      const offset = learnedFrame * truth.width * truth.height;
-      const image = worldCtx.createImageData(truth.width, truth.height);
-      for (let index = 0; index < truth.width * truth.height; index++) {
-        const value = bytes[offset + index];
-        const cursor = index * 4;
-        image.data[cursor] = value;
-        image.data[cursor + 1] = value;
-        image.data[cursor + 2] = value;
-        image.data[cursor + 3] = 255;
-      }
-      const buffer = document.createElement("canvas");
-      buffer.width = truth.width; buffer.height = truth.height;
-      buffer.getContext("2d").putImageData(image, 0, 0);
-      worldCtx.fillStyle = "#05090b";
-      worldCtx.fillRect(0, 0, worldCanvas.width, worldCanvas.height);
-      const side = Math.min(worldCanvas.width, worldCanvas.height);
-      const left = (worldCanvas.width - side) / 2;
-      const top = (worldCanvas.height - side) / 2;
-      worldCtx.imageSmoothingEnabled = true;
-      worldCtx.imageSmoothingQuality = "high";
-      worldCtx.drawImage(buffer, left, top, side, side);
-    }
-
-    function drawLearnedBelief() {
-      const model = learnedData.model1;
-      const postObservation = learnedFrame >= learnedData.ground_truth.reappearance_step;
-      const values = postObservation ? learnedData.postBelief : learnedData.preBelief;
-      const image = beliefCtx.createImageData(model.width, model.height);
-      values.forEach((value, index) => {
-        const normalized = value / 255;
-        const intensity = Math.sqrt(normalized);
-        const cursor = index * 4;
-        image.data[cursor] = 42 + Math.round(intensity * 213);
-        image.data[cursor + 1] = 12 + Math.round(intensity * 112);
-        image.data[cursor + 2] = 70 + Math.round(intensity * 185);
-        image.data[cursor + 3] = 255;
-      });
-      const buffer = document.createElement("canvas");
-      buffer.width = model.width; buffer.height = model.height;
-      buffer.getContext("2d").putImageData(image, 0, 0);
-      beliefCtx.imageSmoothingEnabled = true;
-      beliefCtx.imageSmoothingQuality = "high";
-      beliefCtx.drawImage(buffer, 0, 0, beliefCanvas.width, beliefCanvas.height);
-    }
-
-    function forceSummary(p) {
-      const names = [];
-      if (p.wind) names.push(`wind ${p.wind < 0 ? "left" : "right"}`);
-      if (p.gravity) names.push(`gravity ${p.gravity < 0 ? "down" : "up"}`);
-      if (p.damping) names.push("damping");
-      return names.length ? names.join(" · ") : "none";
-    }
-
-    function learnedWorldSummary(flat) {
-      const names = [];
-      if (flat[0] >= .5) names.push(`vertical force ${flat[1].toFixed(2)}`);
-      if (flat[2] >= .5) names.push(`horizontal force ${flat[3].toFixed(2)}`);
-      if (flat[4] >= .5) names.push(`damping ${flat[5].toFixed(2)}`);
-      if (flat[6] >= .5) names.push("right wall");
-      if (flat[9] >= .5) names.push("floor");
-      return names.length ? names.join(" · ") : "constant motion";
-    }
 
     const worldSlots = [
       {name: "vertical force", activity: 0, parameters: [1]},
@@ -478,22 +185,9 @@
       {name: "floor", activity: 9, parameters: [10, 11]}
     ];
 
-    function worldSlotValue(flat, slot) {
-      if (flat[slot.activity] < .5) return "off";
-      return slot.parameters.map(index => Number(flat[index]).toFixed(2)).join(" · ");
-    }
-
-    function worldComparisonElements(actual, predicted) {
-      return worldSlots.map(slot => {
-        const row = document.createElement("div");
-        row.className = "comparison-row";
-        [slot.name, worldSlotValue(actual, slot), worldSlotValue(predicted, slot)].forEach(value => {
-          const cell = document.createElement("span");
-          cell.textContent = value;
-          row.append(cell);
-        });
-        return row;
-      });
+    function decodeBytes(encoded) {
+      const raw = atob(encoded);
+      return Uint8Array.from(raw, character => character.charCodeAt(0));
     }
 
     function validateWorldVector(value, name) {
@@ -510,23 +204,26 @@
       const model1 = rollout.model1;
       const model2 = rollout.model2;
       if (!truth || !model1 || !model2) throw new Error("rollout is missing a required model stage");
-      const truthDimensions = [truth.width, truth.height, truth.frame_count];
-      if (!truthDimensions.every(value => Number.isInteger(value) && value > 0)) {
-        throw new Error("ground-truth dimensions must be positive integers");
+      if (![truth.width, truth.height, truth.frame_count].every(Number.isInteger)) {
+        throw new Error("ground-truth dimensions must be integers");
       }
-      if (!Number.isInteger(truth.reappearance_step)
-          || truth.reappearance_step < 0
+      if (truth.width < 1 || truth.height < 1 || truth.frame_count < 1) {
+        throw new Error("ground-truth dimensions must be positive");
+      }
+      if (!Number.isInteger(truth.hidden_start)
+          || !Number.isInteger(truth.hidden_end)
+          || !Number.isInteger(truth.reappearance_step)
+          || truth.hidden_start < 0
+          || truth.hidden_start > truth.hidden_end
+          || truth.hidden_end >= truth.reappearance_step
           || truth.reappearance_step >= truth.frame_count) {
-        throw new Error("reappearance step must index the ground-truth clip");
+        throw new Error("hidden interval and reappearance must index the clip");
       }
       if (![model1.width, model1.height].every(value => Number.isInteger(value) && value > 0)) {
         throw new Error("belief dimensions must be positive integers");
       }
       validateWorldVector(truth.world_flat, "actual world");
       validateWorldVector(model2.predicted_world_flat, "predicted world");
-      for (const value of [truth.frames_base64, model1.pre_belief_u8, model1.post_belief_u8]) {
-        if (typeof value !== "string" || !value) throw new Error("rollout image data is missing");
-      }
       const frameBytes = decodeBytes(truth.frames_base64);
       const preBelief = decodeBytes(model1.pre_belief_u8);
       const postBelief = decodeBytes(model1.post_belief_u8);
@@ -537,12 +234,7 @@
           || postBelief.length !== model1.width * model1.height) {
         throw new Error("belief byte length does not match its dimensions");
       }
-      return {
-        ...rollout,
-        frameBytes,
-        preBelief,
-        postBelief
-      };
+      return {...rollout, frameBytes, preBelief, postBelief};
     }
 
     function validateLearnedPayload(payload) {
@@ -553,161 +245,182 @@
       return payload.rollouts.map(validateLearnedRollout);
     }
 
+    function worldSlotValue(flat, slot) {
+      if (flat[slot.activity] < .5) return "off";
+      return slot.parameters.map(index => Number(flat[index]).toFixed(2)).join(" · ");
+    }
+
+    function comparisonElements(actual, predicted) {
+      return worldSlots.map(slot => {
+        const row = document.createElement("div");
+        row.className = "comparison-row";
+        [slot.name, worldSlotValue(actual, slot), worldSlotValue(predicted, slot)].forEach(value => {
+          const cell = document.createElement("span");
+          cell.textContent = value;
+          row.append(cell);
+        });
+        return row;
+      });
+    }
+
+    function learnedWorldSummary(flat) {
+      const active = worldSlots
+        .filter(slot => flat[slot.activity] >= .5)
+        .map(slot => `${slot.name} ${worldSlotValue(flat, slot)}`);
+      return active.length ? active.join(" · ") : "constant motion";
+    }
+
+    function imageBuffer(width, height, values, colorize = false) {
+      const buffer = document.createElement("canvas");
+      buffer.width = width;
+      buffer.height = height;
+      const ctx = buffer.getContext("2d");
+      const image = ctx.createImageData(width, height);
+      values.forEach((value, index) => {
+        const cursor = index * 4;
+        if (colorize) {
+          const normalized = value / 255;
+          const intensity = Math.sqrt(normalized);
+          image.data[cursor] = 173;
+          image.data[cursor + 1] = 146;
+          image.data[cursor + 2] = 255;
+          image.data[cursor + 3] = Math.round(intensity * 230);
+        } else {
+          image.data[cursor] = value;
+          image.data[cursor + 1] = value;
+          image.data[cursor + 2] = value;
+          image.data[cursor + 3] = 255;
+        }
+      });
+      ctx.putImageData(image, 0, 0);
+      return buffer;
+    }
+
+    function drawBeliefOverlay(left, top, side) {
+      const truth = learnedData.ground_truth;
+      if (!(learnedFrame >= truth.hidden_start && learnedFrame <= truth.hidden_end)) return;
+      const postObservation = learnedFrame >= truth.reappearance_step;
+      const values = postObservation ? learnedData.postBelief : learnedData.preBelief;
+      const beliefBuffer = imageBuffer(
+        learnedData.model1.width,
+        learnedData.model1.height,
+        values,
+        true
+      );
+      worldCtx.save();
+      worldCtx.globalCompositeOperation = "screen";
+      worldCtx.globalAlpha = .92;
+      worldCtx.imageSmoothingEnabled = true;
+      worldCtx.imageSmoothingQuality = "high";
+      worldCtx.drawImage(beliefBuffer, left, top, side, side);
+      worldCtx.restore();
+    }
+
+    function drawLearnedWorld() {
+      if (!learnedData) return;
+      const truth = learnedData.ground_truth;
+      const frameSize = truth.width * truth.height;
+      const offset = learnedFrame * frameSize;
+      const frame = learnedData.frameBytes.slice(offset, offset + frameSize);
+      const buffer = imageBuffer(truth.width, truth.height, frame);
+      worldCtx.fillStyle = "#05090b";
+      worldCtx.fillRect(0, 0, worldCanvas.width, worldCanvas.height);
+      const side = Math.min(worldCanvas.width, worldCanvas.height);
+      const left = (worldCanvas.width - side) / 2;
+      const top = (worldCanvas.height - side) / 2;
+      worldCtx.imageSmoothingEnabled = true;
+      worldCtx.imageSmoothingQuality = "high";
+      worldCtx.drawImage(buffer, left, top, side, side);
+      drawBeliefOverlay(left, top, side);
+    }
+
+    function updateOutputs() {
+      if (!learnedData) return;
+      const truth = learnedData.ground_truth;
+      const postObservation = learnedFrame >= truth.reappearance_step;
+      const hidden = learnedFrame >= truth.hidden_start && learnedFrame <= truth.hidden_end;
+      $("timeReadout").textContent = `frame ${learnedFrame + 1} of ${truth.frame_count}`;
+      $("beliefPhase").textContent = postObservation ? "post-belief after observation"
+        : hidden ? "pre-belief · imagining hidden paths" : "waiting for occlusion";
+      $("truthPhase").textContent = `rollout ${learnedIndex + 1} of ${learnedRollouts.length}`;
+      $("playback").textContent = playing ? "Pause rollout" : "Play rollout";
+      $("statusMessage").textContent = hidden
+        ? "The ball is hidden. Purple shows Model 1’s belief beneath the occluder."
+        : postObservation
+          ? "The ball has reappeared. Model 1 has revised its belief."
+          : "The observed ball is approaching the occluder.";
+    }
+
+    function draw() {
+      drawLearnedWorld();
+      updateOutputs();
+    }
+
     function selectLearnedRollout(index) {
       const candidateIndex = Number(index);
       if (!Number.isInteger(candidateIndex) || !learnedRollouts[candidateIndex]) {
         throw new Error("learned rollout selection is out of range");
       }
       const candidate = learnedRollouts[candidateIndex];
-      const comparison = worldComparisonElements(
+      const comparison = comparisonElements(
         candidate.ground_truth.world_flat,
         candidate.model2.predicted_world_flat
       );
       learnedIndex = candidateIndex;
       learnedData = candidate;
       learnedFrame = 0;
-      learnedAccumulator = 0;
+      accumulator = 0;
       $("comparisonRows").replaceChildren(...comparison);
+      $("operatorReadout").textContent = learnedWorldSummary(candidate.model2.predicted_world_flat);
       draw();
     }
 
-    function setViewVisibility() {
-      document.body.classList.toggle("model-view", learnedMode);
-      $("truthPanel").hidden = false;
-      $("modelOnePanel").hidden = !learnedMode;
-      $("modelTwoPanel").hidden = !learnedMode;
-      $("rolloutPicker").hidden = !learnedMode;
-      $("truthLegend").hidden = learnedMode;
-    }
-
-    function updateOutputs() {
-      setViewVisibility();
-      numericIds.forEach(id => {
-        const output = document.querySelector(`output[data-for="${id}"]`);
-        if (!output) return;
-        const value = Number($(id).value);
-        let suffix = "";
-        if (id === "wind") suffix = value < 0 ? " · left" : value > 0 ? " · right" : "";
-        if (id === "gravity") suffix = value < 0 ? " · down" : value > 0 ? " · up" : "";
-        if (id === "damping") suffix = value === 0 ? "" : " · slows ball";
-        output.textContent = value.toFixed(2) + suffix;
-      });
-      const p = params();
-      if (learnedMode && learnedData) {
-        const count = learnedData.ground_truth.frame_count;
-        $("timeReadout").textContent = `frame ${learnedFrame + 1} of ${count}`;
-        $("stateReadout").textContent = "observed clip · saved ground truth";
-        $("operatorReadout").textContent = learnedWorldSummary(
-          learnedData.model2.predicted_world_flat
-        );
-        $("beliefPhase").textContent = learnedFrame >= learnedData.ground_truth.reappearance_step
-          ? "post-belief after observation" : "pre-belief";
-        $("truthPhase").textContent = `held-out rollout ${learnedIndex + 1} of ${learnedRollouts.length}`;
-        $("simulationMode").classList.remove("active");
-        $("runLearned").classList.add("active");
-        $("simulationMode").setAttribute("aria-pressed", "false");
-        $("runLearned").setAttribute("aria-pressed", "true");
-        $("modeContext").textContent = "Ground truth, Model 1 beliefs, and Model 2’s guess now share one playhead.";
-        $("runSimulation").textContent = learnedPlaying
-          ? "Pause learned example" : "Play learned example";
-        return;
+    async function loadLearnedRollouts() {
+      try {
+        const response = await fetch("learned-example.json");
+        if (!response.ok) throw new Error(`rollout request failed: ${response.status}`);
+        const payload = await response.json();
+        const prepared = validateLearnedPayload(payload);
+        const options = prepared.map((rollout, index) => {
+          const option = document.createElement("option");
+          option.value = String(index);
+          option.textContent = `Rollout ${index + 1} · ${rollout.example_id}`;
+          return option;
+        });
+        learnedRollouts = prepared;
+        $("rolloutSelect").replaceChildren(...options);
+        selectLearnedRollout(0);
+      } catch (error) {
+        playing = false;
+        $("statusMessage").textContent =
+          "Couldn’t load learned rollouts. Open the demo from http://localhost:8765.";
       }
-      $("timeReadout").textContent = `${(stepCount * dt).toFixed(1)} s`;
-      $("stateReadout").textContent = `${Math.round(state.x * 100)}% across · ${Math.round(state.y * 100)}% high`;
-      $("operatorReadout").textContent = `Forces on the ball: ${forceSummary(p)}`;
-      $("beliefPhase").textContent = "candidate hidden paths";
-      $("truthPhase").textContent = "interactive physics";
-      $("simulationMode").classList.add("active");
-      $("runLearned").classList.remove("active");
-      $("simulationMode").setAttribute("aria-pressed", "true");
-      $("runLearned").setAttribute("aria-pressed", "false");
-      $("modeContext").textContent = "You’re peeking directly into the world. The controls change its forces.";
-      $("runSimulation").textContent = playing
-        ? "Pause simulation" : "Play simulation";
-    }
-
-    function draw() {
-      if (learnedMode && learnedData) {
-        drawLearnedWorld(); drawLearnedBelief(); updateOutputs();
-      } else {
-        drawWorld(); updateOutputs();
-      }
-    }
-
-    function simulationStep() {
-      state = advance(state, params());
-      trail.push(state);
-      stepCount += 1;
-      if (trail.length > 160) trail.shift();
-      if (stepCount > 110 || state.x < -.15 || state.x > 1.15 || state.y < -.15 || state.y > 1.15) resetSimulation();
     }
 
     function animate(timestamp) {
       if (!previousTimestamp) previousTimestamp = timestamp;
       const elapsed = Math.min((timestamp - previousTimestamp) / 1000, .1);
       previousTimestamp = timestamp;
-      if (playing) {
+      if (playing && learnedData) {
         accumulator += elapsed;
-        while (accumulator >= .055) { simulationStep(); accumulator -= .055; }
-      }
-      if (learnedMode && learnedData && learnedPlaying) {
-        learnedAccumulator += elapsed;
-        if (learnedAccumulator >= .12) {
+        if (accumulator >= .12) {
           learnedFrame = (learnedFrame + 1) % learnedData.ground_truth.frame_count;
-          learnedAccumulator = 0;
+          accumulator = 0;
         }
       }
       draw();
       requestAnimationFrame(animate);
     }
 
-    controlIds.forEach(id => $(id).addEventListener("input", () => {
-      learnedMode = false;
-      learnedPlaying = false;
-      playing = false;
-      resetSimulation();
-    }));
+    $("playback").addEventListener("click", () => {
+      if (!learnedData) return;
+      playing = !playing;
+      updateOutputs();
+    });
     $("reset").addEventListener("click", () => {
-      if (learnedMode) {
-        learnedFrame = 0; learnedPlaying = false; learnedAccumulator = 0; draw(); return;
-      }
-      playing = false; resetSimulation();
-    });
-    $("runSimulation").addEventListener("click", () => {
-      if (learnedMode) {
-        learnedPlaying = !learnedPlaying; updateOutputs(); return;
-      }
-      playing = !playing; updateOutputs();
-    });
-    $("simulationMode").addEventListener("click", () => {
-      learnedMode = false; learnedPlaying = false; playing = false;
-      setControlsDisabled(false); resetSimulation();
-    });
-    $("runLearned").addEventListener("click", async () => {
-      try {
-        if (!learnedRollouts.length) {
-          const response = await fetch("learned-example.json");
-          if (!response.ok) throw new Error(`learned rollout request failed: ${response.status}`);
-          const payload = await response.json();
-          const prepared = validateLearnedPayload(payload);
-          const options = prepared.map((rollout, index) => {
-            const option = document.createElement("option");
-            option.value = String(index);
-            option.textContent = `Rollout ${index + 1} · ${rollout.example_id}`;
-            return option;
-          });
-          learnedRollouts = prepared;
-          $("rolloutSelect").replaceChildren(...options);
-          selectLearnedRollout(0);
-        }
-      } catch (error) {
-        learnedPlaying = false;
-        $("modeContext").textContent = "Couldn’t load learned rollouts. Open the demo from the local server and try again.";
-        return;
-      }
-      playing = false; learnedMode = true; learnedPlaying = true;
-      learnedFrame = 0; learnedAccumulator = 0;
-      setControlsDisabled(true);
+      playing = false;
+      learnedFrame = 0;
+      accumulator = 0;
       draw();
     });
     $("rolloutSelect").addEventListener("change", event => {
@@ -715,11 +428,11 @@
         selectLearnedRollout(event.target.value);
       } catch (error) {
         event.target.value = String(learnedIndex);
-        $("modeContext").textContent = "Couldn’t select that rollout; the previous valid rollout is still shown.";
+        $("statusMessage").textContent = "Couldn’t select that rollout; the previous one remains.";
       }
     });
 
-    resetSimulation();
+    loadLearnedRollouts();
     requestAnimationFrame(animate);
   </script>
 </body>

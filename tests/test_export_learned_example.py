@@ -28,7 +28,14 @@ def _write_record(root: Path, example_id: str, reappearance_step: int) -> None:
         world_flat=np.zeros(12, dtype=np.float32),
     )
     (truth / "metadata.json").write_text(
-        json.dumps({"example_id": example_id, "reappearance_step": reappearance_step})
+        json.dumps(
+            {
+                "example_id": example_id,
+                "hidden_start": 1,
+                "hidden_end": reappearance_step - 1,
+                "reappearance_step": reappearance_step,
+            }
+        )
     )
 
 
@@ -74,6 +81,13 @@ def test_export_learned_examples_preserves_order_boundaries_and_reappearance(
     assert [
         rollout["ground_truth"]["reappearance_step"] for rollout in payload["rollouts"]
     ] == [3, 4]
+    assert [
+        (
+            rollout["ground_truth"]["hidden_start"],
+            rollout["ground_truth"]["hidden_end"],
+        )
+        for rollout in payload["rollouts"]
+    ] == [(1, 2), (1, 3)]
     for rollout in payload["rollouts"]:
         assert set(rollout) == {"example_id", "ground_truth", "model1", "model2", "provenance"}
         assert set(rollout["model2"]) == {

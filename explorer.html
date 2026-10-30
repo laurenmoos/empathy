@@ -107,7 +107,7 @@
       border-radius: 50%;
       vertical-align: -.05rem;
     }
-    .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin-top: .75rem; }
+    .metrics { margin-top: .75rem; }
     .metric { padding: .75rem; border: 1px solid var(--line); border-radius: 10px; background: rgba(5, 12, 14, .6); }
     .metric small { display: block; margin-bottom: .25rem; color: var(--muted); }
     .metric b { font: 650 .8rem ui-monospace, monospace; }
@@ -137,10 +137,10 @@
 
       <section class="model-two" id="modelTwoPanel" aria-label="Model 2 output">
         <h2>Model 2 · Second-order perception</h2>
-        <small>World guess · evaluation with normalized parameters</small>
+        <small>Guessed active operators · normalized parameters</small>
         <b id="operatorReadout">Waiting for beliefs</b>
         <div class="comparison">
-          <div class="comparison-row heading"><span>Operator</span><span>Actual world</span><span>Model 2 guess</span></div>
+          <div class="comparison-row heading"><span>Operator</span><span>Ground-truth parameters</span><span>Guessed parameters</span></div>
           <div id="comparisonRows"></div>
         </div>
       </section>
@@ -159,7 +159,6 @@
         </div>
         <div class="metrics">
           <div class="metric"><small>Playhead</small><b id="timeReadout">frame 1</b></div>
-          <div class="metric"><small>Belief state</small><b id="beliefPhase">pre-belief</b></div>
         </div>
       </figure>
     </section>
@@ -340,8 +339,6 @@
       const postObservation = learnedFrame >= truth.reappearance_step;
       const hidden = learnedFrame >= truth.hidden_start && learnedFrame <= truth.hidden_end;
       $("timeReadout").textContent = `frame ${learnedFrame + 1} of ${truth.frame_count}`;
-      $("beliefPhase").textContent = postObservation ? "post-belief after observation"
-        : hidden ? "pre-belief · imagining hidden paths" : "waiting for occlusion";
       $("truthPhase").textContent = `rollout ${learnedIndex + 1} of ${learnedRollouts.length}`;
       $("playback").textContent = playing ? "Pause rollout" : "Play rollout";
       $("statusMessage").textContent = hidden

@@ -98,9 +98,11 @@ def test_beliefs_are_composited_into_the_observed_rollout() -> None:
     assert "Couldn’t load learned rollouts" in source
     assert "selectLearnedRollout" in source
     assert '$("rolloutSelect").addEventListener("change"' in source
-    assert "Actual world" in source
-    assert "Model 2 guess" in source
+    assert "Ground-truth parameters" in source
+    assert "Guessed parameters" in source
     assert "normalized parameters" in source
+    assert "beliefPhase" not in parser.ids
+    assert "Belief state" not in source
 
 
 def test_belief_overlay_renders_byte_values_without_clipping() -> None:

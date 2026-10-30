@@ -33,6 +33,15 @@ class WorldFamily:
         active = [slot.name for slot in world.slots if slot.active]
         if not set(active).issubset(self.allowed) or len(active) > self.max_active:
             return False
+        for slot in world.slots:
+            if not slot.active:
+                continue
+            configured = self.operator_config[slot.name]
+            spec = self.schema.spec(slot.name)
+            for name, value in slot.parameter_dict(spec).items():
+                low, high = (float(item) for item in configured[name]["range"])
+                if not low <= value <= high:
+                    return False
         wall_count = sum(name in {"vertical_wall", "horizontal_wall"} for name in active)
         return wall_count <= self.max_walls
 

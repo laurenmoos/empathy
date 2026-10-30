@@ -94,3 +94,24 @@ def test_empty_reachable_set_rasterizes_to_zeros() -> None:
 
     assert not occupancy.any()
 
+
+def test_query_endpoint_does_not_depend_on_later_rollout_invalidity() -> None:
+    grid = EntryStateGrid(
+        x_bounds=(0.8, 0.8),
+        y_bounds=(0.5, 0.5),
+        vx_bounds=(0.1, 0.1),
+        vy_bounds=(0.0, 0.0),
+        resolution=(1, 1, 1, 1),
+    )
+    world = WorldSchema.v1().world()
+
+    short = enumerate_reachable(
+        grid, world, (1,), SimulationConfig(dt=1.0, steps=1)
+    )
+    long = enumerate_reachable(
+        grid, world, (1,), SimulationConfig(dt=1.0, steps=3)
+    )
+
+    assert short.endpoints[1] == long.endpoints[1]
+    assert short.endpoints[1][0].x == 0.9
+

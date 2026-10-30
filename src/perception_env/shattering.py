@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from itertools import combinations
@@ -90,18 +91,52 @@ def count_labelings(matrix: LabelMatrix) -> int:
     return int(np.unique(matrix.values, axis=0).shape[0])
 
 
-def _candidate_subsets(
-    matrix: LabelMatrix, size: int, same_context: bool
-) -> list[tuple[int, ...]]:
-    if not same_context:
-        return list(combinations(range(len(matrix.probes)), size))
+def _context_groups(matrix: LabelMatrix) -> list[tuple[int, ...]]:
     by_context: dict[str, list[int]] = {}
     for index, probe in enumerate(matrix.probes):
         by_context.setdefault(probe.context_id, []).append(index)
+    return [tuple(indices) for indices in by_context.values()]
+
+
+def _candidate_count(matrix: LabelMatrix, size: int, same_context: bool) -> int:
+    if not same_context:
+        return math.comb(len(matrix.probes), size)
+    return sum(
+        math.comb(len(indices), size)
+        for indices in _context_groups(matrix)
+        if len(indices) >= size
+    )
+
+
+def _candidate_subsets(
+    matrix: LabelMatrix,
+    size: int,
+    same_context: bool,
+    budget: int,
+    rng: np.random.Generator,
+) -> tuple[list[tuple[int, ...]], bool]:
+    count = _candidate_count(matrix, size, same_context)
+    if count <= budget:
+        if not same_context:
+            return list(combinations(range(len(matrix.probes)), size)), True
+        candidates: set[tuple[int, ...]] = set()
+        for indices in _context_groups(matrix):
+            candidates.update(combinations(indices, size))
+        return sorted(candidates), True
+
+    groups = (
+        [tuple(range(len(matrix.probes)))]
+        if not same_context
+        else [indices for indices in _context_groups(matrix) if len(indices) >= size]
+    )
     candidates: set[tuple[int, ...]] = set()
-    for indices in by_context.values():
-        candidates.update(combinations(indices, size))
-    return sorted(candidates)
+    attempts = 0
+    while len(candidates) < budget and attempts < budget * 20:
+        group = groups[int(rng.integers(len(groups)))]
+        chosen = rng.choice(group, size=size, replace=False)
+        candidates.add(tuple(sorted(int(index) for index in chosen)))
+        attempts += 1
+    return sorted(candidates), False
 
 
 def _realized(matrix: LabelMatrix, selected: tuple[int, ...]) -> int:
@@ -132,13 +167,13 @@ def search_shattered_set(
     }
     metric_name = "context_conditioned" if same_context else "global_multi_context"
     all_exhaustive = True
-    upper = min(max_n, matrix.values.shape[1])
+    world_capacity = int(math.floor(math.log2(max(matrix.values.shape[0], 1))))
+    upper = min(max_n, matrix.values.shape[1], world_capacity)
     for size in range(upper, 0, -1):
-        candidates = _candidate_subsets(matrix, size, same_context)
-        if len(candidates) > budget:
-            all_exhaustive = False
-            chosen = rng.choice(len(candidates), size=budget, replace=False)
-            candidates = [candidates[int(index)] for index in chosen]
+        candidates, exhaustive = _candidate_subsets(
+            matrix, size, same_context, budget, rng
+        )
+        all_exhaustive = all_exhaustive and exhaustive
         for selected in candidates:
             realized = _realized(matrix, selected)
             if realized == 2**size:

@@ -1,6 +1,11 @@
+import hashlib
 import json
 import subprocess
 from pathlib import Path
+
+import pytest
+
+from perception_env.cli import inspect_run
 
 ROOT = Path(__file__).parents[1]
 PYTHON = ROOT / ".venv" / "bin" / "python"
@@ -54,6 +59,8 @@ def test_sample_manifests_have_deterministic_scientific_hash(tmp_path) -> None:
     assert first_manifest["seed"] == 9
     assert first_manifest["schema_versions"] == {"family": "v1", "world": "v1"}
     assert "wall_clock_duration_seconds" in first_manifest
+    worlds_hash = hashlib.sha256((first / "worlds.json").read_bytes()).hexdigest()
+    assert first_manifest["output_content_hashes"]["worlds.json"] == worlds_hash
 
 
 def test_command_refuses_overwrite_without_force(tmp_path) -> None:
@@ -79,4 +86,15 @@ def test_command_refuses_overwrite_without_force(tmp_path) -> None:
     assert refused.returncode != 0
     assert "already exists" in refused.stderr
     assert replaced.returncode == 0
+
+
+def test_inspect_refuses_to_delete_its_source_run(tmp_path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "manifest.json").write_text("{}")
+
+    with pytest.raises(ValueError, match="overlap"):
+        inspect_run(run=source, output=source, force=True)
+
+    assert (source / "manifest.json").exists()
 

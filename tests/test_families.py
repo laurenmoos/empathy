@@ -61,3 +61,13 @@ def test_family_exposes_versioned_uncertainty_and_invalid_policy() -> None:
     assert family.invalid_rollout_policy == "terminate_and_reject"
     assert family.entry_grid.resolution == (3, 3, 3, 3)
 
+
+def test_family_membership_enforces_versioned_parameter_support() -> None:
+    schema = WorldSchema.v1()
+    family = load_family(CONFIG, "W4")
+    outside_support = schema.world(
+        vertical_wall={"position": 0.1, "restitution": 0.0}
+    )
+
+    assert family.contains(outside_support) is False
+

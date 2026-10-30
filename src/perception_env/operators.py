@@ -34,5 +34,7 @@ def reflect_crossing(
     if not (crossed_positive or crossed_negative):
         return proposed, velocity, False
     reflected_position = position - (proposed - position)
+    if reflected_position == position:
+        reflected_position = position - math.copysign(1.0e-12, proposed - previous)
     return reflected_position, -velocity * restitution, True
 

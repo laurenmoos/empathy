@@ -4,7 +4,13 @@ import pytest
 from perception_env.beliefs import BeliefEvent
 from perception_env.config import RenderConfig, SimulationConfig
 from perception_env.reachability import EntryStateGrid, enumerate_reachable
-from perception_env.records import BenchmarkRecord, Model2InputRecord, load_record, save_record
+from perception_env.records import (
+    BenchmarkRecord,
+    Model2InputRecord,
+    belief_entropy,
+    load_record,
+    save_record,
+)
 from perception_env.render import Occluder, render_sequence
 from perception_env.simulate import BallState, rollout
 from perception_env.world import WorldSchema
@@ -67,6 +73,8 @@ def test_loaded_record_reconstructs_visual_inputs_without_simulation(tmp_path) -
     assert np.array_equal(loaded.sequence().frames, loaded.arrays["frames"])
     assert np.array_equal(loaded.belief_event().pre, loaded.arrays["pre_belief"])
     assert loaded.reachability().query_steps == (4,)
+    assert len(loaded.reachability().trajectories) == 8
+    assert loaded.reachability().trajectories[0].states
 
 
 @pytest.mark.parametrize(
@@ -89,12 +97,14 @@ def test_model2_input_rejects_first_order_fields(forbidden: str) -> None:
 
 
 def test_model2_input_accepts_belief_derived_fields_only() -> None:
+    pre = np.zeros((4, 8, 8), dtype=np.float32)
+    post = np.ones((4, 8, 8), dtype=np.float32)
     record = Model2InputRecord.from_mapping(
         {
-            "pre_belief": np.zeros((4, 8, 8), dtype=np.float32),
-            "post_belief": np.ones((4, 8, 8), dtype=np.float32),
-            "belief_difference": np.ones((4, 8, 8), dtype=np.float32),
-            "entropy": np.zeros(4, dtype=np.float32),
+            "pre_belief": pre,
+            "post_belief": post,
+            "belief_difference": post - pre,
+            "entropy": belief_entropy(pre),
             "history_mask": np.ones(4, dtype=bool),
             "target_world": np.zeros(12, dtype=np.float32),
         }
@@ -105,4 +115,36 @@ def test_model2_input_accepts_belief_derived_fields_only() -> None:
         "post_belief",
         "belief_difference",
     )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["one_dimensional", "wrong_difference", "bad_entropy", "bad_mask", "bad_target"],
+)
+def test_model2_input_enforces_tensor_contract(mutation: str) -> None:
+    pre = np.zeros((4, 8, 8), dtype=np.float32)
+    post = np.ones((4, 8, 8), dtype=np.float32)
+    values = {
+        "pre_belief": pre,
+        "post_belief": post,
+        "belief_difference": post - pre,
+        "entropy": belief_entropy(pre),
+        "history_mask": np.ones(4, dtype=bool),
+        "target_world": np.zeros(12, dtype=np.float32),
+    }
+    if mutation == "one_dimensional":
+        values["pre_belief"] = np.zeros(2)
+        values["post_belief"] = np.zeros(2)
+        values["belief_difference"] = np.zeros(2)
+    elif mutation == "wrong_difference":
+        values["belief_difference"] = np.zeros_like(pre)
+    elif mutation == "bad_entropy":
+        values["entropy"] = np.full(4, 999.0)
+    elif mutation == "bad_mask":
+        values["history_mask"] = np.ones(3, dtype=bool)
+    else:
+        values["target_world"] = np.zeros(11)
+
+    with pytest.raises(ValueError):
+        Model2InputRecord.from_mapping(values)
 

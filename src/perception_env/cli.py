@@ -17,10 +17,17 @@ import numpy as np
 
 from .beliefs import BeliefEvent, build_belief_history, superpose
 from .config import RenderConfig, SimulationConfig
+from .events import extract_reappearance
 from .families import load_family, sample_worlds
 from .identifiability import group_equivalent_worlds
 from .reachability import Probe, enumerate_reachable, rasterize_endpoints
-from .records import BenchmarkRecord, Model2InputRecord, load_record, save_record
+from .records import (
+    BenchmarkRecord,
+    Model2InputRecord,
+    belief_entropy,
+    load_record,
+    save_record,
+)
 from .render import Occluder, render_sequence
 from .shattering import LabelMatrix, build_label_matrix, search_shattered_set
 from .simulate import BallState, rollout
@@ -49,6 +56,20 @@ def _prepare_output(output: Path, force: bool) -> None:
 
 def _config_hash(path: Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def _content_hashes(output: Path, paths: Sequence[str]) -> dict[str, str]:
+    return {
+        path: hashlib.sha256((output / path).read_bytes()).hexdigest()
+        for path in sorted(paths)
+    }
+
+
+def _validate_source_output(source: Path, output: Path) -> None:
+    source = source.resolve()
+    output = output.resolve()
+    if source == output or source.is_relative_to(output) or output.is_relative_to(source):
+        raise ValueError("source and output paths overlap")
 
 
 def _versions() -> dict[str, str]:
@@ -116,6 +137,7 @@ def sample_run(
         "seed": seed,
         "package_versions": _versions(),
         "output_paths": ["worlds.json"],
+        "output_content_hashes": _content_hashes(output, ["worlds.json"]),
         "rejection_counts": {"accepted": count, "rejected": 0},
         "wall_clock_duration_seconds": round(time.perf_counter() - started, 6),
         "output_directory": str(output.resolve()),
@@ -139,12 +161,6 @@ def _posterior_belief(pre: np.ndarray, state: BallState) -> np.ndarray:
     gaussian = np.exp(-((columns - center_x) ** 2 + (rows - center_y) ** 2) / 8.0)
     gaussian /= max(float(gaussian.max()), 1.0e-12)
     return np.clip(0.25 * pre + 0.75 * gaussian, 0.0, 1.0).astype(np.float32)
-
-
-def _belief_entropy(values: np.ndarray) -> np.ndarray:
-    clipped = np.clip(values, 1.0e-6, 1.0 - 1.0e-6)
-    entropy = -(clipped * np.log(clipped) + (1 - clipped) * np.log(1 - clipped))
-    return entropy.mean(axis=(-2, -1)).astype(np.float32)
 
 
 def build_demo(
@@ -189,18 +205,21 @@ def build_demo(
         worlds.append(world)
         trajectory = rollout(initial, world, simulation)
         sequence = render_sequence(trajectory, occluders, render_config)
+        observed = extract_reappearance(sequence)
+        if observed is None:
+            raise RuntimeError(f"demo world {level} did not produce an observable reappearance")
         reachability = enumerate_reachable(
             entry_grid,
             world,
-            (query_step,),
+            (query_step, observed.step),
             simulation,
             context_id="shared-occlusion-context",
         )
         reachability_results.append(reachability)
         valid_paths = [item for item in reachability.trajectories if item.valid]
         pre = superpose(valid_paths, np.ones(len(valid_paths)), render_config)
-        actual_state = trajectory.states[query_step]
-        belief = BeliefEvent(query_step, pre, _posterior_belief(pre, actual_state))
+        actual_state = trajectory.states[observed.step]
+        belief = BeliefEvent(observed.step, pre, _posterior_belief(pre, actual_state))
         belief_events.append(belief)
         record = BenchmarkRecord.from_components(
             record_id=f"example-{level}",
@@ -249,8 +268,8 @@ def build_demo(
         render_config,
         output / "reachability-overlays.png",
         true_endpoint=(
-            records[-1].trajectory().states[query_step].x,
-            records[-1].trajectory().states[query_step].y,
+            records[-1].trajectory().states[belief_events[-1].step].x,
+            records[-1].trajectory().states[belief_events[-1].step].y,
         ),
     )
     visual_paths.append(overlay.path)
@@ -300,9 +319,10 @@ def build_demo(
         json.dumps(shattering_data, indent=2, sort_keys=True)
     )
 
-    rasters = np.stack(
-        [rasterize_endpoints(result, render_config)[-1] for result in reachability_results]
-    )
+    rasters = np.stack([
+        rasterize_endpoints(result, render_config)[result.query_steps.index(query_step)]
+        for result in reachability_results
+    ])
     identifiability = group_equivalent_worlds(
         worlds, labels, tolerance=1.0e-8, possibility_rasters=rasters
     )
@@ -311,13 +331,41 @@ def build_demo(
     )
     visual_paths.append(equivalence_artifact.path)
 
-    history = build_belief_history(belief_events, length=4)
+    persistent_world = worlds[-1]
+    persistent_events: list[BeliefEvent] = []
+    observed_steps: list[int] = []
+    for episode, initial_y in enumerate((0.49, 0.50, 0.51, 0.52)):
+        episode_initial = BallState(initial.x, initial_y, initial.vx, initial.vy)
+        episode_trajectory = rollout(episode_initial, persistent_world, simulation)
+        episode_sequence = render_sequence(episode_trajectory, occluders, render_config)
+        event = extract_reappearance(episode_sequence)
+        if event is None:
+            raise RuntimeError("persistent demo episode did not produce a reappearance")
+        episode_reachability = enumerate_reachable(
+            entry_grid,
+            persistent_world,
+            (event.step,),
+            simulation,
+            context_id="persistent-W2-context",
+        )
+        paths = [item for item in episode_reachability.trajectories if item.valid]
+        pre = superpose(paths, np.ones(len(paths)), render_config)
+        state = episode_trajectory.states[event.step]
+        persistent_events.append(
+            BeliefEvent(
+                episode * (simulation.steps + 1) + event.step,
+                pre,
+                _posterior_belief(pre, state),
+            )
+        )
+        observed_steps.append(event.step)
+    history = build_belief_history(persistent_events, length=4)
     model2 = Model2InputRecord.from_mapping(
         {
             "pre_belief": history.tensor[:, 0],
             "post_belief": history.tensor[:, 1],
             "belief_difference": history.tensor[:, 2],
-            "entropy": _belief_entropy(history.tensor[:, 0]),
+            "entropy": belief_entropy(history.tensor[:, 0]),
             "history_mask": history.mask,
             "target_world": worlds[-1].to_flat(schema),
         }
@@ -346,11 +394,18 @@ def build_demo(
         "seed": seed,
         "package_versions": _versions(),
         "output_paths": output_paths,
+        "output_content_hashes": _content_hashes(output, output_paths),
         "rejection_counts": rejection_counts,
         "shattering": {
             **estimate.metadata,
             "metric_name": estimate.metric_name,
             "dimension": estimate.dimension,
+        },
+        "model2_history": {
+            "world_level": "W2",
+            "event_count": len(persistent_events),
+            "all_events_observed": True,
+            "event_steps": observed_steps,
         },
         "wall_clock_duration_seconds": round(time.perf_counter() - started, 6),
         "output_directory": str(output.resolve()),
@@ -364,6 +419,7 @@ def inspect_run(*, run: str | Path, output: str | Path, force: bool) -> dict[str
     output = Path(output)
     if not (run / "manifest.json").exists():
         raise FileNotFoundError(f"saved run manifest not found: {run}")
+    _validate_source_output(run, output)
     _prepare_output(output, force)
     record_paths = sorted(path for path in (run / "records").iterdir() if path.is_dir())
     records = [load_record(path) for path in record_paths]
@@ -380,6 +436,9 @@ def inspect_run(*, run: str | Path, output: str | Path, force: bool) -> dict[str
         "seed": source["seed"],
         "package_versions": _versions(),
         "output_paths": ["index.html", "world-family-contact-sheet.png"],
+        "output_content_hashes": _content_hashes(
+            output, ["index.html", "world-family-contact-sheet.png"]
+        ),
         "rejection_counts": source["rejection_counts"],
         "wall_clock_duration_seconds": round(time.perf_counter() - started, 6),
         "output_directory": str(output.resolve()),
@@ -393,6 +452,11 @@ def estimate_saved_run(
     started = time.perf_counter()
     run = Path(run)
     output = Path(output)
+    required = (run / "manifest.json", run / "labels.npz", run / "shattering-data.json")
+    missing = [path for path in required if not path.exists()]
+    if missing:
+        raise FileNotFoundError(f"saved run data not found: {missing[0]}")
+    _validate_source_output(run, output)
     _prepare_output(output, force)
     with np.load(run / "labels.npz", allow_pickle=False) as archive:
         values = archive["values"]
@@ -414,6 +478,9 @@ def estimate_saved_run(
         "seed": seed,
         "package_versions": _versions(),
         "output_paths": ["index.html", "shattering-matrix.png"],
+        "output_content_hashes": _content_hashes(
+            output, ["index.html", "shattering-matrix.png"]
+        ),
         "rejection_counts": {},
         "shattering": {
             **estimate.metadata,

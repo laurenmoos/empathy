@@ -26,6 +26,16 @@ def _states_from_array(values: np.ndarray) -> tuple[BallState, ...]:
     return tuple(BallState(*(float(value) for value in row)) for row in values)
 
 
+def belief_entropy(values: np.ndarray) -> np.ndarray:
+    """Return one entropy scalar per belief-history plane."""
+    beliefs = np.asarray(values)
+    if beliefs.ndim != 3:
+        raise ValueError("belief history must have shape [history, height, width]")
+    clipped = np.clip(beliefs, 1.0e-6, 1.0 - 1.0e-6)
+    entropy = -(clipped * np.log(clipped) + (1.0 - clipped) * np.log(1.0 - clipped))
+    return entropy.mean(axis=(-2, -1)).astype(np.float32)
+
+
 @dataclass(frozen=True, eq=False)
 class BenchmarkRecord:
     record_id: str
@@ -71,7 +81,19 @@ class BenchmarkRecord:
                 for item in trajectory.collisions
             ],
             "belief_step": belief.step,
+            "reachability_termination_reasons": [
+                item.termination_reason.value for item in reachability.trajectories
+            ],
         }
+        trajectory_lengths = np.asarray(
+            [len(item.states) for item in reachability.trajectories], dtype=np.int64
+        )
+        max_length = int(trajectory_lengths.max(initial=0))
+        reachability_states = np.zeros(
+            (len(reachability.trajectories), max_length, 4), dtype=np.float64
+        )
+        for index, item in enumerate(reachability.trajectories):
+            reachability_states[index, : len(item.states)] = _states_to_array(item.states)
         arrays = {
             "world_flat": world.to_flat(schema),
             "latent_states": _states_to_array(trajectory.states),
@@ -85,6 +107,14 @@ class BenchmarkRecord:
             "pre_belief": belief.pre,
             "post_belief": belief.post,
             "belief_difference": belief.difference,
+            "reachability_states": reachability_states,
+            "reachability_lengths": trajectory_lengths,
+            "reachability_valid": np.asarray(
+                [item.valid for item in reachability.trajectories], dtype=bool
+            ),
+            "reachability_seeds": np.asarray(
+                [item.seed for item in reachability.trajectories], dtype=np.int64
+            ),
         }
         return cls(
             record_id=record_id,
@@ -151,12 +181,24 @@ class BenchmarkRecord:
         rows = self.arrays["endpoint_states"]
         for step in query_steps:
             endpoints[step] = _states_from_array(rows[rows[:, 0] == step, 1:])
+        trajectories = tuple(
+            Trajectory(
+                states=_states_from_array(self.arrays["reachability_states"][index, :length]),
+                collisions=(),
+                valid=bool(self.arrays["reachability_valid"][index]),
+                seed=int(self.arrays["reachability_seeds"][index]),
+                termination_reason=TerminationReason(
+                    self.metadata["reachability_termination_reasons"][index]
+                ),
+            )
+            for index, length in enumerate(self.arrays["reachability_lengths"])
+        )
         return ReachabilityResult(
             context_id=str(self.metadata["context_id"]),
             entry_grid=entry_grid,
             world=self.world(schema),
             query_steps=query_steps,
-            trajectories=(),
+            trajectories=trajectories,
             endpoints=endpoints,
             config=SimulationConfig(**self.metadata["simulation_config"]),
         )
@@ -194,11 +236,28 @@ class Model2InputRecord:
             raise ValueError(f"missing Model 2 fields: {sorted(missing)}")
         arrays = {name: np.asarray(values[name]) for name in allowed}
         belief_shape = arrays["pre_belief"].shape
+        if len(belief_shape) != 3 or belief_shape[0] != 4:
+            raise ValueError("belief-history fields must have shape [4, height, width]")
         if (
             arrays["post_belief"].shape != belief_shape
             or arrays["belief_difference"].shape != belief_shape
         ):
             raise ValueError("belief-history fields must have the same shape")
+        if not all(np.isfinite(arrays[name]).all() for name in allowed):
+            raise ValueError("Model 2 tensors must contain only finite values")
+        if not np.allclose(
+            arrays["belief_difference"],
+            arrays["post_belief"] - arrays["pre_belief"],
+        ):
+            raise ValueError("belief_difference must equal post_belief - pre_belief")
+        if arrays["entropy"].shape != (4,) or not np.allclose(
+            arrays["entropy"], belief_entropy(arrays["pre_belief"])
+        ):
+            raise ValueError("entropy must be derived from pre_belief")
+        if arrays["history_mask"].shape != (4,) or arrays["history_mask"].dtype != np.bool_:
+            raise ValueError("history_mask must be a boolean vector of length 4")
+        if arrays["target_world"].shape != (len(WorldSchema.v1().field_order),):
+            raise ValueError("target_world does not match the v1 world schema")
         return cls(**arrays)
 
 

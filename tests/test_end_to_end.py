@@ -35,6 +35,9 @@ def test_tiny_demo_builds_visual_benchmark_and_belief_only_model2_input(tmp_path
     assert manifest["shattering"]["algorithm"] == "exhaustive_or_seeded_subset_search"
     assert manifest["shattering"]["budget"] > 0
     assert manifest["shattering"]["seeds"] == [7]
+    assert manifest["model2_history"]["world_level"] == "W2"
+    assert manifest["model2_history"]["event_count"] == 4
+    assert manifest["model2_history"]["all_events_observed"] is True
 
     with np.load(run / "model2-input.npz", allow_pickle=False) as model2:
         assert set(model2.files) == {

@@ -120,3 +120,26 @@ def test_estimate_persists_required_search_metadata() -> None:
         "seeds": [17],
     }
 
+
+def test_world_count_caps_impossible_dimensions_before_combination_search(
+    monkeypatch,
+) -> None:
+    import itertools
+
+    import perception_env.shattering as module
+
+    original = itertools.combinations
+
+    def guarded_combinations(items, size):
+        if size > 1:
+            raise AssertionError("impossible dimension reached combination enumeration")
+        return original(items, size)
+
+    monkeypatch.setattr(module, "combinations", guarded_combinations)
+    contexts = ["clip-a"] * 100
+    labels = matrix([[0] * 100, [1] * 100], contexts=contexts)
+
+    estimate = search_shattered_set(labels, max_n=50, budget=1, seed=3)
+
+    assert estimate.dimension == 1
+

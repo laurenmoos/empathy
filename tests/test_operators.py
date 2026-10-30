@@ -73,3 +73,19 @@ def test_acceleration_is_applied_before_wall_collision() -> None:
     assert result.x == pytest.approx(0.468)
     assert result.vx == pytest.approx(-0.21)
 
+
+def test_exact_wall_landing_preserves_side_for_next_forced_step() -> None:
+    world = WorldSchema.v1().world(
+        horizontal_acceleration={"a_x": 0.2},
+        vertical_wall={"position": 0.5, "restitution": 0.0},
+    )
+    config = SimulationConfig(dt=1.0, steps=1)
+
+    contact = step(BallState(0.1, 0.5, 0.2, 0.0), world, config)
+    after = step(contact, world, config)
+
+    assert contact.x < 0.5
+    assert contact.x == pytest.approx(0.5)
+    assert after.x == pytest.approx(0.3)
+    assert after.x < 0.5
+

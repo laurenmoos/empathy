@@ -113,7 +113,9 @@ def enumerate_reachable(
         endpoints[query_step] = tuple(
             trajectory.states[query_step]
             for trajectory in trajectories
-            if trajectory.valid and len(trajectory.states) > query_step
+            if len(trajectory.states) > query_step
+            and 0.0 <= trajectory.states[query_step].x <= 1.0
+            and 0.0 <= trajectory.states[query_step].y <= 1.0
         )
     return ReachabilityResult(
         context_id=context_id,

@@ -41,7 +41,6 @@ def test_explorer_is_a_self_contained_parameter_interface() -> None:
         "wind",
         "gravity",
         "damping",
-        "verticalWallEnabled",
         "verticalWallPosition",
         "verticalRestitution",
         "horizontalWallPosition",
@@ -62,6 +61,11 @@ def test_explorer_is_a_self_contained_parameter_interface() -> None:
     assert "playing = false" in source
     assert 'id="horizontalWallEnabled"' not in source
     assert "p.horizontalWallEnabled = true" in source
+    assert 'id="verticalWallEnabled"' not in source
+    assert "p.verticalWallEnabled = true" in source
+    assert "· off" not in source
+    assert "always on" not in source
+    assert source.count("<h2>Walls</h2>") == 1
     assert "Adjust the controls below" not in source
     assert "Set the physical parameters, then run" not in source
     assert '<br><span id="visibilityState">' not in source

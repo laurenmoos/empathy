@@ -119,16 +119,11 @@
         </section>
 
         <section class="card">
-          <h2>Vertical wall</h2>
-          <label class="check">Enabled<input id="verticalWallEnabled" type="checkbox"></label>
-          <label>Position · x<output data-for="verticalWallPosition"></output><input id="verticalWallPosition" type="range" min="0.2" max="0.95" step="0.01" value="0.72"></label>
-          <label>Restitution<output data-for="verticalRestitution"></output><input id="verticalRestitution" type="range" min="0" max="1" step="0.01" value="0.8"></label>
-        </section>
-
-        <section class="card">
-          <h2>Horizontal wall · always on</h2>
-          <label>Position · y<output data-for="horizontalWallPosition"></output><input id="horizontalWallPosition" type="range" min="0.05" max="0.9" step="0.01" value="0.18"></label>
-          <label>Restitution<output data-for="horizontalRestitution"></output><input id="horizontalRestitution" type="range" min="0" max="1" step="0.01" value="0.75"></label>
+          <h2>Walls</h2>
+          <label>Right wall · x<output data-for="verticalWallPosition"></output><input id="verticalWallPosition" type="range" min="0.2" max="0.95" step="0.01" value="0.72"></label>
+          <label>Right wall bounce<output data-for="verticalRestitution"></output><input id="verticalRestitution" type="range" min="0" max="1" step="0.01" value="0.8"></label>
+          <label>Floor · y<output data-for="horizontalWallPosition"></output><input id="horizontalWallPosition" type="range" min="0.05" max="0.9" step="0.01" value="0.18"></label>
+          <label>Floor bounce<output data-for="horizontalRestitution"></output><input id="horizontalRestitution" type="range" min="0" max="1" step="0.01" value="0.75"></label>
         </section>
 
         <section class="card">
@@ -175,7 +170,7 @@
   <script>
     const $ = (id) => document.getElementById(id);
     const controlIds = [
-      "wind", "gravity", "damping", "verticalWallEnabled", "verticalWallPosition",
+      "wind", "gravity", "damping", "verticalWallPosition",
       "verticalRestitution", "horizontalWallPosition",
       "horizontalRestitution", "initialY", "initialVx", "occluderLeft", "occluderRight"
     ];
@@ -195,7 +190,7 @@
 
     function params() {
       const p = Object.fromEntries(numericIds.map(id => [id, Number($(id).value)]));
-      p.verticalWallEnabled = $("verticalWallEnabled").checked;
+      p.verticalWallEnabled = true;
       p.horizontalWallEnabled = true;
       if (p.occluderRight < p.occluderLeft + 0.08) p.occluderRight = p.occluderLeft + 0.08;
       return p;
@@ -364,9 +359,9 @@
         if (!output) return;
         const value = Number($(id).value);
         let suffix = "";
-        if (id === "wind") suffix = value < 0 ? " · left" : value > 0 ? " · right" : " · off";
-        if (id === "gravity") suffix = value < 0 ? " · down" : value > 0 ? " · up" : " · off";
-        if (id === "damping") suffix = value === 0 ? " · off" : " · slows ball";
+        if (id === "wind") suffix = value < 0 ? " · left" : value > 0 ? " · right" : "";
+        if (id === "gravity") suffix = value < 0 ? " · down" : value > 0 ? " · up" : "";
+        if (id === "damping") suffix = value === 0 ? "" : " · slows ball";
         output.textContent = value.toFixed(2) + suffix;
       });
       const p = params();

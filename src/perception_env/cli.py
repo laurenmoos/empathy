@@ -531,6 +531,19 @@ def _parser() -> argparse.ArgumentParser:
     stream.add_argument("--events", type=int, default=4)
     stream.add_argument("--output", required=True)
     stream.add_argument("--force", action="store_true")
+
+    live = subparsers.add_parser("live-demo", help="serve the interactive learned-inference demo")
+    live.add_argument("--host", default="127.0.0.1")
+    live.add_argument("--port", type=int, default=8765)
+    live.add_argument("--root", default=".")
+    live.add_argument(
+        "--model1-checkpoint",
+        default="artifacts/model1-learned-demo/training/best.pt",
+    )
+    live.add_argument(
+        "--model2-checkpoint",
+        default="artifacts/model2-learned-demo/training/best.pt",
+    )
     return parser
 
 
@@ -577,6 +590,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                     raise ValueError("refusing to replace a broad output directory")
                 shutil.rmtree(output)
             run_quick_streaming_demo(output, seed=args.seed, event_count=args.events)
+        elif args.command == "live-demo":
+            from .live_server import run_live_server
+
+            run_live_server(
+                host=args.host,
+                port=args.port,
+                root=Path(args.root),
+                model1_checkpoint=Path(args.model1_checkpoint),
+                model2_checkpoint=Path(args.model2_checkpoint),
+            )
     except (FileNotFoundError, FileExistsError, ValueError, KeyError) as error:
         print(f"perception-env: {error}", file=sys.stderr)
         return 2

@@ -4,21 +4,19 @@ Empathy asks whether one system can partially recover another **as a perceiver**
 
 ## Run the demo
 
-Empathy uses Python 3.11+ and [uv](https://docs.astral.sh/uv/).
+Install [uv](https://docs.astral.sh/uv/), clone this repository, and run:
 
 ```bash
-uv sync --extra ml
-uv run empathy live-demo --root . --model1-checkpoint checkpoints/model1.pt
+uv run --extra ml empathy live-demo
 ```
 
-Open <http://127.0.0.1:8765/explorer.html>, set gravity, wind, and damping, then select **Throw the ball**.
+Then open <http://127.0.0.1:8765/explorer.html> and select **Throw the ball**. `uv` handles the environment and dependencies automatically.
 
-To run the checks:
+## Development
 
 ```bash
-uv sync --extra dev --extra ml
-uv run pytest
-uv run ruff check .
+uv run --extra dev --extra ml pytest
+uv run --extra dev ruff check .
 ```
 
 ## Environment

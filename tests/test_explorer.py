@@ -147,8 +147,8 @@ def test_world_guess_shows_all_three_numeric_parameters() -> None:
         "reappearance revision",
     ):
         assert label in source
-    assert "hidden |" in source
-    assert "search ●" in source
+    assert '"closer"' in source
+    assert '"farther"' in source
     assert "function updateSecondOrder" in source
     assert "function predictedParameterNumber" in source
     assert "step.predicted_parameters" in source
@@ -161,17 +161,18 @@ def test_second_order_panel_shows_constraint_direction_without_summary_block() -
     assert {"coherenceScore", "coherenceFill", "coherenceDetail"}.isdisjoint(parser.ids)
     assert parser.canvases == {"perceptionCanvas"}
     assert "function movementDirection" in source
-    assert "constraint-axis" in source
-    assert "constraint-target" in source
-    assert "constraint-guess" in source
-    assert "constraint-previous" in source
-    assert "constraint-legend-axis" in source
-    assert "constraint-legend-values" in source
-    assert "constraint-value-actual" in source
-    assert "constraint-value-arrow" in source
-    assert "constraint-value-guess" in source
-    assert 'direction.textContent = movement === "toward" ? "toward"' in source
+    assert "constraint-direction-mark" in source
+    assert 'direction.textContent = movement === "toward" ? "closer"' in source
     assert 'row.classList.add(`movement-${movement}`)' in source
+    for noise in (
+        "constraint-axis",
+        "constraint-target",
+        "constraint-guess",
+        "constraint-previous",
+        "constraint-legend",
+        "constraint-values",
+    ):
+        assert noise not in source
     assert "mean closeness to hidden parameters" not in source
 
 

@@ -72,27 +72,18 @@
     .panel-head { min-height: 2.5rem; margin-bottom: .65rem; }
     .panel-head span { display: block; margin-top: .25rem; color: var(--muted); font-size: .68rem; line-height: 1.35; }
     canvas { display: block; width: 100%; aspect-ratio: 1.2; background: var(--canvas); }
-    .comparison { --constraint-label: 4.55rem; --constraint-values: 5.45rem; --constraint-gap: .7rem; margin-top: .35rem; }
-    .constraint-legend, .comparison-row { display: grid; grid-template-columns: var(--constraint-label) minmax(7rem, 1fr) var(--constraint-values); gap: var(--constraint-gap); }
-    .constraint-legend { align-items: center; min-height: 1.3rem; color: var(--muted); font-size: .55rem; }
-    .constraint-legend-axis { grid-column: 2; text-align: center; }
-    .constraint-legend-values { grid-column: 3; text-align: center; }
-    .comparison-row { align-items: center; padding: .8rem 0; border-top: 1px solid var(--line); font-size: .66rem; }
-    .constraint-label { display: grid; gap: .2rem; }
+    .comparison { margin-top: .35rem; }
+    .comparison-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 1rem; padding: .85rem 0; border-top: 1px solid var(--line); }
+    .constraint-label { display: block; }
     .constraint-name { font: 500 .72rem Georgia, serif; }
-    .constraint-direction { color: var(--muted); font-size: .55rem; }
+    .constraint-direction { color: var(--muted); font-size: .58rem; letter-spacing: .01em; }
+    .constraint-direction::before { display: inline-block; width: 1rem; text-align: left; }
     .movement-toward .constraint-direction { color: #667864; }
+    .movement-toward .constraint-direction::before { content: "↘"; }
     .movement-away .constraint-direction { color: #967568; }
-    .constraint-axis { position: relative; height: 1rem; }
-    .constraint-axis::before { content: ""; position: absolute; left: 0; right: 0; top: calc(50% - .5px); height: 1px; background: #b9b8ae; }
-    .constraint-target { position: absolute; top: .08rem; width: 1px; height: .84rem; background: #3d433d; transform: translateX(-.5px); }
-    .constraint-previous { position: absolute; top: .36rem; width: .3rem; height: .3rem; border: 1px solid #aaa99f; border-radius: 50%; transform: translateX(-50%); }
-    .constraint-guess { position: absolute; top: .28rem; width: .46rem; height: .46rem; border-radius: 50%; background: #858a81; transform: translateX(-50%); transition: left .35s ease, background-color .35s ease; }
-    .movement-toward .constraint-guess { background: #6d806a; }
-    .movement-away .constraint-guess { background: #9a7567; }
-    .constraint-values { display: grid; grid-template-columns: 1fr .7rem 1fr; align-items: baseline; color: var(--muted); font: 500 .59rem ui-monospace, monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .constraint-value-actual, .constraint-value-guess { text-align: right; }
-    .constraint-value-arrow { text-align: center; }
+    .movement-away .constraint-direction::before { content: "↗"; }
+    .movement-steady .constraint-direction::before { content: "—"; }
+    .movement-new .constraint-direction::before { content: "·"; }
     @media (max-width: 1080px) {
       .layers { grid-template-columns: 1fr; }
     }
@@ -141,10 +132,6 @@
           <h2>Second-order perception</h2>
         </div>
         <div class="comparison">
-          <div class="constraint-legend">
-            <span class="constraint-legend-axis">hidden | &nbsp;&nbsp; search ●</span>
-            <span class="constraint-legend-values">hidden → search</span>
-          </div>
           <div id="comparisonRows"></div>
         </div>
       </article>
@@ -165,9 +152,9 @@
     ];
     const DEFAULT_OCCLUDER = [0.35, 0.55, 0.05, 0.95];
     const worldSlots = [
-      {name: "gravity", operator: "vertical_acceleration", parameter: "a_y", parameterIndex: 0, minimum: -1, maximum: 1, displayMinimum: -.30, displayMaximum: .30},
-      {name: "wind", operator: "horizontal_acceleration", parameter: "a_x", parameterIndex: 1, minimum: -1, maximum: 1, displayMinimum: -.30, displayMaximum: .30},
-      {name: "damping", operator: "damping", parameter: "lambda", parameterIndex: 2, minimum: 0, maximum: 1, displayMinimum: 0, displayMaximum: .60}
+      {name: "gravity", operator: "vertical_acceleration", parameter: "a_y", parameterIndex: 0, minimum: -1, maximum: 1},
+      {name: "wind", operator: "horizontal_acceleration", parameter: "a_x", parameterIndex: 1, minimum: -1, maximum: 1},
+      {name: "damping", operator: "damping", parameter: "lambda", parameterIndex: 2, minimum: 0, maximum: 1}
     ];
 
     let sessionId = null;
@@ -566,12 +553,6 @@
       return slot.minimum + normalized * (slot.maximum - slot.minimum);
     }
 
-    function axisPosition(value, slot) {
-      const clipped = Math.max(slot.displayMinimum, Math.min(slot.displayMaximum, value));
-      return (clipped - slot.displayMinimum)
-        / (slot.displayMaximum - slot.displayMinimum) * 100;
-    }
-
     function movementDirection(actual, current, previous) {
       if (previous === null) return "new";
       const before = Math.abs(previous - actual);
@@ -597,38 +578,12 @@
         name.className = "constraint-name";
         name.textContent = slot.name;
         const direction = document.createElement("span");
-        direction.className = "constraint-direction";
-        direction.textContent = movement === "toward" ? "toward"
-          : movement === "away" ? "away" : movement === "steady" ? "steady" : "first guess";
-        label.append(name, direction);
-        const axis = document.createElement("span");
-        axis.className = "constraint-axis";
-        const target = document.createElement("i");
-        target.className = "constraint-target";
-        target.style.left = `${axisPosition(actualValue, slot).toFixed(1)}%`;
-        if (previousValue !== null) {
-          const previous = document.createElement("i");
-          previous.className = "constraint-previous";
-          previous.style.left = `${axisPosition(previousValue, slot).toFixed(1)}%`;
-          axis.append(previous);
-        }
-        const guess = document.createElement("i");
-        guess.className = "constraint-guess";
-        guess.style.left = `${axisPosition(predictedValue, slot).toFixed(1)}%`;
-        axis.append(target, guess);
-        const values = document.createElement("span");
-        values.className = "constraint-values";
-        const actualText = document.createElement("span");
-        actualText.className = "constraint-value-actual";
-        actualText.textContent = actualValue.toFixed(2);
-        const arrow = document.createElement("span");
-        arrow.className = "constraint-value-arrow";
-        arrow.textContent = "→";
-        const guessText = document.createElement("span");
-        guessText.className = "constraint-value-guess";
-        guessText.textContent = predictedValue.toFixed(2);
-        values.append(actualText, arrow, guessText);
-        row.append(label, axis, values);
+        direction.className = "constraint-direction constraint-direction-mark";
+        direction.textContent = movement === "toward" ? "closer"
+          : movement === "away" ? "farther"
+            : movement === "steady" ? "unchanged" : "observing";
+        label.append(name);
+        row.append(label, direction);
         return row;
       });
     }

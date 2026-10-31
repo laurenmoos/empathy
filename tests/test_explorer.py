@@ -39,8 +39,8 @@ def test_explorer_uses_minimal_numeric_controls_and_plain_layer_names() -> None:
     source, parser = parsed_explorer()
 
     assert parser.input_types == ["number", "number", "number"]
-    assert "<title>Pinball</title>" in source
-    assert "<header><h1>Pinball</h1></header>" in source
+    assert "<title>Empathy</title>" in source
+    assert "<header><h1>Empathy</h1></header>" in source
     assert "text-align: center" in source
     assert "#secondOrderPanel { border-top: 0; }" in source
     assert "reset" not in parser.ids

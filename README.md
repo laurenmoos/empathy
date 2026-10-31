@@ -1,6 +1,6 @@
-# Pinball
+# Empathy
 
-Pinball asks whether one system can partially recover another **as a perceiver**, through the intentional structure preserved in its experience. **Model 1 sees; Model 2 thinks by imagining the world that could have made Model 1 see as it did.**
+Empathy asks whether one system can partially recover another **as a perceiver**, through the intentional structure preserved in its experience. **Model 1 sees; Model 2 thinks by imagining the world that could have made Model 1 see as it did.**
 
 ## Environment
 
@@ -9,8 +9,6 @@ A ball moves behind a fixed occluder. Each environment is defined by gravity, wi
 ## Model 1: Seeing
 
 Model 1 is a video CNN with temporal memory. From the visible frames before and after occlusion, it predicts a weighted set of possible hidden trajectories.
-
-![Within-environment adaptation loop](docs/images/within-environment-adaptation-loop.png)
 
 It learns through a streaming loop. Within one environment, it predicts across episodes with varied initial conditions; completed trajectories are then revealed and used for a few updates, together with replay from earlier environments. Its weights and replay continue into the next environment.
 
@@ -27,8 +25,6 @@ The trajectory maps remain useful outputs for training and visualization, but th
 Model 2 receives the detached pre-belief, post-belief, and belief-change activations. It therefore encounters the internal form of Model 1's experience.
 
 In the diagram, the pre-belief, post-belief, and difference panels are readable projections reconstructed from the underlying activation traces `z_pre`, `z_post`, and `z_post - z_pre`.
-
-![Model 2 inference pipeline](docs/images/model-2-inference-pipeline.png)
 
 A small evidence adapter maps these traces into a space that can be compared with simulated candidates. Sequential Monte Carlo then maintains candidate settings of gravity, wind, and damping. The simulator rolls out each candidate across possible initial states, and Model 2 gives greater weight to worlds whose consequences best explain Model 1's activation history.
 

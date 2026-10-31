@@ -239,7 +239,7 @@ def run_live_server(
     """Load the learned rollout model once, then serve until interrupted."""
     engine = LiveInferenceEngine.from_checkpoint(model1_checkpoint)
     server = create_server(host, port, root, engine)
-    print(f"Perception environment: http://{host}:{server.server_port}/")
+    print(f"Empathy: http://{host}:{server.server_port}/")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

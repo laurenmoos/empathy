@@ -15,6 +15,7 @@ class ConstraintStatus:
     recovered: bool
     activity_match: bool
     parameter_error: float | None
+    closeness: float
 
 
 @dataclass(frozen=True)
@@ -54,28 +55,27 @@ def evaluate_constraint_recovery(
         actual_slot = actual.slot(slot_name)
         predicted_slot = predicted.slot(slot_name)
         activity_match = actual_slot.active == predicted_slot.active
-        parameter_error: float | None = None
+        spec = schema.spec(slot_name)
+        parameter = spec.parameters[0]
+        actual_value = actual_slot.parameters[0] if actual_slot.active else 0.0
+        predicted_value = predicted_slot.parameters[0] if predicted_slot.active else 0.0
+        axis_error = abs(
+            parameter.normalize(actual_value) - parameter.normalize(predicted_value)
+        )
+        closeness = float(np.clip(1.0 - axis_error, 0.0, 1.0))
+        parameter_error: float | None = (
+            axis_error if actual_slot.active or predicted_slot.active else None
+        )
         recovered = activity_match
         if activity_match and actual_slot.active:
-            spec = schema.spec(slot_name)
-            errors = [
-                abs(parameter.normalize(actual_value) - parameter.normalize(predicted_value))
-                for parameter, actual_value, predicted_value in zip(
-                    spec.parameters,
-                    actual_slot.parameters,
-                    predicted_slot.parameters,
-                    strict=True,
-                )
-            ]
-            parameter_error = max(errors)
-            recovered = parameter_error <= tolerance
+            recovered = axis_error <= tolerance
         statuses.append(
-            ConstraintStatus(label, recovered, activity_match, parameter_error)
+            ConstraintStatus(label, recovered, activity_match, parameter_error, closeness)
         )
     recovered_count = sum(item.recovered for item in statuses)
     return ConstraintRecovery(
         recovered=recovered_count,
         total=len(statuses),
-        score=recovered_count / len(statuses),
+        score=float(np.mean([item.closeness for item in statuses])),
         constraints=tuple(statuses),
     )

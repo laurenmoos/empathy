@@ -84,8 +84,11 @@
     .comparison-row { display: grid; grid-template-columns: 1fr .85fr .85fr; gap: .25rem; padding: .55rem 0; border-top: 1px solid var(--line); font-size: .66rem; }
     .comparison-row.heading { color: var(--muted); border-top: 0; }
     .comparison-row span:not(:first-child) { font-family: ui-monospace, monospace; }
+    .constraint-cell { display: grid; gap: .35rem; padding-right: .6rem; }
     .constraint-name { display: flex; align-items: center; gap: .4rem; }
     .constraint-dot { width: .38rem; height: .38rem; border: 1px solid #8f938a; border-radius: 50%; }
+    .constraint-closeness { height: 2px; overflow: hidden; background: #d2d0c7; }
+    .constraint-closeness-fill { display: block; width: 0; height: 100%; transition: width .35s ease, background-color .35s ease; }
     .comparison-row.recovered .constraint-dot { border-color: #697267; background: #697267; }
     .comparison-row.missed .constraint-dot { border-color: #9b8778; background: transparent; }
     @media (max-width: 1080px) {
@@ -201,25 +204,26 @@
         const actualActive = Boolean(actualOperator && actualOperator.active);
         const predictedActive = Boolean(predictedOperator && predictedOperator.active);
         const activityMatch = actualActive === predictedActive;
-        let parameterError = null;
-        let recovered = activityMatch;
-        if (activityMatch && actualActive) {
-          const span = slot.maximum - slot.minimum;
-          parameterError = Math.abs(
-            Number(actualOperator.parameters[slot.parameter])
-            - Number(predictedOperator.parameters[slot.parameter])
-          ) / span;
-          recovered = parameterError <= .10;
-        }
+        const actualValue = actualActive
+          ? Number(actualOperator.parameters[slot.parameter]) : 0;
+        const predictedValue = predictedActive
+          ? Number(predictedOperator.parameters[slot.parameter]) : 0;
+        const parameterError = Math.abs(actualValue - predictedValue)
+          / (slot.maximum - slot.minimum);
+        const closeness = Math.max(0, Math.min(1, 1 - parameterError));
+        const recovered = activityMatch && parameterError <= .10;
         return {
           name: slot.name,
           recovered,
           activity_match: activityMatch,
-          parameter_error: parameterError
+          parameter_error: actualActive || predictedActive ? parameterError : null,
+          closeness
         };
       });
       const recovered = constraints.filter(item => item.recovered).length;
-      return {recovered, total: constraints.length, score: recovered / constraints.length, constraints};
+      const score = constraints.reduce((sum, item) => sum + item.closeness, 0)
+        / constraints.length;
+      return {recovered, total: constraints.length, score, constraints};
     }
 
     function validateLiveEpisode(payload) {
@@ -288,8 +292,10 @@
         if (beliefBytes.length !== step.width * step.height) {
           throw new Error("belief byte length does not match dimensions");
         }
+        const fallbackRecovery = fallbackConstraintRecovery(truth.operators, step.operators);
         const recovery = step.constraint_recovery
-          ?? fallbackConstraintRecovery(truth.operators, step.operators);
+          && step.constraint_recovery.constraints?.every(item => Number.isFinite(item.closeness))
+          ? step.constraint_recovery : fallbackRecovery;
         if (!recovery || !Number.isInteger(recovery.recovered)
             || recovery.total !== 3 || recovery.recovered < 0
             || recovery.recovered > recovery.total
@@ -299,6 +305,8 @@
               item.name === worldSlots[constraintIndex].name
               && typeof item.recovered === "boolean"
               && typeof item.activity_match === "boolean"
+              && Number.isFinite(item.closeness)
+              && item.closeness >= 0 && item.closeness <= 1
               && (item.parameter_error === null
                 || Number.isFinite(item.parameter_error) && item.parameter_error >= 0))) {
           throw new Error("constraint recovery is invalid");
@@ -566,19 +574,35 @@
       return (slot.minimum + normalized * (slot.maximum - slot.minimum)).toFixed(2);
     }
 
+    function closenessColor(value) {
+      const closeness = Math.max(0, Math.min(1, value));
+      const hue = 34 + closeness * 58;
+      return `hsl(${hue.toFixed(0)} 18% 48%)`;
+    }
+
     function comparisonElements(actual, predictedParameters, recovery) {
       return worldSlots.map(slot => {
         const row = document.createElement("div");
         row.className = "comparison-row";
         const status = recovery.constraints.find(item => item.name === slot.name);
         row.classList.add(status.recovered ? "recovered" : "missed");
+        const cell = document.createElement("span");
+        cell.className = "constraint-cell";
         const name = document.createElement("span");
         name.className = "constraint-name";
         const dot = document.createElement("i");
         dot.className = "constraint-dot";
         dot.setAttribute("aria-label", status.recovered ? "recovered" : "missed");
         name.append(dot, document.createTextNode(slot.name));
-        row.append(name);
+        const axisTrack = document.createElement("span");
+        axisTrack.className = "constraint-closeness";
+        const axisFill = document.createElement("i");
+        axisFill.className = "constraint-closeness-fill";
+        axisFill.style.width = `${(status.closeness * 100).toFixed(1)}%`;
+        axisFill.style.backgroundColor = closenessColor(status.closeness);
+        axisTrack.append(axisFill);
+        cell.append(name, axisTrack);
+        row.append(cell);
         [worldSlotValue(actual, slot), predictedParameterValue(predictedParameters, slot)].forEach(value => {
           const cell = document.createElement("span");
           cell.textContent = value;
@@ -597,8 +621,9 @@
     function updateCoherence(recovery) {
       $("coherenceScore").textContent = `${Math.round(recovery.score * 100)}%`;
       $("coherenceFill").style.width = `${(recovery.score * 100).toFixed(1)}%`;
+      $("coherenceFill").style.backgroundColor = closenessColor(recovery.score);
       $("coherenceDetail").textContent =
-        `${recovery.recovered} of ${recovery.total} constraints recovered`;
+        `${Math.round(recovery.score * 100)}% mean closeness to hidden parameters`;
     }
 
     function updateSecondOrder(step) {

@@ -100,7 +100,7 @@ def test_episode_thinks_in_four_belief_only_steps_before_training() -> None:
     recovery = payload["thought_steps"][0]["constraint_recovery"]
     assert recovery["total"] == 3
     assert recovery["recovered"] == 3
-    assert recovery["score"] == 1.0
+    assert 0.99 < recovery["score"] < 1.0
     assert len(payload["thought_steps"][0]["paths"]) == 1
     assert len(payload["thought_steps"][2]["paths"]) == 4
     assert payload["thought_steps"][0]["paths"][0][0] == pytest.approx(path[0])

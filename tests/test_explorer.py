@@ -165,10 +165,13 @@ def test_second_order_panel_visualizes_constraint_coherence_without_new_canvas()
     } <= parser.ids
     assert parser.canvases == {"perceptionCanvas"}
     assert "Coherence" in source
-    assert "constraints recovered" in source
+    assert "mean closeness to hidden parameters" in source
     assert "step.constraint_recovery" in source
     assert 'row.classList.add(status.recovered ? "recovered" : "missed")' in source
     assert "function updateCoherence" in source
+    assert "function closenessColor" in source
+    assert "constraint-closeness-fill" in source
+    assert 'axisFill.style.width = `${(status.closeness * 100).toFixed(1)}%`' in source
     assert '$("coherenceFill").style.width = `${(recovery.score * 100).toFixed(1)}%`' in source
 
 

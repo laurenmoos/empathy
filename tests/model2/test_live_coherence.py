@@ -23,11 +23,14 @@ def test_constraint_recovery_counts_inactive_agreement_and_active_tolerance() ->
 
     assert recovery.recovered == 2
     assert recovery.total == 3
-    assert recovery.score == pytest.approx(2 / 3)
+    assert recovery.score == pytest.approx((0.93 + 1.0 + 0.85) / 3)
     assert [item.name for item in recovery.constraints] == ["gravity", "wind", "damping"]
     assert [item.recovered for item in recovery.constraints] == [True, True, False]
     assert recovery.constraints[0].parameter_error == pytest.approx(0.07)
     assert recovery.constraints[1].parameter_error is None
+    assert [item.closeness for item in recovery.constraints] == pytest.approx(
+        [0.93, 1.0, 0.85]
+    )
 
 
 def test_constraint_recovery_marks_activity_mismatch_as_missed() -> None:

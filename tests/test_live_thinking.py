@@ -89,6 +89,15 @@ def test_episode_thinks_in_four_belief_only_steps_before_training() -> None:
     assert all(len(point) == 2 for point in path)
     assert all(0.0 <= coordinate <= 1.0 for point in path for coordinate in point)
     assert payload["thought_steps"][0]["predicted_parameters"] == [0.5] * 7
+    assert len(payload["thought_steps"][0]["paths"]) == 1
+    assert len(payload["thought_steps"][2]["paths"]) == 4
+    assert payload["thought_steps"][0]["paths"][0][0] == pytest.approx(path[0])
+    assert sum(payload["thought_steps"][2]["path_weights"]) == pytest.approx(1.0)
+    assert all(
+        len(point) == 2
+        for path_points in payload["thought_steps"][2]["paths"]
+        for point in path_points
+    )
 
 
 def test_successive_episodes_vary_offsets_and_keep_completed_event_history() -> None:

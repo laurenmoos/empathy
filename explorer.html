@@ -222,6 +222,16 @@
             || !step.predicted_parameters.every(Number.isFinite)) {
           throw new Error("predicted parameters must contain seven finite values");
         }
+        if (!Array.isArray(step.paths) || step.paths.length < 1
+            || !step.paths.every(path => Array.isArray(path) && path.length > 1
+              && path.every(point => Array.isArray(point) && point.length === 2
+                && point.every(value => Number.isFinite(value)
+                  && value >= 0 && value <= 1)))
+            || !Array.isArray(step.path_weights)
+            || step.path_weights.length !== step.paths.length
+            || !step.path_weights.every(value => Number.isFinite(value) && value >= 0)) {
+          throw new Error("belief paths and weights are invalid");
+        }
         const beliefBytes = decodeBytes(step.belief_u8);
         if (beliefBytes.length !== step.width * step.height) {
           throw new Error("belief byte length does not match dimensions");
@@ -390,15 +400,42 @@
       perceptionCtx.restore();
     }
 
-    function drawBeliefFuzz(step) {
-      const buffer = imageBuffer(step.width, step.height, step.beliefBytes, true);
+    function strokePath(path, width, alpha) {
       perceptionCtx.save();
-      perceptionCtx.imageSmoothingEnabled = true;
-      perceptionCtx.imageSmoothingQuality = "high";
-      perceptionCtx.filter = "blur(5px)";
-      perceptionCtx.globalAlpha = .78;
-      perceptionCtx.drawImage(buffer, 0, 0, perceptionCanvas.width, perceptionCanvas.height);
+      perceptionCtx.beginPath();
+      path.forEach(([x, y], index) => {
+        const px = x * perceptionCanvas.width;
+        const py = (1 - y) * perceptionCanvas.height;
+        if (index === 0) perceptionCtx.moveTo(px, py);
+        else perceptionCtx.lineTo(px, py);
+      });
+      perceptionCtx.strokeStyle = "#788076";
+      perceptionCtx.lineWidth = width;
+      perceptionCtx.globalAlpha = alpha;
+      perceptionCtx.lineCap = "round";
+      perceptionCtx.lineJoin = "round";
+      perceptionCtx.stroke();
       perceptionCtx.restore();
+    }
+
+    function beliefConfidence(weights) {
+      if (weights.length === 1) return 1;
+      const entropy = -weights.reduce(
+        (total, weight) => total + (weight > 0 ? weight * Math.log(weight) : 0),
+        0
+      );
+      return Math.max(0, Math.min(1, 1 - entropy / Math.log(weights.length)));
+    }
+
+    function drawBeliefSuperposition(step) {
+      const confidence = beliefConfidence(step.path_weights);
+      step.paths.forEach((path, index) => {
+        const weight = step.path_weights[index];
+        const broadWidth = 5 + (1 - confidence) * 11 + (1 - weight) * 3;
+        const broadAlpha = .07 + confidence * .12 + weight * .12;
+        strokePath(path, broadWidth, broadAlpha);
+        strokePath(path, 1.2 + weight * 2.2, .12 + confidence * .28 + weight * .38);
+      });
     }
 
     function drawPerception() {
@@ -417,7 +454,7 @@
       const index = thoughtIndex();
       if (index >= 0) {
         const step = currentEpisode.thought_steps[index];
-        drawBeliefFuzz(step);
+        drawBeliefSuperposition(step);
         if (index !== currentThought) {
           currentThought = index;
           updateSecondOrder(step);

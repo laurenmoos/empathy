@@ -87,7 +87,11 @@ def test_explorer_combines_ground_truth_path_and_belief_fuzz() -> None:
     assert "Ground truth + beliefs" in source
     assert "Second-order perception" in source
     assert "function drawGroundTruthPath" in source
-    assert "function drawBeliefFuzz" in source
+    assert "function drawBeliefSuperposition" in source
+    assert "drawBeliefFuzz" not in source
+    assert "step.path_weights" in source
+    assert "lineWidth" in source
+    assert "globalAlpha" in source
 
 
 def test_stream_controls_start_sessions_and_queue_offset_episodes() -> None:

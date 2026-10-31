@@ -93,6 +93,8 @@ class LiveThoughtStep:
     belief: np.ndarray
     guessed_flat: np.ndarray
     guessed_parameters: np.ndarray
+    paths: np.ndarray
+    path_weights: np.ndarray
 
     def to_payload(self) -> dict[str, object]:
         height, width = self.belief.shape
@@ -107,6 +109,8 @@ class LiveThoughtStep:
             "belief_u8": _encoded_u8(np.clip(np.rint(self.belief * 255), 0, 255)),
             "predicted_world_flat": self.guessed_flat.tolist(),
             "predicted_parameters": self.guessed_parameters.tolist(),
+            "paths": self.paths.tolist(),
+            "path_weights": self.path_weights.tolist(),
             "operators": _operator_payload(self.guessed_flat),
         }
 
@@ -241,23 +245,19 @@ class LiveThinkingSession:
                 post_prediction = self.model1(batch.post_frames, batch.post_times, batch.post_mask)
                 mode_count = pre_prediction.positions.shape[1]
                 counts = (1, min(2, mode_count), mode_count)
+                visual_predictions = [
+                    _subset(pre_prediction, count) for count in counts
+                ]
+                visual_predictions.append(post_prediction)
                 beliefs = [
                     rasterize_mixture(
-                        _subset(pre_prediction, count),
+                        prediction,
                         height=size,
                         width=size,
                         step_mask=batch.target_mask,
                     ).collapsed[0].cpu().numpy().astype(np.float32)
-                    for count in counts
+                    for prediction in visual_predictions
                 ]
-                beliefs.append(
-                    rasterize_mixture(
-                        post_prediction,
-                        height=size,
-                        width=size,
-                        step_mask=batch.target_mask,
-                    ).collapsed[0].cpu().numpy().astype(np.float32)
-                )
 
             labels = (
                 "first possibility",
@@ -268,7 +268,9 @@ class LiveThinkingSession:
             previous = np.zeros_like(beliefs[0])
             steps: list[LiveThoughtStep] = []
             final_inputs: BeliefInputs | None = None
-            for index, (label, belief) in enumerate(zip(labels, beliefs, strict=True)):
+            for index, (label, belief, visual_prediction) in enumerate(
+                zip(labels, beliefs, visual_predictions, strict=True)
+            ):
                 packet = Model1BeliefPacket(
                     episode_id="live-thinking",
                     event_ordinal=self._episode_index,
@@ -287,6 +289,18 @@ class LiveThinkingSession:
                 guessed = decode_prediction(prediction, WorldSchema.v1()).flat[0].astype(
                     np.float32
                 )
+                visual_paths = (
+                    visual_prediction.positions[0]
+                    .detach()
+                    .cpu()
+                    .numpy()
+                    .astype(np.float32)
+                )
+                entry_position = record.target_states[0, :2].astype(np.float32)
+                entries = np.broadcast_to(
+                    entry_position, (len(visual_paths), 1, 2)
+                ).copy()
+                visual_paths = np.concatenate((entries, visual_paths), axis=1)
                 steps.append(
                     LiveThoughtStep(
                         index,
@@ -295,6 +309,12 @@ class LiveThinkingSession:
                         belief.copy(),
                         guessed,
                         guessed_parameters,
+                        visual_paths,
+                        torch.softmax(visual_prediction.logits[0], dim=0)
+                        .detach()
+                        .cpu()
+                        .numpy()
+                        .astype(np.float32),
                     )
                 )
                 previous = belief

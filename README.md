@@ -24,7 +24,7 @@ The trajectory maps remain useful outputs for training and visualization, but th
 
 Model 2 receives the detached pre-belief, post-belief, and belief-change activations. It therefore encounters the internal form of Model 1's experience.
 
-In the diagram, the pre-belief, post-belief, and difference panels are readable projections reconstructed from the underlying activation traces `z_pre`, `z_post`, and `z_post - z_pre`.
+The pre-belief, post-belief, and difference panels are readable projections reconstructed from the underlying activation traces `z_pre`, `z_post`, and `z_post - z_pre`.
 
 A small evidence adapter maps these traces into a space that can be compared with simulated candidates. Sequential Monte Carlo then maintains candidate settings of gravity, wind, and damping. The simulator rolls out each candidate across possible initial states, and Model 2 gives greater weight to worlds whose consequences best explain Model 1's activation history.
 

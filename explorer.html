@@ -53,11 +53,6 @@
     button:disabled { cursor: wait; opacity: .6; }
     .buttons { display: grid; gap: .45rem; margin-top: .9rem; }
     .status { min-height: 3.6em; margin: .65rem 0 0; color: var(--muted); font-size: .7rem; line-height: 1.4; }
-    .session-note { margin-top: 1rem; padding-top: .8rem; border-top: 1px solid var(--line); }
-    .session-note strong { display: block; color: var(--amber); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; }
-    .session-grid { display: grid; gap: .55rem; margin-top: .65rem; }
-    .session-grid small { display: block; color: var(--muted); font-size: .65rem; }
-    .session-grid b { font: 650 .72rem ui-monospace, monospace; }
     .layers {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(16rem, .78fr);
@@ -72,20 +67,14 @@
       border-radius: 15px;
       background: var(--panel);
     }
-    .panel-head { min-height: 3.2rem; margin-bottom: .65rem; }
+    .panel-head { min-height: 2.5rem; margin-bottom: .65rem; }
     .panel-head span { display: block; margin-top: .25rem; color: var(--muted); font-size: .68rem; line-height: 1.35; }
     canvas { display: block; width: 100%; aspect-ratio: 1; border-radius: 10px; background: #05090b; }
-    .legend { margin-top: .65rem; color: var(--muted); font-size: .67rem; line-height: 1.45; }
-    .dot { display: inline-block; width: .55rem; height: .55rem; margin-right: .25rem; border-radius: 50%; }
     .readout { min-height: 2.4em; font: 650 .76rem ui-monospace, monospace; color: var(--violet); }
     .comparison { margin-top: .7rem; }
     .comparison-row { display: grid; grid-template-columns: 1fr .85fr .85fr; gap: .25rem; padding: .42rem 0; border-top: 1px solid var(--line); font-size: .64rem; }
     .comparison-row.heading { color: var(--muted); border-top: 0; }
     .comparison-row span:not(:first-child) { font-family: ui-monospace, monospace; }
-    .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; margin-top: .8rem; }
-    .metric { padding: .55rem; border: 1px solid var(--line); border-radius: 9px; background: rgba(5, 12, 14, .65); }
-    .metric small { display: block; color: var(--muted); font-size: .61rem; }
-    .metric b { font: 650 .7rem ui-monospace, monospace; }
     @media (max-width: 1080px) {
       .layers { grid-template-columns: 1fr 1fr; }
       #secondOrderPanel { grid-column: 1 / -1; }
@@ -120,31 +109,23 @@
         <button id="reset">Reset stream</button>
       </div>
       <p class="status" id="statusMessage">Ready.</p>
-      <section class="session-note">
-        <div class="session-grid">
-          <div><small>Episode</small><b id="episodeReadout">—</b></div>
-          <div><small>Initial offset · y / vx / vy</small><b id="offsetReadout">—</b></div>
-        </div>
-      </section>
     </aside>
 
     <section class="layers">
       <article class="panel" id="worldPanel">
         <div class="panel-head">
           <h2>Ground truth</h2>
-          <span id="worldPhase">Waiting for an episode</span>
+          <span id="worldPhase"></span>
         </div>
         <canvas id="worldCanvas" width="640" height="640"></canvas>
-        <p class="legend"><i class="dot" style="background:white"></i>Actual rollout.</p>
       </article>
 
       <article class="panel" id="beliefPanel">
         <div class="panel-head">
-          <h2>Belief space</h2>
-          <span id="thoughtReadout">No belief yet</span>
+          <h2>Beliefs</h2>
+          <span id="thoughtReadout"></span>
         </div>
         <canvas id="beliefCanvas" width="640" height="640"></canvas>
-        <p class="legend"><i class="dot" style="background:var(--violet)"></i>Possible hidden paths accumulate, then revise at reappearance.</p>
       </article>
 
       <article class="panel" id="secondOrderPanel">
@@ -155,12 +136,6 @@
         <div class="comparison">
           <div class="comparison-row heading"><span>Operator</span><span>Ground-truth parameters</span><span>Pre-update guess</span></div>
           <div id="comparisonRows"></div>
-        </div>
-        <div class="metrics">
-          <div class="metric"><small>Latent updates</small><b id="latentUpdates">0</b></div>
-          <div class="metric"><small>Weight updates</small><b id="weightUpdates">0</b></div>
-          <div class="metric"><small>Latest online loss</small><b id="onlineLoss">—</b></div>
-          <div class="metric"><small>Thought step</small><b id="thoughtStepMetric">—</b></div>
         </div>
       </article>
     </section>
@@ -341,9 +316,6 @@
       currentFrame = 0;
       currentThought = -1;
       accumulator = 0;
-      $("episodeReadout").textContent = String(episode.episode_index + 1);
-      const [, y, vx, vy] = episode.initial_state;
-      $("offsetReadout").textContent = `${y.toFixed(2)} / ${vx.toFixed(2)} / ${vy.toFixed(2)}`;
       $("statusMessage").textContent = "The ball is approaching the occluder.";
       draw();
       requestNextEpisode();
@@ -386,30 +358,24 @@
     function clearWorldCanvas() {
       worldCtx.fillStyle = "#05090b";
       worldCtx.fillRect(0, 0, worldCanvas.width, worldCanvas.height);
-      $("worldPhase").textContent = "Waiting for an episode";
+      $("worldPhase").textContent = "";
     }
 
     function clearBeliefCanvas() {
       beliefCtx.fillStyle = "#05090b";
       beliefCtx.fillRect(0, 0, beliefCanvas.width, beliefCanvas.height);
-      $("thoughtReadout").textContent = "No belief yet";
-      $("thoughtStepMetric").textContent = "—";
+      $("thoughtReadout").textContent = "";
     }
 
     function clearSecondOrder() {
       $("operatorReadout").textContent = "—";
       $("comparisonRows").replaceChildren();
-      $("latentUpdates").textContent = "0";
-      $("weightUpdates").textContent = "0";
-      $("onlineLoss").textContent = "—";
     }
 
     function clearAllLayers() {
       clearWorldCanvas();
       clearBeliefCanvas();
       clearSecondOrder();
-      $("episodeReadout").textContent = "—";
-      $("offsetReadout").textContent = "—";
     }
 
     function drawWorld() {
@@ -449,7 +415,6 @@
 
     function drawBelief() {
       const index = thoughtIndex();
-      updateLearningReadout(index);
       if (!currentEpisode || index < 0) return clearBeliefCanvas();
       const step = currentEpisode.thought_steps[index];
       const buffer = imageBuffer(step.width, step.height, step.beliefBytes, true);
@@ -459,24 +424,9 @@
       beliefCtx.imageSmoothingQuality = "high";
       beliefCtx.drawImage(buffer, 0, 0, beliefCanvas.width, beliefCanvas.height);
       $("thoughtReadout").textContent = `${index + 1}/4 · ${step.label}`;
-      $("thoughtStepMetric").textContent = `${index + 1} / 4`;
       if (index !== currentThought) {
         currentThought = index;
         updateSecondOrder(step);
-      }
-    }
-
-    function updateLearningReadout(index) {
-      if (!currentEpisode) return;
-      const completedLatent = currentEpisode.latent_update_count - 4;
-      const completedWeights = currentEpisode.weight_update_count - 1;
-      $("latentUpdates").textContent = String(completedLatent + Math.max(0, index + 1));
-      if (index === 3) {
-        $("weightUpdates").textContent = String(currentEpisode.weight_update_count);
-        $("onlineLoss").textContent = currentEpisode.training.loss.toFixed(4);
-      } else {
-        $("weightUpdates").textContent = String(completedWeights);
-        $("onlineLoss").textContent = "pending reveal";
       }
     }
 
@@ -557,8 +507,6 @@
       clearWorldCanvas();
       clearBeliefCanvas();
       clearSecondOrder();
-      $("episodeReadout").textContent = "—";
-      $("offsetReadout").textContent = "—";
       $("statusMessage").textContent = message;
       $("streamToggle").disabled = false;
       updateControls();

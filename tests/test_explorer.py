@@ -42,7 +42,7 @@ def test_explorer_uses_minimal_numeric_controls_and_plain_layer_names() -> None:
 
     assert parser.input_types == ["number", "number", "number"]
     assert "<h2>Ground truth</h2>" in source
-    assert "<h2>Belief space</h2>" in source
+    assert "<h2>Beliefs</h2>" in source
     assert "<h2>Second-order perception</h2>" in source
     for unwanted in (
         "Choose one world",
@@ -53,6 +53,16 @@ def test_explorer_uses_minimal_numeric_controls_and_plain_layer_names() -> None:
         "Model 1",
         "Model 2",
         "Waiting for a belief",
+        "Waiting for an episode",
+        "Actual rollout.",
+        "Possible hidden paths accumulate",
+        "No belief yet",
+        "<small>Episode</small>",
+        "Initial offset",
+        "Latent updates",
+        "Weight updates",
+        "Latest online loss",
+        "Thought step",
     ):
         assert unwanted not in source
     state_source = EXPLORER_STATE.read_text()
@@ -74,7 +84,7 @@ def test_explorer_has_three_visually_disjoint_perceptual_layers() -> None:
     assert parser.canvases == {"worldCanvas", "beliefCanvas"}
     assert not parser.external_urls
     assert "Ground truth" in source
-    assert "Belief space" in source
+    assert "Beliefs" in source
     assert "Second-order perception" in source
     assert "drawBeliefOverlay" not in source
     assert 'globalCompositeOperation = "screen"' not in source
@@ -89,8 +99,6 @@ def test_stream_controls_start_sessions_and_queue_offset_episodes() -> None:
         "damping",
         "streamToggle",
         "reset",
-        "episodeReadout",
-        "offsetReadout",
     } <= parser.ids
     assert 'postJson("/api/session/start"' in source
     assert 'postJson("/api/session/next"' in source
@@ -99,19 +107,18 @@ def test_stream_controls_start_sessions_and_queue_offset_episodes() -> None:
     assert "episodeQueue" in source
     assert "requestNextEpisode();" in source
     assert "Play thinking stream" in source
-    assert "Initial offset" in source
 
 
-def test_thought_steps_and_online_updates_have_visible_state() -> None:
+def test_thought_steps_and_world_guess_have_visible_state() -> None:
     source, parser = parsed_explorer()
 
+    assert {"thoughtReadout", "operatorReadout"} <= parser.ids
     assert {
-        "thoughtReadout",
-        "operatorReadout",
         "latentUpdates",
         "weightUpdates",
         "onlineLoss",
-    } <= parser.ids
+        "thoughtStepMetric",
+    }.isdisjoint(parser.ids)
     for label in (
         "first possibility",
         "more possibilities",
@@ -121,11 +128,7 @@ def test_thought_steps_and_online_updates_have_visible_state() -> None:
         assert label in source
     assert "Ground-truth parameters" in source
     assert "Pre-update guess" in source
-    assert "latent_update_count" in source
-    assert "weight_update_count" in source
-    assert "training.loss" in source
-    assert "function updateLearningReadout" in source
-    assert "index === 3" in source
+    assert "function updateSecondOrder" in source
 
 
 def test_parameter_edits_invalidate_the_stream_and_clear_all_layers() -> None:

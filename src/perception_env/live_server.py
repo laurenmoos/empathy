@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import threading
 import uuid
+from collections import OrderedDict
+from dataclasses import dataclass
 from functools import partial
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -14,29 +16,69 @@ from typing import Any
 from .live_inference import LiveInferenceEngine, LiveInferenceError, LiveParameters
 
 
+@dataclass
+class _SessionEntry:
+    session: Any
+    request_lock: threading.Lock
+    active_requests: int = 0
+    closing: bool = False
+
+
 class LiveSessionRegistry:
     """Own fixed-world thinking sessions without reloading either checkpoint."""
 
-    def __init__(self, engine: LiveInferenceEngine) -> None:
+    def __init__(self, engine: LiveInferenceEngine, *, max_sessions: int = 8) -> None:
+        if max_sessions < 1:
+            raise ValueError("max_sessions must be positive")
         self.engine = engine
-        self._sessions: dict[str, tuple[Any, threading.Lock]] = {}
+        self.max_sessions = max_sessions
+        self._sessions: OrderedDict[str, _SessionEntry] = OrderedDict()
         self._lock = threading.Lock()
 
     def start(self, parameters: LiveParameters) -> str:
-        session = self.engine.thinking_session(parameters)
-        session_id = uuid.uuid4().hex
         with self._lock:
-            self._sessions[session_id] = (session, threading.Lock())
+            while len(self._sessions) >= self.max_sessions:
+                idle_id = next(
+                    (
+                        session_id
+                        for session_id, entry in self._sessions.items()
+                        if entry.active_requests == 0
+                    ),
+                    None,
+                )
+                if idle_id is None:
+                    raise LiveInferenceError("all live session slots are busy; retry shortly")
+                del self._sessions[idle_id]
+            session = self.engine.thinking_session(parameters)
+            session_id = uuid.uuid4().hex
+            self._sessions[session_id] = _SessionEntry(session, threading.Lock())
         return session_id
 
     def next_episode(self, session_id: str):
         with self._lock:
             entry = self._sessions.get(session_id)
-        if entry is None:
-            raise KeyError("unknown session ID")
-        session, session_lock = entry
-        with session_lock:
-            return session.next_episode()
+            if entry is None or entry.closing:
+                raise KeyError("unknown session ID")
+            entry.active_requests += 1
+            self._sessions.move_to_end(session_id)
+        try:
+            with entry.request_lock:
+                return entry.session.next_episode()
+        finally:
+            with self._lock:
+                entry.active_requests -= 1
+                if entry.closing and entry.active_requests == 0:
+                    self._sessions.pop(session_id, None)
+
+    def close(self, session_id: str) -> bool:
+        with self._lock:
+            entry = self._sessions.get(session_id)
+            if entry is None:
+                return False
+            entry.closing = True
+            if entry.active_requests == 0:
+                del self._sessions[session_id]
+            return True
 
 
 def process_inference_request(
@@ -106,6 +148,20 @@ def process_session_next(
     return HTTPStatus.OK, episode.to_payload()
 
 
+def process_session_close(
+    registry: LiveSessionRegistry, body: bytes
+) -> tuple[HTTPStatus, dict[str, Any]]:
+    try:
+        payload = json.loads(body)
+    except (ValueError, UnicodeDecodeError):
+        return HTTPStatus.BAD_REQUEST, {"error": "request body must be valid JSON"}
+    if not isinstance(payload, dict) or set(payload) != {"session_id"}:
+        return HTTPStatus.BAD_REQUEST, {"error": "request must contain exactly: session_id"}
+    if not isinstance(payload["session_id"], str) or not payload["session_id"]:
+        return HTTPStatus.BAD_REQUEST, {"error": "session_id must be a nonempty string"}
+    return HTTPStatus.OK, {"closed": registry.close(payload["session_id"])}
+
+
 class _LiveDemoHandler(SimpleHTTPRequestHandler):
     engine: LiveInferenceEngine
     registry: LiveSessionRegistry
@@ -120,7 +176,12 @@ class _LiveDemoHandler(SimpleHTTPRequestHandler):
         self.wfile.write(encoded)
 
     def do_POST(self) -> None:  # noqa: N802
-        if self.path not in {"/api/infer", "/api/session/start", "/api/session/next"}:
+        if self.path not in {
+            "/api/infer",
+            "/api/session/start",
+            "/api/session/next",
+            "/api/session/close",
+        }:
             self._json(HTTPStatus.NOT_FOUND, {"error": "endpoint not found"})
             return
         try:
@@ -133,6 +194,8 @@ class _LiveDemoHandler(SimpleHTTPRequestHandler):
             status, payload = process_session_start(self.registry, body)
         elif self.path == "/api/session/next":
             status, payload = process_session_next(self.registry, body)
+        elif self.path == "/api/session/close":
+            status, payload = process_session_close(self.registry, body)
         else:
             status, payload = process_inference_request(self.engine, body)
         self._json(status, payload)

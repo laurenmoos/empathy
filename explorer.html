@@ -164,12 +164,14 @@
     </section>
   </main>
 
+  <script src="explorer_state.js"></script>
   <script>
     const $ = id => document.getElementById(id);
     const worldCanvas = $("worldCanvas");
     const worldCtx = worldCanvas.getContext("2d");
     const beliefCanvas = $("beliefCanvas");
     const beliefCtx = beliefCanvas.getContext("2d");
+    const {frameNarration} = PerceptionUIState;
     const EXPECTED_THOUGHT_LABELS = [
       "first possibility",
       "more possibilities",
@@ -190,6 +192,7 @@
     let playing = false;
     let fetching = false;
     let requestSerial = 0;
+    let statusOverride = null;
     let accumulator = 0;
     let previousTimestamp = 0;
 
@@ -283,6 +286,7 @@
       currentThought = -1;
       playing = false;
       fetching = false;
+      statusOverride = null;
       clearAllLayers();
       $("streamToggle").disabled = true;
       $("statusMessage").textContent = "Starting a fixed-world thinking session…";
@@ -300,7 +304,8 @@
         if (serial !== requestSerial) return;
         playing = false;
         sessionId = null;
-        $("statusMessage").textContent = `Couldn’t start the stream: ${error.message}`;
+        statusOverride = `Couldn’t start the stream: ${error.message}`;
+        $("statusMessage").textContent = statusOverride;
       } finally {
         if (serial === requestSerial) $("streamToggle").disabled = false;
         updateControls();
@@ -321,7 +326,8 @@
       } catch (error) {
         if (serial !== requestSerial) return;
         playing = false;
-        $("statusMessage").textContent = `Stream stopped: ${error.message}`;
+        statusOverride = `Stream stopped: ${error.message}`;
+        $("statusMessage").textContent = statusOverride;
       } finally {
         if (serial === requestSerial) fetching = false;
         updateControls();
@@ -422,11 +428,11 @@
         : currentFrame >= truth.reappearance_step
           ? "Ball reappeared · evidence arrives"
           : "Ball visible";
-      $("statusMessage").textContent = hidden
-        ? "Model 1 is expanding possible hidden paths."
-        : currentFrame >= truth.reappearance_step
-          ? "Evidence arrived. The guess is scored, then Model 2 learns."
-          : "The ball is approaching the occluder.";
+      $("statusMessage").textContent = frameNarration(
+        hidden,
+        currentFrame >= truth.reappearance_step,
+        statusOverride
+      );
     }
 
     function thoughtIndex() {
@@ -536,6 +542,7 @@
     }
 
     function stopAndClear(message) {
+      const previousSession = sessionId;
       requestSerial += 1;
       sessionId = null;
       episodeQueue.length = 0;
@@ -544,6 +551,7 @@
       currentThought = -1;
       playing = false;
       fetching = false;
+      statusOverride = message;
       clearWorldCanvas();
       clearBeliefCanvas();
       clearSecondOrder();
@@ -552,6 +560,9 @@
       $("statusMessage").textContent = message;
       $("streamToggle").disabled = false;
       updateControls();
+      if (previousSession) {
+        postJson("/api/session/close", {session_id: previousSession}).catch(() => {});
+      }
     }
 
     $("streamToggle").addEventListener("click", () => {
@@ -559,6 +570,7 @@
         startSession();
         return;
       }
+      statusOverride = null;
       playing = !playing;
       if (playing && !currentEpisode) requestNextEpisode();
       updateControls();

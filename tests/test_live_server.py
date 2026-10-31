@@ -11,6 +11,7 @@ from perception_env.live_server import (
     LiveSessionRegistry,
     create_server,
     process_inference_request,
+    process_session_close,
     process_session_next,
     process_session_start,
 )
@@ -193,3 +194,29 @@ def test_registry_serializes_concurrent_requests_for_one_session() -> None:
         episodes = list(pool.map(lambda _: registry.next_episode(session_id), range(2)))
 
     assert sorted(episode.index for episode in episodes) == [0, 1]
+
+
+def test_registry_evicts_oldest_idle_session_at_capacity() -> None:
+    registry = LiveSessionRegistry(FakeThinkingEngine(), max_sessions=2)
+    first = registry.start(LiveParameters())
+    second = registry.start(LiveParameters(gravity=-0.1))
+    third = registry.start(LiveParameters(wind=0.1))
+
+    with pytest.raises(KeyError, match="unknown session"):
+        registry.next_episode(first)
+    assert registry.next_episode(second).index == 0
+    assert registry.next_episode(third).index == 0
+
+
+def test_session_close_releases_the_registered_model_copy() -> None:
+    registry = LiveSessionRegistry(FakeThinkingEngine())
+    session_id = registry.start(LiveParameters())
+
+    status, payload = process_session_close(
+        registry, json.dumps({"session_id": session_id}).encode()
+    )
+
+    assert status is HTTPStatus.OK
+    assert payload == {"closed": True}
+    with pytest.raises(KeyError, match="unknown session"):
+        registry.next_episode(session_id)

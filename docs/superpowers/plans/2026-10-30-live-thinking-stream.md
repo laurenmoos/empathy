@@ -81,4 +81,3 @@
 - [ ] Document `.venv/bin/perception-env live-demo`, the belief-only boundary, and the limitation that same-world adaptation can learn a constant answer.
 - [ ] Start the real server and visually verify at least three successive offsets, belief/world separation, one parameter reset, and a rejected parameter combination.
 - [ ] Run `pytest -q`, `ruff check .`, and `git diff --check`, then commit.
-

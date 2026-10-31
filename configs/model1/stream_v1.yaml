@@ -1,0 +1,9 @@
+schema_version: model1-stream-v1
+stream:
+  levels: [W0, W1, W2, W3, W4]
+  environment_count: 10
+  episodes_per_environment: 16
+  max_attempts_per_environment: 500
+  replay_capacity: 128
+  replay_batch_size: 16
+  update_steps_per_environment: 4

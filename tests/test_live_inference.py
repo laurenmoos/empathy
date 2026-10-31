@@ -186,3 +186,24 @@ def test_hidden_truth_changes_recovery_but_not_belief_only_guess() -> None:
     assert evaluate_constraint_recovery(neutral, guess_flat) != evaluate_constraint_recovery(
         gravity, guess_flat
     )
+
+
+def test_live_smc_runtime_bounds_four_event_candidate_work(monkeypatch) -> None:
+    from perception_env.live_thinking import SMCModel2Runtime
+    from perception_env.model2 import smc
+
+    calls = 0
+
+    def counted_field(world, height, width, observed):
+        nonlocal calls
+        del world, observed
+        calls += 1
+        return np.zeros((height, width), dtype=np.float64)
+
+    monkeypatch.setattr(smc, "_candidate_field", counted_field)
+    beliefs = np.zeros((1, 4, 3, 16, 16), dtype=np.float32)
+    inputs = BeliefInputs(beliefs, np.ones((1, 4), dtype=bool))
+
+    SMCModel2Runtime(seed=7).infer(inputs)
+
+    assert calls <= 120

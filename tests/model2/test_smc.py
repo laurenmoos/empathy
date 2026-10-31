@@ -65,3 +65,40 @@ def test_curved_belief_ranks_downward_gravity_above_neutral_world() -> None:
     assert result.best_world[0] == 1.0
     assert schema.from_flat(result.best_world).slot("vertical_acceleration").parameters[0] < 0
     assert max(gravity_weights) > max(neutral_weights)
+
+
+def test_signed_revision_changes_posterior_when_post_belief_is_identical() -> None:
+    size = 32
+    post = np.zeros((size, size), dtype=np.float32)
+    post[12, 11:20] = 1.0
+
+    newly_added = BeliefWorldSMC(SMCConfig(particle_count=18, rounds=2, seed=11)).infer(
+        _inputs(post, np.zeros_like(post))
+    )
+    unchanged = BeliefWorldSMC(SMCConfig(particle_count=18, rounds=2, seed=11)).infer(
+        _inputs(post, post)
+    )
+
+    assert sorted(row.tobytes() for row in newly_added.ranked_worlds) == sorted(
+        row.tobytes() for row in unchanged.ranked_worlds
+    )
+    assert not np.array_equal(newly_added.weights, unchanged.weights)
+    assert not np.array_equal(
+        newly_added.event_discrepancies, unchanged.event_discrepancies
+    )
+
+
+def test_single_event_likelihood_is_not_reapplied_by_rejuvenation_rounds() -> None:
+    post = np.zeros((32, 32), dtype=np.float32)
+    post[12, 11:20] = 1.0
+
+    one_round = BeliefWorldSMC(
+        SMCConfig(particle_count=18, rounds=1, seed=13)
+    ).infer(_inputs(post))
+    four_rounds = BeliefWorldSMC(
+        SMCConfig(particle_count=18, rounds=4, seed=13)
+    ).infer(_inputs(post))
+
+    assert np.array_equal(one_round.ranked_worlds, four_rounds.ranked_worlds)
+    assert np.array_equal(one_round.weights, four_rounds.weights)
+    assert np.array_equal(one_round.event_discrepancies, four_rounds.event_discrepancies)

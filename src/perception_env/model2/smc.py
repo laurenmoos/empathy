@@ -179,14 +179,15 @@ def _transport_cost(
 
 def _event_discrepancy(
     candidate: np.ndarray,
-    pre: np.ndarray,
+    neutral: np.ndarray,
     post: np.ndarray,
     difference: np.ndarray,
     config: SMCConfig,
 ) -> float:
     spatial = _transport_cost(candidate, post, config)
     candidate_scale = candidate / max(float(candidate.max()), 1.0e-12)
-    signed = np.mean(np.abs((candidate_scale - pre) - difference))
+    neutral_scale = neutral / max(float(neutral.max()), 1.0e-12)
+    signed = np.mean(np.abs((candidate_scale - neutral_scale) - difference))
     return float(spatial + config.signed_change_weight * signed)
 
 
@@ -199,6 +200,47 @@ def _normalize_log_weights(log_weights: np.ndarray) -> np.ndarray:
     return weights / total
 
 
+def _jitter_particles(
+    particles: np.ndarray, config: SMCConfig, rng: np.random.Generator
+) -> np.ndarray:
+    proposals = particles + rng.normal(0.0, config.jitter_scale, particles.shape)
+    proposals[:, :2] = np.clip(proposals[:, :2], -0.30, 0.30)
+    proposals[:, 2] = np.clip(proposals[:, 2], 0.0, 0.60)
+    proposals[:, :2][np.abs(proposals[:, :2]) <= 0.05] = 0.0
+    proposals[:, 2][proposals[:, 2] <= 0.01] = 0.0
+    return proposals
+
+
+def _score_particles(
+    particles: np.ndarray,
+    inputs: BeliefInputs,
+    belief_indices: np.ndarray,
+    config: SMCConfig,
+) -> np.ndarray:
+    scores = np.empty((len(particles), len(belief_indices)), dtype=np.float64)
+    neutral_world = _world_from_particle(np.zeros(3, dtype=np.float64))
+    for event_index, belief_index in enumerate(belief_indices):
+        pre, post, difference = inputs.beliefs[0, belief_index]
+        observed = np.maximum(pre, post)
+        neutral = _candidate_field(
+            neutral_world,
+            inputs.beliefs.shape[-2],
+            inputs.beliefs.shape[-1],
+            observed,
+        )
+        for particle_index, particle in enumerate(particles):
+            candidate = _candidate_field(
+                _world_from_particle(particle),
+                inputs.beliefs.shape[-2],
+                inputs.beliefs.shape[-1],
+                observed,
+            )
+            scores[particle_index, event_index] = _event_discrepancy(
+                candidate, neutral, post, difference, config
+            )
+    return scores
+
+
 class BeliefWorldSMC:
     def __init__(self, config: SMCConfig | None = None) -> None:
         self.config = config or SMCConfig()
@@ -209,33 +251,36 @@ class BeliefWorldSMC:
         rng = np.random.default_rng(self.config.seed)
         particles = _initial_particles(self.config, rng)
         valid = np.flatnonzero(inputs.history_mask[0])
-        discrepancies = np.empty((len(particles), len(valid)), dtype=np.float64)
         weights = np.full(len(particles), 1.0 / len(particles), dtype=np.float64)
-        for round_index in range(self.config.rounds):
-            for particle_index, particle in enumerate(particles):
-                world = _world_from_particle(particle)
-                for event_index, belief_index in enumerate(valid):
-                    pre, post, difference = inputs.beliefs[0, belief_index]
-                    field = _candidate_field(
-                        world,
-                        inputs.beliefs.shape[-2],
-                        inputs.beliefs.shape[-1],
-                        np.maximum(pre, post),
-                    )
-                    discrepancies[particle_index, event_index] = _event_discrepancy(
-                        field, pre, post, difference, self.config
-                    )
-            log_weights = -self.config.score_temperature * discrepancies.sum(axis=1)
+        log_weights = np.zeros(len(particles), dtype=np.float64)
+        for event_position in range(len(valid)):
+            event_score = _score_particles(
+                particles, inputs, valid[event_position : event_position + 1], self.config
+            )[:, 0]
+            log_weights += -self.config.score_temperature * event_score
             weights = _normalize_log_weights(log_weights)
-            if round_index + 1 == self.config.rounds:
+            if event_position + 1 == len(valid):
                 break
             selected = rng.choice(len(particles), len(particles), replace=True, p=weights)
             particles = particles[selected].copy()
-            particles += rng.normal(0.0, self.config.jitter_scale, particles.shape)
-            particles[:, :2] = np.clip(particles[:, :2], -0.30, 0.30)
-            particles[:, 2] = np.clip(particles[:, 2], 0.0, 0.60)
-            particles[:, :2][np.abs(particles[:, :2]) <= 0.05] = 0.0
-            particles[:, 2][particles[:, 2] <= 0.01] = 0.0
+            log_weights.fill(0.0)
+            processed = valid[: event_position + 1]
+            for _ in range(self.config.rounds - 1):
+                proposals = _jitter_particles(particles, self.config, rng)
+                current_score = _score_particles(
+                    particles, inputs, processed, self.config
+                ).sum(axis=1)
+                proposal_score = _score_particles(
+                    proposals, inputs, processed, self.config
+                ).sum(axis=1)
+                log_acceptance = -self.config.score_temperature * (
+                    proposal_score - current_score
+                )
+                accepted = np.log(rng.random(len(particles))) < np.minimum(
+                    0.0, log_acceptance
+                )
+                particles[accepted] = proposals[accepted]
+        discrepancies = _score_particles(particles, inputs, valid, self.config)
         worlds = np.stack(
             [_world_from_particle(particle).to_flat(WorldSchema.v1()) for particle in particles]
         ).astype(np.float32)

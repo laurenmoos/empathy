@@ -93,7 +93,13 @@ class SMCModel2Runtime:
     """Expose the README's belief-only particle search through the live runtime."""
 
     def __init__(self, *, seed: int = 7, config: SMCConfig | None = None) -> None:
-        self.config = config or SMCConfig(seed=seed)
+        self.config = config or SMCConfig(
+            particle_count=12,
+            rounds=1,
+            seed=seed,
+            grid_size=6,
+            sinkhorn_iterations=10,
+        )
         self.weight_update_count = 0
         self._last_result: SMCResult | None = None
 

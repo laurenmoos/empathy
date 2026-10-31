@@ -3,6 +3,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import torch
 import yaml
 
 from perception_env.model1.config import load_model1_config
@@ -12,7 +13,9 @@ from perception_env.model1.stream_train import (
     StreamTrainingConfig,
     generate_environment_batches,
     load_stream_training_config,
+    train_model1_stream,
 )
+from perception_env.model1.train import load_checkpoint
 
 
 def _stream_config(**overrides) -> StreamTrainingConfig:
@@ -54,6 +57,8 @@ def test_stream_configuration_rejects_nonpositive_and_oversized_values(tmp_path)
         _stream_config(environment_count=0)
     with pytest.raises(ValueError, match="replay"):
         _stream_config(replay_capacity=2, replay_batch_size=3)
+    with pytest.raises(ValueError, match="first environment"):
+        _stream_config(episodes_per_environment=1, replay_batch_size=2)
 
     path = tmp_path / "stream.yaml"
     path.write_text(
@@ -145,3 +150,88 @@ def test_replay_is_bounded_seeded_and_keeps_environment_provenance() -> None:
     replay.add(0, _record(1))
     replay.add(1, _record(2))
     assert {entry.environment_index for entry in replay.sample(3)} == {0, 1}
+
+
+def _tiny_model_config():
+    config = load_model1_config(Path("configs/model1/v1.yaml"))
+    return replace(
+        config,
+        model=replace(config.model, modes=3, hidden_size=16, frame_channels=(4, 8)),
+        training=replace(
+            config.training,
+            batch_size=2,
+            epochs=1,
+            learning_rate=0.003,
+        ),
+    )
+
+
+def test_stream_trainer_records_each_frozen_batch_before_replay_updates(tmp_path) -> None:
+    result = train_model1_stream(
+        _tiny_model_config(),
+        _stream_config(
+            environment_count=2,
+            episodes_per_environment=2,
+            replay_capacity=4,
+            replay_batch_size=2,
+        ),
+        Path("configs/world_families/v1.yaml"),
+        tmp_path / "run",
+        device=torch.device("cpu"),
+        seed=23,
+    )
+
+    assert [event.weight_update_count for event in result.events] == [0, 0, 1, 1]
+    assert len(result.history) == 2
+    assert result.history[0]["replay_environment_indices"] == [0, 0]
+    assert set(result.history[1]["replay_environment_indices"]) == {0, 1}
+    assert result.summary["initial_model_hash"] != result.summary["final_model_hash"]
+    assert result.checkpoint.is_file()
+    assert (tmp_path / "run" / "history.jsonl").is_file()
+    assert (tmp_path / "run" / "stream-summary.json").is_file()
+    for event in result.events:
+        with np.load(event.path, allow_pickle=False) as payload:
+            assert np.array_equal(
+                payload["belief_difference"], payload["post_belief"] - payload["pre_belief"]
+            )
+
+
+def test_stream_training_replays_exactly_under_same_seed(tmp_path) -> None:
+    config = _tiny_model_config()
+    stream = _stream_config(
+        environment_count=2,
+        episodes_per_environment=2,
+        replay_capacity=4,
+        replay_batch_size=2,
+    )
+    first = train_model1_stream(
+        config,
+        stream,
+        Path("configs/world_families/v1.yaml"),
+        tmp_path / "first",
+        device=torch.device("cpu"),
+        seed=29,
+    )
+    second = train_model1_stream(
+        config,
+        stream,
+        Path("configs/world_families/v1.yaml"),
+        tmp_path / "second",
+        device=torch.device("cpu"),
+        seed=29,
+    )
+
+    assert first.history == second.history
+    for left, right in zip(first.events, second.events, strict=True):
+        with np.load(left.path, allow_pickle=False) as a, np.load(
+            right.path, allow_pickle=False
+        ) as b:
+            assert all(np.array_equal(a[name], b[name]) for name in a.files)
+    first_model, _ = load_checkpoint(first.checkpoint, expected_config=config)
+    second_model, _ = load_checkpoint(second.checkpoint, expected_config=config)
+    assert all(
+        torch.equal(left, right)
+        for left, right in zip(
+            first_model.state_dict().values(), second_model.state_dict().values(), strict=True
+        )
+    )

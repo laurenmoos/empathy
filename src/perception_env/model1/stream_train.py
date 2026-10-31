@@ -2,17 +2,24 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import numpy as np
+import torch
 import yaml
 
 from perception_env.families import load_family, sample_worlds
 from perception_env.simulate import BallState
 
 from .config import Model1Config
-from .data import Model1ExampleRecord, make_model1_record
+from .data import Model1ExampleRecord, collate_model1, make_model1_record
+from .model import Model1
+from .rasterize import rasterize_mixture
+from .train import _run_batch, save_checkpoint, seed_model1
 
 
 @dataclass(frozen=True)
@@ -41,6 +48,8 @@ class StreamTrainingConfig:
             raise ValueError("stream training values and levels must be positive")
         if self.replay_batch_size > self.replay_capacity:
             raise ValueError("replay batch size cannot exceed replay capacity")
+        if self.replay_batch_size > self.episodes_per_environment:
+            raise ValueError("replay batch must fit in the first environment")
 
 
 def load_stream_training_config(path: Path) -> StreamTrainingConfig:
@@ -163,3 +172,231 @@ class Model1ReplayBuffer:
             raise ValueError("sample count outside replay population")
         indices = self._rng.choice(len(self._entries), size=count, replace=False)
         return tuple(self._entries[int(index)] for index in indices)
+
+    def sample_for_update(
+        self, count: int, *, current_environment: int
+    ) -> tuple[ReplayEntry, ...]:
+        if count < 1 or count > len(self._entries):
+            raise ValueError("sample count outside replay population")
+        current = [
+            index
+            for index, entry in enumerate(self._entries)
+            if entry.environment_index == current_environment
+        ]
+        previous = [
+            index
+            for index, entry in enumerate(self._entries)
+            if entry.environment_index < current_environment
+        ]
+        selected: list[int] = []
+        if current:
+            selected.append(int(self._rng.choice(current)))
+        if previous and len(selected) < count:
+            selected.append(int(self._rng.choice(previous)))
+        available = [index for index in range(len(self._entries)) if index not in selected]
+        remaining = count - len(selected)
+        if remaining:
+            selected.extend(int(index) for index in self._rng.choice(available, remaining, False))
+        return tuple(self._entries[index] for index in selected)
+
+
+@dataclass(frozen=True, eq=False)
+class RecordedBeliefEvent:
+    environment_index: int
+    event_id: str
+    weight_update_count: int
+    path: Path
+
+
+@dataclass(frozen=True, eq=False)
+class StreamTrainingResult:
+    events: tuple[RecordedBeliefEvent, ...]
+    history: tuple[dict[str, Any], ...]
+    checkpoint: Path
+    summary: dict[str, Any]
+
+
+def _model_hash(model: Model1) -> str:
+    digest = hashlib.sha256()
+    for name, values in sorted(model.state_dict().items()):
+        array = np.ascontiguousarray(values.detach().cpu().numpy())
+        digest.update(name.encode())
+        digest.update(array.tobytes())
+    return digest.hexdigest()
+
+
+def _loss_values(terms) -> dict[str, float]:
+    return {
+        name: float(getattr(terms, name).detach().cpu())
+        for name in ("total", "trajectory", "mode", "state", "pre_belief", "post_belief")
+    }
+
+
+def _record_frozen_batch(
+    model: Model1,
+    batch: EnvironmentBatch,
+    config: Model1Config,
+    events_root: Path,
+    *,
+    device: torch.device,
+    weight_update_count: int,
+) -> tuple[RecordedBeliefEvent, ...]:
+    collated = collate_model1(batch.records, config).to(device)
+    model.eval()
+    with torch.inference_mode():
+        pre_prediction = model(
+            collated.pre_frames, collated.pre_times, collated.pre_mask
+        )
+        post_prediction = model(
+            collated.post_frames, collated.post_times, collated.post_mask
+        )
+        pre = rasterize_mixture(
+            pre_prediction,
+            height=config.dataset.frame_size,
+            width=config.dataset.frame_size,
+            step_mask=collated.target_mask,
+        ).collapsed.cpu().numpy()
+        post = rasterize_mixture(
+            post_prediction,
+            height=config.dataset.frame_size,
+            width=config.dataset.frame_size,
+            step_mask=collated.target_mask,
+        ).collapsed.cpu().numpy()
+    events: list[RecordedBeliefEvent] = []
+    for index, record in enumerate(batch.records):
+        path = events_root / f"{record.example_id}.npz"
+        np.savez_compressed(
+            path,
+            pre_belief=pre[index].astype(np.float32),
+            post_belief=post[index].astype(np.float32),
+            belief_difference=(post[index] - pre[index]).astype(np.float32),
+            environment_index=np.asarray(batch.environment_index, dtype=np.int64),
+            weight_update_count=np.asarray(weight_update_count, dtype=np.int64),
+        )
+        events.append(
+            RecordedBeliefEvent(
+                batch.environment_index,
+                record.example_id,
+                weight_update_count,
+                path,
+            )
+        )
+    return tuple(events)
+
+
+def train_model1_stream(
+    config: Model1Config,
+    stream_config: StreamTrainingConfig,
+    family_config: Path,
+    output: Path,
+    *,
+    device: torch.device,
+    seed: int,
+) -> StreamTrainingResult:
+    output = Path(output)
+    if output.exists():
+        raise FileExistsError(output)
+    batches = generate_environment_batches(
+        config, stream_config, family_config, seed=seed
+    )
+    output.mkdir(parents=True)
+    events_root = output / "events"
+    events_root.mkdir()
+    generator = seed_model1(seed)
+    del generator
+    model = Model1(config.model, prediction_steps=config.dataset.prediction_steps).to(device)
+    optimizer = torch.optim.AdamW(
+        model.parameters(),
+        lr=config.training.learning_rate,
+        weight_decay=config.training.weight_decay,
+    )
+    replay = Model1ReplayBuffer(stream_config.replay_capacity, seed=seed + 1)
+    initial_hash = _model_hash(model)
+    events: list[RecordedBeliefEvent] = []
+    history: list[dict[str, Any]] = []
+    weight_update_count = 0
+    best_loss = float("inf")
+    history_path = output / "history.jsonl"
+    environment_summaries: list[dict[str, Any]] = []
+    for environment in batches:
+        frozen_events = _record_frozen_batch(
+            model,
+            environment,
+            config,
+            events_root,
+            device=device,
+            weight_update_count=weight_update_count,
+        )
+        events.extend(frozen_events)
+        for record in environment.records:
+            replay.add(environment.environment_index, record)
+        event_rows: list[dict[str, Any]] = []
+        for update_index in range(stream_config.update_steps_per_environment):
+            sampled = replay.sample_for_update(
+                stream_config.replay_batch_size,
+                current_environment=environment.environment_index,
+            )
+            raw_batch = collate_model1([entry.record for entry in sampled], config)
+            model.train()
+            optimizer.zero_grad(set_to_none=True)
+            terms = _run_batch(model, raw_batch.to(device), config)
+            terms.total.backward()
+            torch.nn.utils.clip_grad_norm_(
+                model.parameters(), config.training.gradient_clip
+            )
+            optimizer.step()
+            weight_update_count += 1
+            values = _loss_values(terms)
+            best_loss = min(best_loss, values["total"])
+            row: dict[str, Any] = {
+                "environment_index": environment.environment_index,
+                "update_index": update_index,
+                "weight_update_count": weight_update_count,
+                "replay_event_ids": [entry.record.example_id for entry in sampled],
+                "replay_environment_indices": [
+                    entry.environment_index for entry in sampled
+                ],
+                **values,
+            }
+            history.append(row)
+            event_rows.append(row)
+            with history_path.open("a") as stream:
+                stream.write(json.dumps(row, sort_keys=True) + "\n")
+        environment_summaries.append(
+            {
+                "environment_index": environment.environment_index,
+                "level": environment.level,
+                "world_id": environment.world_id,
+                "event_ids": [record.example_id for record in environment.records],
+                "recorded_weight_update_count": frozen_events[0].weight_update_count,
+                "completed_weight_update_count": event_rows[-1][
+                    "weight_update_count"
+                ],
+                "rejection_counts": environment.rejection_counts,
+            }
+        )
+    checkpoint = save_checkpoint(
+        output / "stream-last.pt",
+        model,
+        optimizer,
+        config,
+        epoch=weight_update_count,
+        seed=seed,
+        best_validation_loss=best_loss,
+    )
+    model.eval()
+    summary: dict[str, Any] = {
+        "schema_version": stream_config.schema_version,
+        "seed": seed,
+        "environment_count": len(batches),
+        "event_count": len(events),
+        "weight_update_count": weight_update_count,
+        "replay_size": len(replay.entries),
+        "initial_model_hash": initial_hash,
+        "final_model_hash": _model_hash(model),
+        "environments": environment_summaries,
+    }
+    (output / "stream-summary.json").write_text(
+        json.dumps(summary, indent=2, sort_keys=True)
+    )
+    return StreamTrainingResult(tuple(events), tuple(history), checkpoint, summary)

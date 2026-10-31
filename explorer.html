@@ -73,10 +73,21 @@
     .panel-head span { display: block; margin-top: .25rem; color: var(--muted); font-size: .68rem; line-height: 1.35; }
     canvas { display: block; width: 100%; aspect-ratio: 1.2; background: var(--canvas); }
     .readout { min-height: 2.4em; font: 500 .76rem ui-monospace, monospace; color: var(--forest); }
+    .coherence { margin: .8rem 0 1.1rem; padding: .75rem 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .coherence-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+    .coherence-label { color: var(--muted); font: 500 .68rem/1.2 Georgia, serif; }
+    .coherence-score { color: var(--forest); font: 600 1rem/1 ui-monospace, monospace; }
+    .coherence-track { height: 3px; margin-top: .55rem; overflow: hidden; background: #d2d0c7; }
+    .coherence-fill { display: block; width: 0; height: 100%; background: #697267; transition: width .35s ease; }
+    .coherence-detail { min-height: 1.2em; margin-top: .45rem; color: var(--muted); font-size: .62rem; }
     .comparison { margin-top: .7rem; }
     .comparison-row { display: grid; grid-template-columns: 1fr .85fr .85fr; gap: .25rem; padding: .55rem 0; border-top: 1px solid var(--line); font-size: .66rem; }
     .comparison-row.heading { color: var(--muted); border-top: 0; }
     .comparison-row span:not(:first-child) { font-family: ui-monospace, monospace; }
+    .constraint-name { display: flex; align-items: center; gap: .4rem; }
+    .constraint-dot { width: .38rem; height: .38rem; border: 1px solid #8f938a; border-radius: 50%; }
+    .comparison-row.recovered .constraint-dot { border-color: #697267; background: #697267; }
+    .comparison-row.missed .constraint-dot { border-color: #9b8778; background: transparent; }
     @media (max-width: 1080px) {
       .layers { grid-template-columns: 1fr; }
     }
@@ -125,8 +136,16 @@
           <h2>Second-order perception</h2>
         </div>
         <div class="readout" id="operatorReadout">—</div>
+        <div class="coherence" aria-live="polite">
+          <div class="coherence-head">
+            <span class="coherence-label">Coherence</span>
+            <strong class="coherence-score" id="coherenceScore"></strong>
+          </div>
+          <div class="coherence-track"><span class="coherence-fill" id="coherenceFill"></span></div>
+          <div class="coherence-detail" id="coherenceDetail"></div>
+        </div>
         <div class="comparison">
-          <div class="comparison-row heading"><span>Operator</span><span>Ground-truth parameters</span><span>Pre-update guess</span></div>
+          <div class="comparison-row heading"><span>Constraint</span><span>Ground-truth parameters</span><span>Belief-only guess</span></div>
           <div id="comparisonRows"></div>
         </div>
       </article>
@@ -145,6 +164,7 @@
       "full belief",
       "reappearance revision"
     ];
+    const DEFAULT_OCCLUDER = [0.35, 0.55, 0.05, 0.95];
     const worldSlots = [
       {name: "gravity", operator: "vertical_acceleration", parameter: "a_y", parameterIndex: 0, minimum: -1, maximum: 1},
       {name: "wind", operator: "horizontal_acceleration", parameter: "a_x", parameterIndex: 1, minimum: -1, maximum: 1},
@@ -172,6 +192,34 @@
       if (!Array.isArray(value) || value.length !== 12 || !value.every(Number.isFinite)) {
         throw new Error(`${name} must be a finite 12-value world vector`);
       }
+    }
+
+    function fallbackConstraintRecovery(actual, predicted) {
+      const constraints = worldSlots.map(slot => {
+        const actualOperator = actual[slot.operator];
+        const predictedOperator = predicted[slot.operator];
+        const actualActive = Boolean(actualOperator && actualOperator.active);
+        const predictedActive = Boolean(predictedOperator && predictedOperator.active);
+        const activityMatch = actualActive === predictedActive;
+        let parameterError = null;
+        let recovered = activityMatch;
+        if (activityMatch && actualActive) {
+          const span = slot.maximum - slot.minimum;
+          parameterError = Math.abs(
+            Number(actualOperator.parameters[slot.parameter])
+            - Number(predictedOperator.parameters[slot.parameter])
+          ) / span;
+          recovered = parameterError <= .10;
+        }
+        return {
+          name: slot.name,
+          recovered,
+          activity_match: activityMatch,
+          parameter_error: parameterError
+        };
+      });
+      const recovered = constraints.filter(item => item.recovered).length;
+      return {recovered, total: constraints.length, score: recovered / constraints.length, constraints};
     }
 
     function validateLiveEpisode(payload) {
@@ -204,9 +252,13 @@
         throw new Error("hidden interval and reappearance must index the clip");
       }
       validateWorldVector(truth.world_flat, "actual world");
-      const frameBytes = decodeBytes(truth.frames_base64);
-      if (frameBytes.length !== truth.width * truth.height * truth.frame_count) {
-        throw new Error("frame byte length does not match dimensions");
+      const occluder = truth.occluder ?? DEFAULT_OCCLUDER;
+      if (!Array.isArray(occluder) || occluder.length !== 4
+          || !occluder.every(value => Number.isFinite(value)
+            && value >= 0 && value <= 1)
+          || occluder[0] >= occluder[1]
+          || occluder[2] >= occluder[3]) {
+        throw new Error("ground-truth occluder must contain four normalized values");
       }
       if (!Array.isArray(payload.thought_steps) || payload.thought_steps.length !== 4) {
         throw new Error("episode must contain four thought steps");
@@ -236,14 +288,33 @@
         if (beliefBytes.length !== step.width * step.height) {
           throw new Error("belief byte length does not match dimensions");
         }
-        return {...step, beliefBytes};
+        const recovery = step.constraint_recovery
+          ?? fallbackConstraintRecovery(truth.operators, step.operators);
+        if (!recovery || !Number.isInteger(recovery.recovered)
+            || recovery.total !== 3 || recovery.recovered < 0
+            || recovery.recovered > recovery.total
+            || !Number.isFinite(recovery.score) || recovery.score < 0 || recovery.score > 1
+            || !Array.isArray(recovery.constraints) || recovery.constraints.length !== 3
+            || !recovery.constraints.every((item, constraintIndex) =>
+              item.name === worldSlots[constraintIndex].name
+              && typeof item.recovered === "boolean"
+              && typeof item.activity_match === "boolean"
+              && (item.parameter_error === null
+                || Number.isFinite(item.parameter_error) && item.parameter_error >= 0))) {
+          throw new Error("constraint recovery is invalid");
+        }
+        return {...step, beliefBytes, constraint_recovery: recovery};
       });
       if (!payload.training || !Number.isFinite(payload.training.loss)
           || !Number.isInteger(payload.latent_update_count)
           || !Number.isInteger(payload.weight_update_count)) {
         throw new Error("online update metadata is invalid");
       }
-      return {...payload, ground_truth: {...truth, frameBytes}, thought_steps: thoughtSteps};
+      return {
+        ...payload,
+        ground_truth: {...truth, occluder},
+        thought_steps: thoughtSteps
+      };
     }
 
     function selectedParameters() {
@@ -341,32 +412,6 @@
       requestNextEpisode();
     }
 
-    function imageBuffer(width, height, values, colorize = false) {
-      const buffer = document.createElement("canvas");
-      buffer.width = width;
-      buffer.height = height;
-      const ctx = buffer.getContext("2d");
-      const image = ctx.createImageData(width, height);
-      values.forEach((value, index) => {
-        const cursor = index * 4;
-        if (colorize) {
-          const intensity = Math.sqrt(value / 255);
-          image.data[cursor] = 139;
-          image.data[cursor + 1] = 145;
-          image.data[cursor + 2] = 134;
-          image.data[cursor + 3] = Math.round(intensity * 205);
-        } else {
-          const intensity = value / 255;
-          image.data[cursor] = Math.round(219 + (61 - 219) * intensity);
-          image.data[cursor + 1] = Math.round(216 + (67 - 216) * intensity);
-          image.data[cursor + 2] = Math.round(208 + (61 - 208) * intensity);
-          image.data[cursor + 3] = 255;
-        }
-      });
-      ctx.putImageData(image, 0, 0);
-      return buffer;
-    }
-
     function clearPerceptionCanvas() {
       perceptionCtx.fillStyle = "#dbd8d0";
       perceptionCtx.fillRect(0, 0, perceptionCanvas.width, perceptionCanvas.height);
@@ -375,6 +420,9 @@
 
     function clearSecondOrder() {
       $("operatorReadout").textContent = "";
+      $("coherenceScore").textContent = "";
+      $("coherenceFill").style.width = "0%";
+      $("coherenceDetail").textContent = "";
       $("comparisonRows").replaceChildren();
     }
 
@@ -384,6 +432,7 @@
     }
 
     function drawGroundTruthPath(path) {
+      if (path.length < 2) return;
       perceptionCtx.save();
       perceptionCtx.beginPath();
       path.forEach(([x, y], index) => {
@@ -392,12 +441,41 @@
         if (index === 0) perceptionCtx.moveTo(px, py);
         else perceptionCtx.lineTo(px, py);
       });
-      perceptionCtx.strokeStyle = "#333832";
-      perceptionCtx.lineWidth = 2.2;
+      perceptionCtx.strokeStyle = "#4f554f";
+      perceptionCtx.lineWidth = 1.35;
+      perceptionCtx.globalAlpha = .58;
       perceptionCtx.lineCap = "round";
       perceptionCtx.lineJoin = "round";
       perceptionCtx.stroke();
       perceptionCtx.restore();
+    }
+
+    function drawOccluder([xMin, xMax, yMin, yMax]) {
+      perceptionCtx.save();
+      perceptionCtx.fillStyle = "rgba(61, 67, 61, .16)";
+      perceptionCtx.strokeStyle = "rgba(61, 67, 61, .32)";
+      perceptionCtx.lineWidth = 1;
+      const x = xMin * perceptionCanvas.width;
+      const y = (1 - yMax) * perceptionCanvas.height;
+      const width = (xMax - xMin) * perceptionCanvas.width;
+      const height = (yMax - yMin) * perceptionCanvas.height;
+      perceptionCtx.fillRect(x, y, width, height);
+      perceptionCtx.strokeRect(x, y, width, height);
+      perceptionCtx.restore();
+    }
+
+    function progressiveGroundTruthPath(truth) {
+      if (currentFrame < truth.hidden_start) return [];
+      const duration = Math.max(1, truth.reappearance_step - truth.hidden_start);
+      const progress = Math.max(
+        0,
+        Math.min(1, (currentFrame - truth.hidden_start) / duration)
+      );
+      const count = Math.min(
+        truth.path.length,
+        Math.max(2, Math.ceil(progress * truth.path.length))
+      );
+      return truth.path.slice(0, count);
     }
 
     function strokePath(path, width, alpha) {
@@ -441,15 +519,9 @@
     function drawPerception() {
       if (!currentEpisode) return clearPerceptionCanvas();
       const truth = currentEpisode.ground_truth;
-      const frameSize = truth.width * truth.height;
-      const offset = currentFrame * frameSize;
-      const frame = truth.frameBytes.slice(offset, offset + frameSize);
-      const buffer = imageBuffer(truth.width, truth.height, frame);
       perceptionCtx.fillStyle = "#dbd8d0";
       perceptionCtx.fillRect(0, 0, perceptionCanvas.width, perceptionCanvas.height);
-      perceptionCtx.imageSmoothingEnabled = true;
-      perceptionCtx.imageSmoothingQuality = "high";
-      perceptionCtx.drawImage(buffer, 0, 0, perceptionCanvas.width, perceptionCanvas.height);
+      drawOccluder(truth.occluder);
       const hidden = currentFrame >= truth.hidden_start && currentFrame <= truth.hidden_end;
       const index = thoughtIndex();
       if (index >= 0) {
@@ -460,7 +532,7 @@
           updateSecondOrder(step);
         }
       }
-      drawGroundTruthPath(truth.path);
+      drawGroundTruthPath(progressiveGroundTruthPath(truth));
       $("worldPhase").textContent = hidden
         ? "Ball hidden · the world continues"
         : currentFrame >= truth.reappearance_step
@@ -494,11 +566,20 @@
       return (slot.minimum + normalized * (slot.maximum - slot.minimum)).toFixed(2);
     }
 
-    function comparisonElements(actual, predictedParameters) {
+    function comparisonElements(actual, predictedParameters, recovery) {
       return worldSlots.map(slot => {
         const row = document.createElement("div");
         row.className = "comparison-row";
-        [slot.name, worldSlotValue(actual, slot), predictedParameterValue(predictedParameters, slot)].forEach(value => {
+        const status = recovery.constraints.find(item => item.name === slot.name);
+        row.classList.add(status.recovered ? "recovered" : "missed");
+        const name = document.createElement("span");
+        name.className = "constraint-name";
+        const dot = document.createElement("i");
+        dot.className = "constraint-dot";
+        dot.setAttribute("aria-label", status.recovered ? "recovered" : "missed");
+        name.append(dot, document.createTextNode(slot.name));
+        row.append(name);
+        [worldSlotValue(actual, slot), predictedParameterValue(predictedParameters, slot)].forEach(value => {
           const cell = document.createElement("span");
           cell.textContent = value;
           row.append(cell);
@@ -513,12 +594,21 @@
         .join(" · ");
     }
 
+    function updateCoherence(recovery) {
+      $("coherenceScore").textContent = `${Math.round(recovery.score * 100)}%`;
+      $("coherenceFill").style.width = `${(recovery.score * 100).toFixed(1)}%`;
+      $("coherenceDetail").textContent =
+        `${recovery.recovered} of ${recovery.total} constraints recovered`;
+    }
+
     function updateSecondOrder(step) {
       $("operatorReadout").textContent = worldSummary(step.predicted_parameters);
+      updateCoherence(step.constraint_recovery);
       $("comparisonRows").replaceChildren(
         ...comparisonElements(
           currentEpisode.ground_truth.operators,
-          step.predicted_parameters
+          step.predicted_parameters,
+          step.constraint_recovery
         )
       );
     }
@@ -537,12 +627,12 @@
           accumulator = 0;
           if (currentFrame < currentEpisode.ground_truth.frame_count - 1) {
             currentFrame += 1;
+            draw();
           } else {
             advanceEpisode();
           }
         }
       }
-      draw();
       requestAnimationFrame(animate);
     }
 

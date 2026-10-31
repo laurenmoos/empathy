@@ -94,6 +94,23 @@ def test_explorer_combines_ground_truth_path_and_belief_fuzz() -> None:
     assert "globalAlpha" in source
 
 
+def test_explorer_uses_vector_trajectories_without_ball_pixels() -> None:
+    source, _ = parsed_explorer()
+
+    assert "function drawOccluder" in source
+    assert "function progressiveGroundTruthPath" in source
+    assert "drawGroundTruthPath(progressiveGroundTruthPath(truth));" in source
+    for unwanted in (
+        "function drawBallMarker",
+        "function imageBuffer",
+        "frames_base64",
+        "frameBytes",
+        "drawImage",
+        "createRadialGradient",
+    ):
+        assert unwanted not in source
+
+
 def test_stream_controls_start_sessions_and_queue_offset_episodes() -> None:
     source, parser = parsed_explorer()
 
@@ -131,11 +148,28 @@ def test_world_guess_shows_all_three_numeric_parameters() -> None:
     ):
         assert label in source
     assert "Ground-truth parameters" in source
-    assert "Pre-update guess" in source
+    assert "Belief-only guess" in source
     assert "function updateSecondOrder" in source
     assert "function predictedParameterValue" in source
     assert "step.predicted_parameters" in source
     assert 'return "inactive"' not in source
+
+
+def test_second_order_panel_visualizes_constraint_coherence_without_new_canvas() -> None:
+    source, parser = parsed_explorer()
+
+    assert {
+        "coherenceScore",
+        "coherenceFill",
+        "coherenceDetail",
+    } <= parser.ids
+    assert parser.canvases == {"perceptionCanvas"}
+    assert "Coherence" in source
+    assert "constraints recovered" in source
+    assert "step.constraint_recovery" in source
+    assert 'row.classList.add(status.recovered ? "recovered" : "missed")' in source
+    assert "function updateCoherence" in source
+    assert '$("coherenceFill").style.width = `${(recovery.score * 100).toFixed(1)}%`' in source
 
 
 def test_parameter_edits_invalidate_the_stream_and_clear_all_layers() -> None:
@@ -149,14 +183,17 @@ def test_parameter_edits_invalidate_the_stream_and_clear_all_layers() -> None:
     assert "Parameters changed. Start a new thinking stream." in source
 
 
-def test_live_episode_validation_checks_frames_beliefs_and_four_thoughts() -> None:
+def test_live_episode_validation_checks_trajectory_beliefs_and_four_thoughts() -> None:
     source, _ = parsed_explorer()
 
     assert 'payload.schema_version !== "live-thinking-v1"' in source
     assert "payload.thought_steps.length !== 4" in source
-    assert "frame byte length" in source
+    assert "const occluder = truth.occluder ?? DEFAULT_OCCLUDER;" in source
+    assert "ground_truth: {...truth, occluder}" in source
+    assert "ground-truth occluder must contain four normalized values" in source
     assert "belief byte length" in source
     assert "predicted_world_flat" in source
+    assert "constraint recovery is invalid" in source
     assert "initial_state" in source
     assert "requestAnimationFrame" in source
 

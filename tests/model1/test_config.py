@@ -1,7 +1,9 @@
+from dataclasses import asdict
 from pathlib import Path
 
 import pytest
 
+from perception_env.model1 import config as config_module
 from perception_env.model1.config import load_model1_config
 
 
@@ -17,6 +19,13 @@ def test_v1_config_fixes_mvp_dimensions() -> None:
     assert config.training.seed == 7
     assert config.training.batch_size == 32
     assert all(value >= 0 for value in config.loss.weights())
+
+
+def test_model1_config_reconstructs_from_portable_dictionary() -> None:
+    config = load_model1_config(Path("configs/model1/v1.yaml"))
+
+    assert hasattr(config_module, "model1_config_from_dict")
+    assert config_module.model1_config_from_dict(asdict(config)) == config
 
 
 @pytest.mark.parametrize(

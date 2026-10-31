@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from .config import Model1Config
+from .config import Model1Config, model1_config_from_dict
 from .data import Model1ExampleRecord, collate_model1
 from .losses import Model1LossTerms, model1_loss
 from .model import Model1
@@ -47,11 +47,11 @@ def seed_model1(seed: int) -> torch.Generator:
 
 
 def _versions() -> dict[str, str]:
-    result = {"torch": torch.__version__, "numpy": np.__version__}
+    result = {"torch": str(torch.__version__), "numpy": str(np.__version__)}
     try:
-        result["perception-env"] = importlib.metadata.version("perception-env")
+        result["empathy"] = importlib.metadata.version("empathy")
     except importlib.metadata.PackageNotFoundError:
-        result["perception-env"] = "unknown"
+        result["empathy"] = "unknown"
     return result
 
 
@@ -89,7 +89,6 @@ def save_checkpoint(
         {
             "model_state": model.state_dict(),
             "optimizer_state": optimizer.state_dict(),
-            "config": config,
             "config_dict": asdict(config),
             "metadata": asdict(metadata),
         },
@@ -104,8 +103,8 @@ def load_checkpoint(
     expected_config: Model1Config | None = None,
     device: torch.device | str = "cpu",
 ) -> tuple[Model1, CheckpointMetadata]:
-    payload = torch.load(Path(path), map_location=device, weights_only=False)
-    config: Model1Config = payload["config"]
+    payload = torch.load(Path(path), map_location=device, weights_only=True)
+    config = model1_config_from_dict(payload["config_dict"])
     metadata = payload["metadata"]
     schema_is_consistent = metadata.get("schema_version") == config.schema_version
     if config.schema_version != "model1-v1" or not schema_is_consistent:

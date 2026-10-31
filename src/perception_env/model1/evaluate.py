@@ -12,7 +12,7 @@ from typing import Any
 import numpy as np
 import torch
 
-from .config import Model1Config
+from .config import Model1Config, model1_config_from_dict
 from .data import Model1ExampleRecord, collate_model1
 from .metrics import (
     belief_metrics,
@@ -181,8 +181,8 @@ def evaluate_model1(
     output = Path(output)
     if output.exists():
         raise FileExistsError(output)
-    payload = torch.load(Path(checkpoint), map_location="cpu", weights_only=False)
-    config: Model1Config = payload["config"]
+    payload = torch.load(Path(checkpoint), map_location="cpu", weights_only=True)
+    config = model1_config_from_dict(payload["config_dict"])
     model, _ = load_checkpoint(checkpoint, expected_config=config, device=device)
     output.mkdir(parents=True)
     records_root = output / "records"

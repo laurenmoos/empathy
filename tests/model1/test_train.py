@@ -91,6 +91,11 @@ def test_checkpoint_round_trip_and_dimension_validation(tmp_path) -> None:
     assert metadata.best_validation_loss > 0
     assert model.training is False
 
+    payload = torch.load(result.best_checkpoint, weights_only=False)
+    assert "config" not in payload
+    assert payload["metadata"]["package_versions"].get("empathy")
+    assert "perception-env" not in payload["metadata"]["package_versions"]
+
     bad = replace(config, model=replace(config.model, modes=7))
     with pytest.raises(ValueError, match="configuration"):
         load_checkpoint(result.best_checkpoint, expected_config=bad)
@@ -102,8 +107,7 @@ def test_checkpoint_round_trip_and_dimension_validation(tmp_path) -> None:
     with pytest.raises(ValueError, match="configuration"):
         load_checkpoint(result.best_checkpoint, expected_config=incompatible_normalization)
 
-    payload = torch.load(result.best_checkpoint, weights_only=False)
-    payload["config"] = replace(config, schema_version="unknown")
+    payload["config_dict"]["schema_version"] = "unknown"
     unsupported = tmp_path / "unsupported.pt"
     torch.save(payload, unsupported)
     with pytest.raises(ValueError, match="schema"):

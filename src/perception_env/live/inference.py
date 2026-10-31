@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from ..model1.config import Model1Config
+from ..model1.config import Model1Config, model1_config_from_dict
 from ..model1.data import Model1ExampleRecord, collate_model1
 from ..model1.rasterize import rasterize_mixture
 from ..model1.train import load_checkpoint
@@ -145,8 +145,8 @@ class LiveInferenceEngine:
 
     @classmethod
     def from_checkpoint(cls, model1_checkpoint: Path):
-        payload = torch.load(Path(model1_checkpoint), map_location="cpu", weights_only=False)
-        config: Model1Config = payload["config"]
+        payload = torch.load(Path(model1_checkpoint), map_location="cpu", weights_only=True)
+        config = model1_config_from_dict(payload["config_dict"])
         model1, _ = load_checkpoint(model1_checkpoint, expected_config=config, device="cpu")
         from .thinking import SMCModel2Runtime
 

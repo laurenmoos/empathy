@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -113,8 +114,8 @@ def _pairs(values: dict[str, Any]) -> dict[str, tuple[float, float]]:
     return {key: (float(value[0]), float(value[1])) for key, value in values.items()}
 
 
-def load_model1_config(path: Path) -> Model1Config:
-    payload = yaml.safe_load(Path(path).read_text())
+def model1_config_from_dict(values: Mapping[str, object]) -> Model1Config:
+    payload = dict(values)
     dataset = dict(payload["dataset"])
     dataset["levels"] = tuple(dataset["levels"])
     dataset["counts"] = tuple(int(value) for value in dataset["counts"])
@@ -132,3 +133,7 @@ def load_model1_config(path: Path) -> Model1Config:
         training=TrainingConfig(**payload["training"]),
         evaluation=EvaluationConfig(**payload["evaluation"]),
     )
+
+
+def load_model1_config(path: Path) -> Model1Config:
+    return model1_config_from_dict(yaml.safe_load(Path(path).read_text()))

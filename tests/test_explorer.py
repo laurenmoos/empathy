@@ -63,6 +63,7 @@ def test_explorer_uses_minimal_numeric_controls_and_plain_layer_names() -> None:
         "Weight updates",
         "Latest online loss",
         "Thought step",
+        ">Ready.</p>",
     ):
         assert unwanted not in source
     state_source = EXPLORER_STATE.read_text()

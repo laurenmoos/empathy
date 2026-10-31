@@ -1,7 +1,7 @@
-from perception_env.config import RenderConfig
-from perception_env.events import extract_reappearance
-from perception_env.render import Occluder, render_sequence
-from perception_env.simulate import BallState, TerminationReason, Trajectory
+from perception_env.physics.config import RenderConfig
+from perception_env.physics.events import extract_reappearance
+from perception_env.physics.render import Occluder, render_sequence
+from perception_env.physics.simulate import BallState, TerminationReason, Trajectory
 
 
 def sequence_for(xs: list[float], min_hidden_steps: int = 2):

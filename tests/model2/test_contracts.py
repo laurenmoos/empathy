@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from perception_env.model2.contracts import BeliefInputs, SchemaLayout, WorldTargets
-from perception_env.world import WorldSchema
+from perception_env.physics.world import WorldSchema
 
 
 def inputs(n=2, size=16):

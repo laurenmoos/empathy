@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from perception_env.reachability import Probe
-from perception_env.shattering import (
+from perception_env.reasoning.reachability import Probe
+from perception_env.reasoning.shattering import (
     LabelMatrix,
     _bootstrap_interval,
     estimate_complexity_recovery,

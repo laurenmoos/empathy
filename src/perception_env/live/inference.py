@@ -11,18 +11,18 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from .config import RenderConfig, SimulationConfig
-from .events import extract_reappearance
-from .model1.config import Model1Config
-from .model1.data import Model1ExampleRecord, collate_model1
-from .model1.rasterize import rasterize_mixture
-from .model1.train import load_checkpoint
-from .model2.adapters import Model1BeliefPacket, adapt_model1_events
-from .model2.contracts import BeliefInputs, WorldPrediction
-from .model2.decode import decode_prediction
-from .render import Occluder, render_sequence
-from .simulate import BallState, rollout
-from .world import WorldCode, WorldSchema
+from ..model1.config import Model1Config
+from ..model1.data import Model1ExampleRecord, collate_model1
+from ..model1.rasterize import rasterize_mixture
+from ..model1.train import load_checkpoint
+from ..model2.adapters import Model1BeliefPacket, adapt_model1_events
+from ..model2.contracts import BeliefInputs, WorldPrediction
+from ..model2.decode import decode_prediction
+from ..physics.config import RenderConfig, SimulationConfig
+from ..physics.events import extract_reappearance
+from ..physics.render import Occluder, render_sequence
+from ..physics.simulate import BallState, rollout
+from ..physics.world import WorldCode, WorldSchema
 
 
 class LiveInferenceError(ValueError):
@@ -148,7 +148,7 @@ class LiveInferenceEngine:
         payload = torch.load(Path(model1_checkpoint), map_location="cpu", weights_only=False)
         config: Model1Config = payload["config"]
         model1, _ = load_checkpoint(model1_checkpoint, expected_config=config, device="cpu")
-        from .live_thinking import SMCModel2Runtime
+        from .thinking import SMCModel2Runtime
 
         runtime = SMCModel2Runtime()
         return cls(
@@ -162,7 +162,7 @@ class LiveInferenceEngine:
         """Create one fixed-world stream backed by the loaded online Model 2 runtime."""
         if self.model2_runtime is None:
             raise RuntimeError("thinking sessions require an online Model 2 runtime")
-        from .live_thinking import LiveThinkingSession
+        from .thinking import LiveThinkingSession
 
         runtime = (
             self.model2_runtime.fork()

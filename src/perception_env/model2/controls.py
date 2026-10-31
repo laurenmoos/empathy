@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from perception_env.world import WorldSchema
+from perception_env.physics.world import WorldSchema
 
 from .config import TrainingConfig
 from .contracts import SchemaLayout, WorldPrediction, WorldTargets

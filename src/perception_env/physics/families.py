@@ -9,7 +9,7 @@ from typing import Any
 import numpy as np
 import yaml
 
-from .reachability import EntryStateGrid
+from ..reasoning.reachability import EntryStateGrid
 from .world import WorldCode, WorldSchema
 
 

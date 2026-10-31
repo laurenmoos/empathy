@@ -17,9 +17,9 @@ from typing import Any
 import numpy as np
 import torch
 
-from perception_env.beliefs import BeliefEvent, build_belief_history
-from perception_env.families import load_family
-from perception_env.records import Model2InputRecord, belief_entropy
+from perception_env.physics.families import load_family
+from perception_env.reasoning.beliefs import BeliefEvent, build_belief_history
+from perception_env.reasoning.records import Model2InputRecord, belief_entropy
 
 from .config import load_model1_config
 from .data import Model1Dataset, generate_model1_dataset

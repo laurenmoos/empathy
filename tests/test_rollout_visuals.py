@@ -1,7 +1,7 @@
-from perception_env.config import SimulationConfig
-from perception_env.simulate import BallState, rollout
-from perception_env.visualize import render_trajectory_strip
-from perception_env.world import WorldSchema
+from perception_env.physics.config import SimulationConfig
+from perception_env.physics.simulate import BallState, rollout
+from perception_env.physics.world import WorldSchema
+from perception_env.reasoning.visualize import render_trajectory_strip
 
 
 def test_trajectory_strip_exposes_path_geometry_and_seed(tmp_path) -> None:

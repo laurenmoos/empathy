@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from perception_env.world import WorldSchema
+from perception_env.physics.world import WorldSchema
 
 
 def test_v1_world_round_trips_flat_representation() -> None:

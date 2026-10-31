@@ -10,8 +10,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from perception_env.visualize import VisualArtifact, _save_visual
-from perception_env.world import WorldSchema
+from perception_env.physics.world import WorldSchema
+from perception_env.reasoning.visualize import VisualArtifact, _save_visual
 
 from .data import array_hash
 

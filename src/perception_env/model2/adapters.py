@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from perception_env.beliefs import BeliefEvent, build_belief_history
+from perception_env.reasoning.beliefs import BeliefEvent, build_belief_history
 
 from .contracts import BeliefInputs
 

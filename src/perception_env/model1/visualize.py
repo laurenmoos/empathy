@@ -10,7 +10,7 @@ from typing import Any
 import matplotlib.pyplot as plt
 import numpy as np
 
-from perception_env.visualize import VisualArtifact
+from perception_env.reasoning.visualize import VisualArtifact
 
 from .evaluate import EvaluationSummary, Model1PredictionRecord
 

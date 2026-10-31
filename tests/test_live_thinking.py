@@ -4,14 +4,14 @@ import numpy as np
 import pytest
 import torch
 
-from perception_env.live_inference import LiveParameters
-from perception_env.live_thinking import LiveThinkingSession, OnlineModel2Runtime
+from perception_env.live.inference import LiveParameters
+from perception_env.live.thinking import LiveThinkingSession, OnlineModel2Runtime
 from perception_env.model1.config import load_model1_config
 from perception_env.model1.types import TrajectoryMixture
 from perception_env.model2.contracts import BeliefInputs, WorldPrediction
 from perception_env.model2.network import InverseWorldCNN
-from perception_env.simulate import BallState
-from perception_env.world import WorldSchema
+from perception_env.physics.simulate import BallState
+from perception_env.physics.world import WorldSchema
 
 ROOT = Path(__file__).parents[1]
 

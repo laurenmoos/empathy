@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from perception_env.model2.coherence import evaluate_constraint_recovery
-from perception_env.world import WorldSchema
+from perception_env.physics.world import WorldSchema
 
 
 def _flat(**operators) -> np.ndarray:

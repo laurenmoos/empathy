@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 
-from perception_env.beliefs import BeliefEvent, build_belief_history, superpose
-from perception_env.config import RenderConfig
-from perception_env.simulate import BallState, TerminationReason, Trajectory
+from perception_env.physics.config import RenderConfig
+from perception_env.physics.simulate import BallState, TerminationReason, Trajectory
+from perception_env.reasoning.beliefs import BeliefEvent, build_belief_history, superpose
 
 
 def trajectory(points: list[tuple[float, float]], seed: int = 0) -> Trajectory:

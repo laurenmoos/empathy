@@ -7,9 +7,9 @@ from itertools import product
 
 import numpy as np
 
-from .config import RenderConfig, SimulationConfig
-from .simulate import BallState, Trajectory, rollout
-from .world import WorldCode
+from ..physics.config import RenderConfig, SimulationConfig
+from ..physics.simulate import BallState, Trajectory, rollout
+from ..physics.world import WorldCode
 
 
 def _axis_values(bounds: tuple[float, float], count: int) -> np.ndarray:

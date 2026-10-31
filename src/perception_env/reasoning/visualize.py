@@ -10,17 +10,17 @@ from typing import TYPE_CHECKING, Any
 import matplotlib.pyplot as plt
 import numpy as np
 
-from .world import WorldCode, WorldSchema
+from ..physics.world import WorldCode, WorldSchema
 
 if TYPE_CHECKING:
+    from ..physics.config import RenderConfig
+    from ..physics.render import RenderedSequence
+    from ..physics.simulate import Trajectory
     from .beliefs import BeliefEvent
-    from .config import RenderConfig
     from .identifiability import IdentifiabilityReport
     from .reachability import ReachabilityResult
     from .records import BenchmarkRecord
-    from .render import RenderedSequence
     from .shattering import ShatteringEstimate
-    from .simulate import Trajectory
 
 
 @dataclass(frozen=True)
@@ -85,7 +85,7 @@ def render_world_card(
 def render_trajectory_strip(
     trajectory: Trajectory, world: WorldCode, schema: WorldSchema, path: Path
 ) -> VisualArtifact:
-    from .simulate import Trajectory
+    from ..physics.simulate import Trajectory
 
     if not isinstance(trajectory, Trajectory):
         raise TypeError("trajectory must be a Trajectory")
@@ -143,8 +143,8 @@ def render_trajectory_strip(
 def render_observation_strip(
     sequence: RenderedSequence, path: Path
 ) -> VisualArtifact:
-    from .events import extract_reappearance
-    from .render import RenderedSequence, _hidden_runs
+    from ..physics.events import extract_reappearance
+    from ..physics.render import RenderedSequence, _hidden_runs
 
     if not isinstance(sequence, RenderedSequence):
         raise TypeError("sequence must be a RenderedSequence")
@@ -226,7 +226,7 @@ def render_operator_comparison(
     operator: str,
     path: Path,
 ) -> VisualArtifact:
-    from .simulate import Trajectory
+    from ..physics.simulate import Trajectory
 
     if len(trajectories) != len(worlds) or not trajectories:
         raise ValueError("trajectories and worlds must have the same nonzero length")

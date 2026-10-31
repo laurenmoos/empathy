@@ -10,25 +10,25 @@ from typing import Protocol
 import numpy as np
 import torch
 
-from .live_inference import (
+from ..model1.data import collate_model1
+from ..model1.rasterize import rasterize_mixture
+from ..model1.types import TrajectoryMixture
+from ..model2.adapters import Model1BeliefPacket, adapt_model1_events
+from ..model2.coherence import ConstraintRecovery, evaluate_constraint_recovery
+from ..model2.contracts import BeliefInputs, WorldPrediction
+from ..model2.decode import decode_prediction
+from ..model2.losses import world_code_loss
+from ..model2.smc import BeliefWorldSMC, SMCConfig, SMCResult
+from ..model2.train import predict as predict_model2
+from ..physics.simulate import BallState
+from ..physics.world import WorldSchema
+from .inference import (
     LiveInferenceEngine,
     LiveInferenceError,
     LiveParameters,
     _encoded_u8,
     _operator_payload,
 )
-from .model1.data import collate_model1
-from .model1.rasterize import rasterize_mixture
-from .model1.types import TrajectoryMixture
-from .model2.adapters import Model1BeliefPacket, adapt_model1_events
-from .model2.coherence import ConstraintRecovery, evaluate_constraint_recovery
-from .model2.contracts import BeliefInputs, WorldPrediction
-from .model2.decode import decode_prediction
-from .model2.losses import world_code_loss
-from .model2.smc import BeliefWorldSMC, SMCConfig, SMCResult
-from .model2.train import predict as predict_model2
-from .simulate import BallState
-from .world import WorldSchema
 
 
 class Model2Runtime(Protocol):

@@ -1,13 +1,13 @@
 import numpy as np
 
-from perception_env.config import RenderConfig, SimulationConfig
-from perception_env.reachability import (
+from perception_env.physics.config import RenderConfig, SimulationConfig
+from perception_env.physics.world import WorldSchema
+from perception_env.reasoning.reachability import (
     EntryStateGrid,
     Probe,
     enumerate_reachable,
     rasterize_endpoints,
 )
-from perception_env.world import WorldSchema
 
 
 def test_enumerates_hand_computable_endpoints_and_probe_labels() -> None:

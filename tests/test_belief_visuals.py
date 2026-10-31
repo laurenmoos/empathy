@@ -2,11 +2,11 @@ import warnings
 
 import numpy as np
 
-from perception_env.beliefs import BeliefEvent
-from perception_env.config import RenderConfig, SimulationConfig
-from perception_env.reachability import EntryStateGrid, enumerate_reachable
-from perception_env.visualize import render_belief_panel
-from perception_env.world import WorldSchema
+from perception_env.physics.config import RenderConfig, SimulationConfig
+from perception_env.physics.world import WorldSchema
+from perception_env.reasoning.beliefs import BeliefEvent
+from perception_env.reasoning.reachability import EntryStateGrid, enumerate_reachable
+from perception_env.reasoning.visualize import render_belief_panel
 
 
 def make_result(empty: bool):

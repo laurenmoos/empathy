@@ -1,9 +1,9 @@
 import numpy as np
 
-from perception_env.identifiability import group_equivalent_worlds, parameter_scoring_mask
-from perception_env.reachability import Probe
-from perception_env.shattering import LabelMatrix
-from perception_env.world import WorldSchema
+from perception_env.physics.world import WorldSchema
+from perception_env.reasoning.identifiability import group_equivalent_worlds, parameter_scoring_mask
+from perception_env.reasoning.reachability import Probe
+from perception_env.reasoning.shattering import LabelMatrix
 
 
 def fixture(search_complete: bool = True):

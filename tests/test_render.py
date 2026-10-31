@@ -1,8 +1,8 @@
 import numpy as np
 
-from perception_env.config import RenderConfig
-from perception_env.render import Occluder, render_sequence
-from perception_env.simulate import BallState, TerminationReason, Trajectory
+from perception_env.physics.config import RenderConfig
+from perception_env.physics.render import Occluder, render_sequence
+from perception_env.physics.simulate import BallState, TerminationReason, Trajectory
 
 
 def make_trajectory(xs: list[float], y: float = 0.5) -> Trajectory:

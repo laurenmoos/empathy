@@ -7,8 +7,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from ..physics.world import WorldCode, WorldSchema
 from .shattering import LabelMatrix
-from .world import WorldCode, WorldSchema
 
 
 @dataclass(frozen=True)

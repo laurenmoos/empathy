@@ -1,8 +1,8 @@
-from perception_env.config import RenderConfig, SimulationConfig
-from perception_env.render import Occluder, render_sequence
-from perception_env.simulate import BallState, rollout
-from perception_env.visualize import render_observation_strip, render_operator_comparison
-from perception_env.world import WorldSchema
+from perception_env.physics.config import RenderConfig, SimulationConfig
+from perception_env.physics.render import Occluder, render_sequence
+from perception_env.physics.simulate import BallState, rollout
+from perception_env.physics.world import WorldSchema
+from perception_env.reasoning.visualize import render_observation_strip, render_operator_comparison
 
 
 def test_observation_strip_shows_latent_visible_and_hidden_views(tmp_path) -> None:

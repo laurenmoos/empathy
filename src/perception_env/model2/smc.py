@@ -6,9 +6,9 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from perception_env.config import SimulationConfig
-from perception_env.simulate import BallState, rollout
-from perception_env.world import WorldCode, WorldSchema
+from perception_env.physics.config import SimulationConfig
+from perception_env.physics.simulate import BallState, rollout
+from perception_env.physics.world import WorldCode, WorldSchema
 
 from .contracts import BeliefInputs
 

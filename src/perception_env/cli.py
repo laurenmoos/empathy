@@ -15,23 +15,24 @@ from typing import Any
 
 import numpy as np
 
-from .beliefs import BeliefEvent, build_belief_history, superpose
-from .config import RenderConfig, SimulationConfig
-from .events import extract_reappearance
-from .families import load_family, sample_worlds
-from .identifiability import group_equivalent_worlds
-from .reachability import Probe, enumerate_reachable, rasterize_endpoints
-from .records import (
+from .physics.config import RenderConfig, SimulationConfig
+from .physics.events import extract_reappearance
+from .physics.families import load_family, sample_worlds
+from .physics.render import Occluder, render_sequence
+from .physics.simulate import BallState, rollout
+from .physics.world import WorldCode, WorldSchema
+from .reasoning.beliefs import BeliefEvent, build_belief_history, superpose
+from .reasoning.identifiability import group_equivalent_worlds
+from .reasoning.reachability import Probe, enumerate_reachable, rasterize_endpoints
+from .reasoning.records import (
     BenchmarkRecord,
     Model2InputRecord,
     belief_entropy,
     load_record,
     save_record,
 )
-from .render import Occluder, render_sequence
-from .shattering import LabelMatrix, build_label_matrix, search_shattered_set
-from .simulate import BallState, rollout
-from .visualize import (
+from .reasoning.shattering import LabelMatrix, build_label_matrix, search_shattered_set
+from .reasoning.visualize import (
     render_belief_panel,
     render_dataset_contact_sheet,
     render_equivalence_gallery,
@@ -40,7 +41,6 @@ from .visualize import (
     render_trajectory_strip,
     render_world_card,
 )
-from .world import WorldCode, WorldSchema
 
 
 def _prepare_output(output: Path, force: bool) -> None:
@@ -572,7 +572,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 quick=args.quick,
             )
         elif args.command == "live-demo":
-            from .live_server import run_live_server
+            from .live.server import run_live_server
 
             run_live_server(
                 host=args.host,

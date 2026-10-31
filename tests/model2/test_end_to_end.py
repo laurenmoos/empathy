@@ -10,7 +10,7 @@ from perception_env.model2.evaluate import evaluate_model, score_predictions
 from perception_env.model2.fixtures import generate_fixtures
 from perception_env.model2.network import InverseWorldCNN
 from perception_env.model2.train import train_model
-from perception_env.world import WorldSchema
+from perception_env.physics.world import WorldSchema
 
 from .test_evaluate import prediction_for, tiny_config
 

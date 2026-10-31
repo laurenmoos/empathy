@@ -9,7 +9,7 @@ from perception_env.model2.contracts import BeliefInputs, WorldTargets
 from perception_env.model2.controls import fit_constant_baseline, run_controls
 from perception_env.model2.data import save_dataset
 from perception_env.model2.train import load_model
-from perception_env.world import WorldSchema
+from perception_env.physics.world import WorldSchema
 
 
 def test_constant_baseline_only_uses_active_identifiable_train_targets():

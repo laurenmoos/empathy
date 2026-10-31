@@ -12,8 +12,8 @@ import numpy as np
 import torch
 import yaml
 
-from perception_env.families import load_family, sample_worlds
-from perception_env.simulate import BallState
+from perception_env.physics.families import load_family, sample_worlds
+from perception_env.physics.simulate import BallState
 
 from .config import Model1Config
 from .data import Model1ExampleRecord, collate_model1, make_model1_record

@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from perception_env.live_inference import LiveInferenceError, LiveParameters
-from perception_env.live_server import (
+from perception_env.live.inference import LiveInferenceError, LiveParameters
+from perception_env.live.server import (
     LiveSessionRegistry,
     create_server,
     process_inference_request,
@@ -51,12 +51,12 @@ def test_server_bootstrap_loads_only_the_model1_checkpoint(monkeypatch, tmp_path
         return FakeEngine()
 
     monkeypatch.setattr(
-        "perception_env.live_server.LiveInferenceEngine.from_checkpoint",
+        "perception_env.live.server.LiveInferenceEngine.from_checkpoint",
         from_checkpoint,
         raising=False,
     )
     monkeypatch.setattr(
-        "perception_env.live_server.create_server",
+        "perception_env.live.server.create_server",
         lambda host, port, root, engine: FakeServer(),
     )
 

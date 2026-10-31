@@ -1,11 +1,11 @@
 import numpy as np
 
-from perception_env.coherence import (
+from perception_env.reasoning.coherence import (
     CapacityThresholds,
     TemporalCoherenceReport,
     find_capacity_breakpoint,
 )
-from perception_env.shattering import ComplexityRecoveryEstimate, ShatteringInterval
+from perception_env.reasoning.shattering import ComplexityRecoveryEstimate, ShatteringInterval
 
 
 def _coherence(value: float | None) -> TemporalCoherenceReport:

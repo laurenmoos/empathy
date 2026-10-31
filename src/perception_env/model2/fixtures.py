@@ -11,19 +11,19 @@ from pathlib import Path
 
 import numpy as np
 
-from perception_env.beliefs import BeliefEvent, build_belief_history, superpose
-from perception_env.config import RenderConfig, SimulationConfig
-from perception_env.events import extract_reappearance
-from perception_env.families import load_family, sample_worlds
-from perception_env.reachability import (
+from perception_env.physics.config import RenderConfig, SimulationConfig
+from perception_env.physics.events import extract_reappearance
+from perception_env.physics.families import load_family, sample_worlds
+from perception_env.physics.render import Occluder, render_sequence
+from perception_env.physics.simulate import BallState, rollout
+from perception_env.physics.world import WorldCode, WorldSchema
+from perception_env.reasoning.beliefs import BeliefEvent, build_belief_history, superpose
+from perception_env.reasoning.reachability import (
     EntryStateGrid,
     Probe,
     enumerate_reachable,
     rasterize_endpoints,
 )
-from perception_env.render import Occluder, render_sequence
-from perception_env.simulate import BallState, rollout
-from perception_env.world import WorldCode, WorldSchema
 
 from .config import FixtureConfig
 from .contracts import BeliefInputs, SchemaLayout, WorldTargets

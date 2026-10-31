@@ -9,7 +9,7 @@ from perception_env.model2.contracts import WorldPrediction, WorldTargets
 from perception_env.model2.evaluate import evaluate_model, score_predictions
 from perception_env.model2.fixtures import generate_fixtures
 from perception_env.model2.train import train_model
-from perception_env.world import WorldSchema
+from perception_env.physics.world import WorldSchema
 
 
 def tiny_config():

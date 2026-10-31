@@ -10,7 +10,7 @@ from perception_env.model2.contracts import BeliefInputs, WorldTargets
 from perception_env.model2.data import save_dataset
 from perception_env.model2.network import InverseWorldCNN
 from perception_env.model2.train import load_model, predict, train_model
-from perception_env.world import WorldSchema
+from perception_env.physics.world import WorldSchema
 
 
 def learning_dataset(root):

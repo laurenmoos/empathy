@@ -1,6 +1,6 @@
-from perception_env.config import SimulationConfig
-from perception_env.simulate import BallState, TerminationReason, rollout
-from perception_env.world import WorldSchema
+from perception_env.physics.config import SimulationConfig
+from perception_env.physics.simulate import BallState, TerminationReason, rollout
+from perception_env.physics.world import WorldSchema
 
 
 def test_rollout_is_deterministic_and_records_seed_and_states() -> None:

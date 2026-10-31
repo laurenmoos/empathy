@@ -1,8 +1,8 @@
 from test_records import make_record
 
-from perception_env.records import load_record, save_record
-from perception_env.visualize import render_dataset_contact_sheet
-from perception_env.world import WorldSchema
+from perception_env.physics.world import WorldSchema
+from perception_env.reasoning.records import load_record, save_record
+from perception_env.reasoning.visualize import render_dataset_contact_sheet
 
 
 def test_contact_sheet_renders_from_reloaded_records(tmp_path) -> None:

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from perception_env.coherence import compute_temporal_coherence
+from perception_env.reasoning.coherence import compute_temporal_coherence
 
 
 def test_coherence_reports_perfect_agreement_and_independent_coverage() -> None:

@@ -1,10 +1,10 @@
 import numpy as np
 import pytest
 
-from perception_env.config import SimulationConfig
-from perception_env.reachability import EntryStateGrid, Probe
-from perception_env.recovery import EvaluationContext, build_matched_possibility_bank
-from perception_env.world import WorldSchema
+from perception_env.physics.config import SimulationConfig
+from perception_env.physics.world import WorldSchema
+from perception_env.reasoning.reachability import EntryStateGrid, Probe
+from perception_env.reasoning.recovery import EvaluationContext, build_matched_possibility_bank
 
 
 def _context() -> EvaluationContext:

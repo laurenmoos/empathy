@@ -10,8 +10,8 @@ from perception_env.model2.fixtures import (
     generate_fixtures,
     split_world_groups,
 )
-from perception_env.simulate import BallState
-from perception_env.world import WorldSchema
+from perception_env.physics.simulate import BallState
+from perception_env.physics.world import WorldSchema
 
 
 def tiny_config():

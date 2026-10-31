@@ -13,7 +13,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
-from .live_inference import LiveInferenceEngine, LiveInferenceError, LiveParameters
+from .inference import LiveInferenceEngine, LiveInferenceError, LiveParameters
 
 
 @dataclass

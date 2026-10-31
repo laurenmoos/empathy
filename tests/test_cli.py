@@ -54,7 +54,7 @@ def test_live_demo_uses_one_tracked_checkpoint_by_default() -> None:
 
 
 def test_live_demo_delegates_only_the_model1_checkpoint(monkeypatch, tmp_path) -> None:
-    from perception_env import live_server
+    from perception_env.live import server as live_server
 
     captured = {}
 

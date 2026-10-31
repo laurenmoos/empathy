@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from perception_env.world import WorldCode, WorldSchema
+from perception_env.physics.world import WorldCode, WorldSchema
 
 from .contracts import WorldPrediction
 

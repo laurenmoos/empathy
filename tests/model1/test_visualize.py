@@ -103,4 +103,4 @@ def test_calibration_and_failure_gallery_render_from_saved_values(tmp_path) -> N
     source = inspect.getsource(__import__("perception_env.model1.visualize", fromlist=["*"]))
     assert "model1.model" not in source
     assert "model1.train" not in source
-    assert "perception_env.simulate" not in source
+    assert "perception_env.physics.simulate" not in source

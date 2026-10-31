@@ -29,7 +29,7 @@ class BlockTorch(importlib.abc.MetaPathFinder):
             raise ImportError('torch deliberately unavailable')
 sys.meta_path.insert(0, BlockTorch())
 import perception_env
-from perception_env.world import WorldSchema
+from perception_env.physics.world import WorldSchema
 assert len(WorldSchema.v1().field_order) == 12
 """
     completed = subprocess.run([sys.executable, "-c", program], capture_output=True, text=True)

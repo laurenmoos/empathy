@@ -4,7 +4,7 @@ import numpy as np
 
 from perception_env.model2.contracts import BeliefInputs
 from perception_env.model2.smc import BeliefWorldSMC, SMCConfig
-from perception_env.world import WorldSchema
+from perception_env.physics.world import WorldSchema
 
 
 def _inputs(post: np.ndarray | None = None, pre: np.ndarray | None = None) -> BeliefInputs:

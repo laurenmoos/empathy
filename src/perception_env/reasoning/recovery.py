@@ -8,9 +8,9 @@ from typing import Any
 
 import numpy as np
 
-from .config import SimulationConfig
+from ..physics.config import SimulationConfig
+from ..physics.world import WorldCode
 from .reachability import EntryStateGrid, Probe, enumerate_reachable
-from .world import WorldCode
 
 
 @dataclass(frozen=True)

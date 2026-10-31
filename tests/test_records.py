@@ -1,19 +1,19 @@
 import numpy as np
 import pytest
 
-from perception_env.beliefs import BeliefEvent
-from perception_env.config import RenderConfig, SimulationConfig
-from perception_env.reachability import EntryStateGrid, enumerate_reachable
-from perception_env.records import (
+from perception_env.physics.config import RenderConfig, SimulationConfig
+from perception_env.physics.render import Occluder, render_sequence
+from perception_env.physics.simulate import BallState, rollout
+from perception_env.physics.world import WorldSchema
+from perception_env.reasoning.beliefs import BeliefEvent
+from perception_env.reasoning.reachability import EntryStateGrid, enumerate_reachable
+from perception_env.reasoning.records import (
     BenchmarkRecord,
     Model2InputRecord,
     belief_entropy,
     load_record,
     save_record,
 )
-from perception_env.render import Occluder, render_sequence
-from perception_env.simulate import BallState, rollout
-from perception_env.world import WorldSchema
 
 
 def make_record(rejection_reason: str | None = None) -> BenchmarkRecord:

@@ -7,8 +7,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .config import RenderConfig
-from .simulate import Trajectory
+from ..physics.config import RenderConfig
+from ..physics.simulate import Trajectory
 
 
 def _trajectory_mask(trajectory: Trajectory, render: RenderConfig) -> np.ndarray:

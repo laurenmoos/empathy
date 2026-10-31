@@ -6,7 +6,7 @@ from dataclasses import asdict, dataclass
 
 import numpy as np
 
-from perception_env.world import WorldSchema
+from perception_env.physics.world import WorldSchema
 
 
 @dataclass(frozen=True)

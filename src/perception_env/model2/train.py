@@ -13,7 +13,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from perception_env.world import WorldSchema
+from perception_env.physics.world import WorldSchema
 
 from . import INPUT_SCHEMA_VERSION
 from .config import TrainingConfig

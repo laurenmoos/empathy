@@ -13,8 +13,8 @@ from perception_env.model1.data import (
     make_model1_record,
     save_example,
 )
-from perception_env.simulate import BallState
-from perception_env.world import WorldSchema
+from perception_env.physics.simulate import BallState
+from perception_env.physics.world import WorldSchema
 
 
 def _record() -> Model1ExampleRecord:

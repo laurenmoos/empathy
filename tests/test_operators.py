@@ -2,9 +2,9 @@ import math
 
 import pytest
 
-from perception_env.config import SimulationConfig
-from perception_env.simulate import BallState, step
-from perception_env.world import WorldSchema
+from perception_env.physics.config import SimulationConfig
+from perception_env.physics.simulate import BallState, step
+from perception_env.physics.world import WorldSchema
 
 
 def test_constant_velocity_uses_semi_implicit_position_update() -> None:

@@ -2,6 +2,25 @@
 
 Empathy asks whether one system can partially recover another **as a perceiver**, through the intentional structure preserved in its experience. **Model 1 sees; Model 2 thinks by imagining the world that could have made Model 1 see as it did.**
 
+## Run the demo
+
+Empathy uses Python 3.11+ and [uv](https://docs.astral.sh/uv/).
+
+```bash
+uv sync --extra ml
+uv run empathy live-demo --root . --model1-checkpoint checkpoints/model1.pt
+```
+
+Open <http://127.0.0.1:8765/explorer.html>, set gravity, wind, and damping, then select **Throw the ball**.
+
+To run the checks:
+
+```bash
+uv sync --extra dev --extra ml
+uv run pytest
+uv run ruff check .
+```
+
 ## Environment
 
 A ball moves behind a fixed occluder. Each environment is defined by gravity, wind, and damping. These parameters compose at every time step to transform one ball state into the next, so the hidden trajectory carries their joint constraints without directly revealing their values.

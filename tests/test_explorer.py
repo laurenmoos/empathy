@@ -147,8 +147,8 @@ def test_world_guess_shows_all_three_numeric_parameters() -> None:
         "reappearance revision",
     ):
         assert label in source
-    assert '"closer"' in source
-    assert '"farther"' in source
+    assert "movement-toward" in source
+    assert "movement-away" in source
     assert "function updateSecondOrder" in source
     assert "function predictedParameterNumber" in source
     assert "step.predicted_parameters" in source
@@ -162,7 +162,8 @@ def test_second_order_panel_shows_constraint_direction_without_summary_block() -
     assert parser.canvases == {"perceptionCanvas"}
     assert "function movementDirection" in source
     assert "constraint-direction-mark" in source
-    assert 'direction.textContent = movement === "toward" ? "closer"' in source
+    assert 'direction.textContent = "";' in source
+    assert 'direction.setAttribute("aria-label", movement)' in source
     assert 'row.classList.add(`movement-${movement}`)' in source
     for noise in (
         "constraint-axis",
@@ -184,7 +185,25 @@ def test_parameter_edits_invalidate_the_stream_and_clear_all_layers() -> None:
     assert "episodeQueue.length = 0;" in source
     assert "clearPerceptionCanvas();" in source
     assert "clearSecondOrder();" in source
-    assert "Parameters changed. Start a new thinking stream." in source
+    assert 'stopAndClear();' in source
+
+
+def test_normal_playback_is_visual_without_narration_feeds() -> None:
+    source, parser = parsed_explorer()
+
+    assert "worldPhase" not in parser.ids
+    assert "frameNarration" not in source
+    for narration in (
+        "The ball is approaching the occluder.",
+        "Generating another offset…",
+        "Ball hidden · the world continues",
+        "Ball reappeared · evidence arrives",
+        "Ball visible",
+        "Stream reset. Start again when ready.",
+        "Parameters changed. Start a new thinking stream.",
+    ):
+        assert narration not in source
+    assert 'statusOverride = `Stream stopped: ${error.message}`' not in source
 
 
 def test_live_episode_validation_checks_trajectory_beliefs_and_four_thoughts() -> None:

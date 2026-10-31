@@ -56,6 +56,7 @@
     button:disabled { cursor: wait; opacity: .6; }
     .buttons { display: grid; gap: .45rem; margin-top: .9rem; }
     .status { min-height: 3.6em; margin: .65rem 0 0; color: #aeb2aa; font-size: .7rem; line-height: 1.4; }
+    .status:empty { display: none; }
     .layers {
       display: grid;
       grid-template-columns: minmax(0, 1.6fr) minmax(17rem, .7fr);
@@ -122,7 +123,6 @@
       <article class="panel" id="perceptionPanel">
         <div class="panel-head">
           <h2>Seeing</h2>
-          <span id="worldPhase"></span>
         </div>
         <canvas id="perceptionCanvas" width="768" height="640"></canvas>
       </article>
@@ -138,12 +138,10 @@
     </section>
   </main>
 
-  <script src="explorer_state.js"></script>
   <script>
     const $ = id => document.getElementById(id);
     const perceptionCanvas = $("perceptionCanvas");
     const perceptionCtx = perceptionCanvas.getContext("2d");
-    const {frameNarration} = PerceptionUIState;
     const EXPECTED_THOUGHT_LABELS = [
       "first possibility",
       "more possibilities",
@@ -165,7 +163,6 @@
     let playing = false;
     let fetching = false;
     let requestSerial = 0;
-    let statusOverride = null;
     let accumulator = 0;
     let previousTimestamp = 0;
 
@@ -336,10 +333,9 @@
       currentThought = -1;
       playing = false;
       fetching = false;
-      statusOverride = null;
+      $("statusMessage").textContent = "";
       clearAllLayers();
       $("streamToggle").disabled = true;
-      $("statusMessage").textContent = "Starting a fixed-world thinking session…";
       try {
         const payload = await postJson("/api/session/start", selectedParameters());
         if (serial !== requestSerial) return;
@@ -348,14 +344,12 @@
         }
         sessionId = payload.session_id;
         playing = true;
-        $("statusMessage").textContent = "Generating the first offset episode…";
         await requestNextEpisode();
       } catch (error) {
         if (serial !== requestSerial) return;
         playing = false;
         sessionId = null;
-        statusOverride = `Couldn’t start the stream: ${error.message}`;
-        $("statusMessage").textContent = statusOverride;
+        $("statusMessage").textContent = `Couldn’t start the stream: ${error.message}`;
       } finally {
         if (serial === requestSerial) $("streamToggle").disabled = false;
         updateControls();
@@ -376,8 +370,7 @@
       } catch (error) {
         if (serial !== requestSerial) return;
         playing = false;
-        statusOverride = `Stream stopped: ${error.message}`;
-        $("statusMessage").textContent = statusOverride;
+        $("statusMessage").textContent = `Stream stopped: ${error.message}`;
       } finally {
         if (serial === requestSerial) fetching = false;
         updateControls();
@@ -389,7 +382,6 @@
       currentFrame = 0;
       currentThought = -1;
       accumulator = 0;
-      $("statusMessage").textContent = "The ball is approaching the occluder.";
       draw();
       requestNextEpisode();
     }
@@ -399,14 +391,12 @@
         setCurrentEpisode(episodeQueue.shift());
         return;
       }
-      $("statusMessage").textContent = "Generating another offset…";
       requestNextEpisode();
     }
 
     function clearPerceptionCanvas() {
       perceptionCtx.fillStyle = "#dbd8d0";
       perceptionCtx.fillRect(0, 0, perceptionCanvas.width, perceptionCanvas.height);
-      $("worldPhase").textContent = "";
     }
 
     function clearSecondOrder() {
@@ -509,7 +499,6 @@
       perceptionCtx.fillStyle = "#dbd8d0";
       perceptionCtx.fillRect(0, 0, perceptionCanvas.width, perceptionCanvas.height);
       drawOccluder(truth.occluder);
-      const hidden = currentFrame >= truth.hidden_start && currentFrame <= truth.hidden_end;
       const index = thoughtIndex();
       if (index >= 0) {
         const step = currentEpisode.thought_steps[index];
@@ -520,16 +509,6 @@
         }
       }
       drawGroundTruthPath(progressiveGroundTruthPath(truth));
-      $("worldPhase").textContent = hidden
-        ? "Ball hidden · the world continues"
-        : currentFrame >= truth.reappearance_step
-          ? "Ball reappeared · evidence arrives"
-          : "Ball visible";
-      $("statusMessage").textContent = frameNarration(
-        hidden,
-        currentFrame >= truth.reappearance_step,
-        statusOverride
-      );
     }
 
     function thoughtIndex() {
@@ -579,9 +558,8 @@
         name.textContent = slot.name;
         const direction = document.createElement("span");
         direction.className = "constraint-direction constraint-direction-mark";
-        direction.textContent = movement === "toward" ? "closer"
-          : movement === "away" ? "farther"
-            : movement === "steady" ? "unchanged" : "observing";
+        direction.textContent = "";
+        direction.setAttribute("aria-label", movement);
         label.append(name);
         row.append(label, direction);
         return row;
@@ -629,7 +607,7 @@
         : playing ? "Pause thinking stream" : "Resume thinking stream";
     }
 
-    function stopAndClear(message) {
+    function stopAndClear() {
       const previousSession = sessionId;
       requestSerial += 1;
       sessionId = null;
@@ -639,10 +617,9 @@
       currentThought = -1;
       playing = false;
       fetching = false;
-      statusOverride = message;
       clearPerceptionCanvas();
       clearSecondOrder();
-      $("statusMessage").textContent = message;
+      $("statusMessage").textContent = "";
       $("streamToggle").disabled = false;
       updateControls();
       if (previousSession) {
@@ -655,18 +632,17 @@
         startSession();
         return;
       }
-      statusOverride = null;
       playing = !playing;
       if (playing && !currentEpisode) requestNextEpisode();
       updateControls();
     });
     $("reset").addEventListener("click", () => {
-      stopAndClear("Stream reset. Start again when ready.");
+      stopAndClear();
     });
 
     ["gravity", "wind", "damping"].forEach(id => {
       $(id).addEventListener("input", () => {
-        stopAndClear("Parameters changed. Start a new thinking stream.");
+        stopAndClear();
       });
     });
 

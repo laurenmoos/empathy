@@ -41,8 +41,8 @@ def test_explorer_uses_minimal_numeric_controls_and_plain_layer_names() -> None:
     source, parser = parsed_explorer()
 
     assert parser.input_types == ["number", "number", "number"]
-    assert "<h2>Ground truth + beliefs</h2>" in source
-    assert "<h2>Second-order perception</h2>" in source
+    assert "<h2>Seeing</h2>" in source
+    assert "<h2>Thinking</h2>" in source
     for unwanted in (
         "Choose one world",
         "down ↔ up",
@@ -84,8 +84,8 @@ def test_explorer_combines_ground_truth_path_and_belief_fuzz() -> None:
     )
     assert parser.canvases == {"perceptionCanvas"}
     assert not parser.external_urls
-    assert "Ground truth + beliefs" in source
-    assert "Second-order perception" in source
+    assert "<h2>Seeing</h2>" in source
+    assert "<h2>Thinking</h2>" in source
     assert "function drawGroundTruthPath" in source
     assert "function drawBeliefSuperposition" in source
     assert "drawBeliefFuzz" not in source

@@ -8,6 +8,7 @@ import importlib.metadata
 import json
 import shutil
 import sys
+import tempfile
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -17,6 +18,7 @@ import numpy as np
 import torch
 
 from perception_env.beliefs import BeliefEvent, build_belief_history
+from perception_env.families import load_family
 from perception_env.records import Model2InputRecord, belief_entropy
 
 from .config import load_model1_config
@@ -210,10 +212,18 @@ def train_run(args) -> dict[str, Any]:
 def stream_train_run(args) -> dict[str, Any]:
     started = time.perf_counter()
     output = Path(args.output)
-    _prepare_output(output, args.force)
     config = load_model1_config(Path(args.config))
     config = replace(config, training=replace(config.training, seed=args.seed))
     stream_config = load_stream_training_config(Path(args.stream_config))
+    family_config = Path(args.family_config)
+    for level in set(stream_config.levels):
+        load_family(family_config, level)
+    for source in (Path(args.config), Path(args.stream_config), family_config):
+        _validate_separate(source, output)
+    if output.exists() and not args.force:
+        raise FileExistsError(output)
+    if output.resolve() in {Path.cwd().resolve(), Path("/").resolve()}:
+        raise ValueError("refusing to replace a broad output directory")
     if args.quick:
         episodes = min(stream_config.episodes_per_environment, 2)
         replay_batch = min(stream_config.replay_batch_size, episodes)
@@ -227,35 +237,58 @@ def stream_train_run(args) -> dict[str, Any]:
             replay_batch_size=replay_batch,
             update_steps_per_environment=1,
         )
-    result = train_model1_stream(
-        config,
-        stream_config,
-        Path(args.family_config),
-        output,
-        device=torch.device(args.device),
-        seed=args.seed,
-    )
-    event_paths = [str(event.path.relative_to(output)) for event in result.events]
-    return _write_manifest(
-        output,
-        command="stream-train",
-        arguments={"device": args.device, "quick": args.quick},
-        seed=args.seed,
-        stable={
-            "config_hash": _hash_file(Path(args.config)),
-            "stream_config_hash": _hash_file(Path(args.stream_config)),
-            "family_config_hash": _hash_file(Path(args.family_config)),
-            "history_hash": _hash_file(output / "history.jsonl"),
-            "stream_summary": result.summary,
-        },
-        output_paths=[
-            "stream-summary.json",
-            "history.jsonl",
-            result.checkpoint.name,
-            *event_paths,
-        ],
-        started=started,
-    )
+    output.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=f".{output.name}-staging-", dir=output.parent))
+    staging.rmdir()
+    try:
+        result = train_model1_stream(
+            config,
+            stream_config,
+            family_config,
+            staging,
+            device=torch.device(args.device),
+            seed=args.seed,
+        )
+        event_paths = [str(event.path.relative_to(staging)) for event in result.events]
+        manifest = _write_manifest(
+            staging,
+            command="stream-train",
+            arguments={"device": args.device, "quick": args.quick},
+            seed=args.seed,
+            stable={
+                "config_hash": _hash_file(Path(args.config)),
+                "stream_config_hash": _hash_file(Path(args.stream_config)),
+                "family_config_hash": _hash_file(family_config),
+                "history_hash": _hash_file(staging / "history.jsonl"),
+                "stream_summary": result.summary,
+            },
+            output_paths=[
+                "stream-summary.json",
+                "history.jsonl",
+                result.checkpoint.name,
+                *event_paths,
+            ],
+            started=started,
+        )
+        backup: Path | None = None
+        if output.exists():
+            backup = Path(
+                tempfile.mkdtemp(prefix=f".{output.name}-backup-", dir=output.parent)
+            )
+            backup.rmdir()
+            output.rename(backup)
+        try:
+            staging.rename(output)
+        except Exception:
+            if backup is not None:
+                backup.rename(output)
+            raise
+        if backup is not None:
+            shutil.rmtree(backup)
+        return manifest
+    finally:
+        if staging.exists():
+            shutil.rmtree(staging)
 
 
 def evaluate_run(args) -> dict[str, Any]:

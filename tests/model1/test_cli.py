@@ -128,3 +128,28 @@ def test_stream_train_command_writes_frozen_events_updates_and_checkpoint(tmp_pa
     assert manifest["command"] == "stream-train"
     assert manifest["stream_summary"]["weight_update_count"] == 2
     assert main(arguments) == 2
+
+
+def test_stream_train_force_preserves_existing_run_when_inputs_are_invalid(tmp_path) -> None:
+    output = tmp_path / "stream-run"
+    output.mkdir()
+    sentinel = output / "keep.txt"
+    sentinel.write_text("original run")
+    invalid_stream = tmp_path / "invalid-stream.yaml"
+    invalid_stream.write_text("schema_version: model1-stream-v1\nstream: nope\n")
+
+    assert main(
+        [
+            "stream-train",
+            "--config",
+            str(small_config(tmp_path)),
+            "--stream-config",
+            str(invalid_stream),
+            "--family-config",
+            "configs/world_families/v1.yaml",
+            "--output",
+            str(output),
+            "--force",
+        ]
+    ) == 2
+    assert sentinel.read_text() == "original run"

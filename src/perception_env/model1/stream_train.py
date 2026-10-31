@@ -50,12 +50,16 @@ class StreamTrainingConfig:
             raise ValueError("replay batch size cannot exceed replay capacity")
         if self.replay_batch_size > self.episodes_per_environment:
             raise ValueError("replay batch must fit in the first environment")
+        if self.environment_count > 1 and self.replay_batch_size < 2:
+            raise ValueError("multiple environments require at least two replay samples")
 
 
 def load_stream_training_config(path: Path) -> StreamTrainingConfig:
     payload = yaml.safe_load(Path(path).read_text())
     if not isinstance(payload, dict) or set(payload) != {"schema_version", "stream"}:
         raise ValueError("stream configuration must contain schema_version and stream")
+    if not isinstance(payload["stream"], dict):
+        raise ValueError("stream configuration stream must be a mapping")
     values = dict(payload["stream"])
     expected = {
         "levels",
@@ -166,6 +170,46 @@ class Model1ReplayBuffer:
         index = int(self._rng.integers(0, self._seen))
         if index < self.capacity:
             self._entries[index] = entry
+
+    def add_environment(
+        self,
+        environment_index: int,
+        records: list[Model1ExampleRecord] | tuple[Model1ExampleRecord, ...],
+    ) -> None:
+        if not records:
+            raise ValueError("environment replay batch cannot be empty")
+        prior = [
+            entry
+            for entry in self._entries
+            if entry.environment_index < environment_index
+        ]
+        protected_prior = (
+            prior[int(self._rng.integers(0, len(prior)))] if prior else None
+        )
+        for record in records:
+            self.add(environment_index, record)
+        if protected_prior is None:
+            return
+        previous_indices = [
+            index
+            for index, entry in enumerate(self._entries)
+            if entry.environment_index < environment_index
+        ]
+        if not previous_indices:
+            replace_index = int(self._rng.integers(0, len(self._entries)))
+            self._entries[replace_index] = protected_prior
+            previous_indices = [replace_index]
+        if not any(
+            entry.environment_index == environment_index for entry in self._entries
+        ):
+            candidates = [
+                index
+                for index in range(len(self._entries))
+                if index != previous_indices[0]
+            ]
+            replace_index = int(self._rng.choice(candidates))
+            record = records[int(self._rng.integers(0, len(records)))]
+            self._entries[replace_index] = ReplayEntry(environment_index, record)
 
     def sample(self, count: int) -> tuple[ReplayEntry, ...]:
         if count < 1 or count > len(self._entries):
@@ -328,8 +372,7 @@ def train_model1_stream(
             weight_update_count=weight_update_count,
         )
         events.extend(frozen_events)
-        for record in environment.records:
-            replay.add(environment.environment_index, record)
+        replay.add_environment(environment.environment_index, environment.records)
         event_rows: list[dict[str, Any]] = []
         for update_index in range(stream_config.update_steps_per_environment):
             sampled = replay.sample_for_update(

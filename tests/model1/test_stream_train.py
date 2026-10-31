@@ -59,6 +59,8 @@ def test_stream_configuration_rejects_nonpositive_and_oversized_values(tmp_path)
         _stream_config(replay_capacity=2, replay_batch_size=3)
     with pytest.raises(ValueError, match="first environment"):
         _stream_config(episodes_per_environment=1, replay_batch_size=2)
+    with pytest.raises(ValueError, match="at least two"):
+        _stream_config(replay_batch_size=1)
 
     path = tmp_path / "stream.yaml"
     path.write_text(
@@ -150,6 +152,18 @@ def test_replay_is_bounded_seeded_and_keeps_environment_provenance() -> None:
     replay.add(0, _record(1))
     replay.add(1, _record(2))
     assert {entry.environment_index for entry in replay.sample(3)} == {0, 1}
+
+
+@pytest.mark.parametrize("seed", range(30))
+def test_replay_batch_preserves_current_and_prior_world_under_capacity_pressure(seed) -> None:
+    replay = Model1ReplayBuffer(2, seed=seed)
+    replay.add_environment(0, [_record(0), _record(1)])
+    replay.add_environment(1, [_record(2), _record(3)])
+
+    sampled = replay.sample_for_update(2, current_environment=1)
+
+    assert {entry.environment_index for entry in replay.entries} == {0, 1}
+    assert {entry.environment_index for entry in sampled} == {0, 1}
 
 
 def _tiny_model_config():

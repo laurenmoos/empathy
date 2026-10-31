@@ -2,22 +2,13 @@
 
 Empathy asks whether one system can partially recover another **as a perceiver**, through the intentional structure preserved in its experience. **Model 1 sees; Model 2 thinks by imagining the world that could have made Model 1 see as it did.**
 
-## Run the demo
-
-Install [uv](https://docs.astral.sh/uv/), clone this repository, and run:
+## Run
 
 ```bash
-uv run --extra ml empathy live-demo
+uv run empathy
 ```
 
-Then open <http://127.0.0.1:8765/explorer.html> and select **Throw the ball**. `uv` handles the environment and dependencies automatically.
-
-## Development
-
-```bash
-uv run --extra dev --extra ml pytest
-uv run --extra dev ruff check .
-```
+Open <http://127.0.0.1:8765/explorer.html>.
 
 ## Environment
 

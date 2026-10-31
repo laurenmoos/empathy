@@ -91,6 +91,30 @@ def test_live_demo_delegates_only_the_model1_checkpoint(monkeypatch, tmp_path) -
     }
 
 
+def test_bare_command_launches_the_live_demo(monkeypatch) -> None:
+    from empathy.live import server as live_server
+
+    captured = {}
+
+    def fake_run_live_server(*, host, port, root, model1_checkpoint) -> None:
+        captured.update(
+            host=host,
+            port=port,
+            root=root,
+            model1_checkpoint=model1_checkpoint,
+        )
+
+    monkeypatch.setattr(live_server, "run_live_server", fake_run_live_server)
+
+    assert main([]) == 0
+    assert captured == {
+        "host": "127.0.0.1",
+        "port": 8765,
+        "root": Path("."),
+        "model1_checkpoint": Path("checkpoints/model1.pt"),
+    }
+
+
 def test_missing_configuration_returns_clear_error(tmp_path) -> None:
     result = run_cli(
         "sample",

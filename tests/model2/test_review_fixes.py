@@ -9,14 +9,14 @@ import pytest
 from empathy.model2.config import EvaluationConfig, TrainingConfig, load_config
 
 
-def test_torch_is_only_an_ml_extra_and_lock_matches():
+def test_torch_is_a_normal_dependency_and_lock_matches():
     project = tomllib.loads(Path("pyproject.toml").read_text())["project"]
-    assert not any(item.startswith("torch") for item in project["dependencies"])
-    assert any(item.startswith("torch") for item in project["optional-dependencies"]["ml"])
+    assert any(item.startswith("torch") for item in project["dependencies"])
+    assert "ml" not in project["optional-dependencies"]
     lock = tomllib.loads(Path("uv.lock").read_text())
     package = next(p for p in lock["package"] if p["name"] == "empathy")
-    assert not any(item["name"] == "torch" for item in package["dependencies"])
-    assert package["optional-dependencies"]["ml"] == [{"name": "torch"}]
+    assert any(item["name"] == "torch" for item in package["dependencies"])
+    assert "ml" not in package["optional-dependencies"]
 
 
 def test_base_package_import_does_not_require_torch():

@@ -72,4 +72,6 @@ def test_distribution_and_console_command_are_named_empathy() -> None:
 
     assert project["name"] == "empathy"
     assert project["scripts"] == {"empathy": "empathy.cli:main"}
+    assert "torch>=2.5" in project["dependencies"]
+    assert "ml" not in project["optional-dependencies"]
     assert {path.name for path in (ROOT / "src").iterdir() if path.is_dir()} == {"empathy"}

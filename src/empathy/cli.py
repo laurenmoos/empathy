@@ -539,6 +539,8 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
+    if not arguments:
+        arguments = ["live-demo"]
     if arguments and arguments[0] == "model1":
         from .model1.cli import main as model1_main
 

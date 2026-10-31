@@ -44,6 +44,9 @@ def test_explorer_uses_minimal_numeric_controls_and_plain_layer_names() -> None:
     assert "<title>Pinball</title>" in source
     assert "<header><h1>Pinball</h1></header>" in source
     assert "text-align: center" in source
+    assert "#secondOrderPanel { border-top: 0; }" in source
+    assert "reset" not in parser.ids
+    assert "Reset stream" not in source
     assert "<h2>Seeing</h2>" in source
     assert "<h2>Thinking</h2>" in source
     for unwanted in (
@@ -129,7 +132,6 @@ def test_stream_controls_start_sessions_and_queue_offset_episodes() -> None:
         "wind",
         "damping",
         "streamToggle",
-        "reset",
     } <= parser.ids
     assert 'postJson("/api/session/start"' in source
     assert 'postJson("/api/session/next"' in source

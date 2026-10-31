@@ -70,6 +70,7 @@
       border-top: 1px solid var(--line);
       background: transparent;
     }
+    #secondOrderPanel { border-top: 0; }
     .panel-head { min-height: 2.5rem; margin-bottom: .65rem; }
     .panel-head span { display: block; margin-top: .25rem; color: var(--muted); font-size: .68rem; line-height: 1.35; }
     canvas { display: block; width: 100%; aspect-ratio: 1.2; background: var(--canvas); }
@@ -121,7 +122,6 @@
       </label>
       <div class="buttons">
         <button class="primary" id="streamToggle">Throw the ball</button>
-        <button id="reset">Reset stream</button>
       </div>
       <p class="status" id="statusMessage"></p>
     </aside>
@@ -730,10 +730,6 @@
       if (playing && !currentEpisode) requestNextEpisode();
       updateControls();
     });
-    $("reset").addEventListener("click", () => {
-      stopAndClear();
-    });
-
     ["gravity", "wind", "damping"].forEach(id => {
       $(id).addEventListener("input", () => {
         stopAndClear();

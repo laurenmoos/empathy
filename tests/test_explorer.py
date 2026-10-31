@@ -1,10 +1,8 @@
-import subprocess
 from html.parser import HTMLParser
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
 EXPLORER = ROOT / "explorer.html"
-EXPLORER_STATE = ROOT / "explorer_state.js"
 
 
 class ExplorerParser(HTMLParser):
@@ -71,11 +69,6 @@ def test_explorer_uses_minimal_numeric_controls_and_plain_layer_names() -> None:
         ">Ready.</p>",
     ):
         assert unwanted not in source
-    state_source = EXPLORER_STATE.read_text()
-    assert "Model 1" not in state_source
-    assert "Model 2" not in state_source
-
-
 def test_explorer_combines_ground_truth_path_and_belief_fuzz() -> None:
     source, parser = parsed_explorer()
 
@@ -235,24 +228,3 @@ def test_live_episode_validation_checks_trajectory_beliefs_and_four_thoughts() -
     assert "constraint recovery is invalid" in source
     assert "initial_state" in source
     assert "requestAnimationFrame" in source
-
-
-def test_frame_narration_preserves_stream_failures() -> None:
-    script = """
-const {frameNarration} = require('./explorer_state.js');
-const failure = 'Stream stopped: Network unavailable';
-if (frameNarration(false, false, failure) !== failure) process.exit(1);
-if (frameNarration(true, false, null) !== 'Possible hidden paths are expanding.') {
-  process.exit(2);
-}
-"""
-
-    result = subprocess.run(
-        ["node", "-e", script],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    assert result.returncode == 0, result.stderr

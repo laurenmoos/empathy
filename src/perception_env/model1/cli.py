@@ -26,6 +26,7 @@ from .evaluate import (
     load_evaluation_summary,
     load_prediction_record,
 )
+from .stream_train import load_stream_training_config, train_model1_stream
 from .train import train_model1
 from .visualize import (
     render_calibration_plot,
@@ -206,6 +207,57 @@ def train_run(args) -> dict[str, Any]:
     )
 
 
+def stream_train_run(args) -> dict[str, Any]:
+    started = time.perf_counter()
+    output = Path(args.output)
+    _prepare_output(output, args.force)
+    config = load_model1_config(Path(args.config))
+    config = replace(config, training=replace(config.training, seed=args.seed))
+    stream_config = load_stream_training_config(Path(args.stream_config))
+    if args.quick:
+        episodes = min(stream_config.episodes_per_environment, 2)
+        replay_batch = min(stream_config.replay_batch_size, episodes)
+        stream_config = replace(
+            stream_config,
+            environment_count=min(stream_config.environment_count, 2),
+            episodes_per_environment=episodes,
+            replay_capacity=max(
+                replay_batch, min(stream_config.replay_capacity, 8)
+            ),
+            replay_batch_size=replay_batch,
+            update_steps_per_environment=1,
+        )
+    result = train_model1_stream(
+        config,
+        stream_config,
+        Path(args.family_config),
+        output,
+        device=torch.device(args.device),
+        seed=args.seed,
+    )
+    event_paths = [str(event.path.relative_to(output)) for event in result.events]
+    return _write_manifest(
+        output,
+        command="stream-train",
+        arguments={"device": args.device, "quick": args.quick},
+        seed=args.seed,
+        stable={
+            "config_hash": _hash_file(Path(args.config)),
+            "stream_config_hash": _hash_file(Path(args.stream_config)),
+            "family_config_hash": _hash_file(Path(args.family_config)),
+            "history_hash": _hash_file(output / "history.jsonl"),
+            "stream_summary": result.summary,
+        },
+        output_paths=[
+            "stream-summary.json",
+            "history.jsonl",
+            result.checkpoint.name,
+            *event_paths,
+        ],
+        started=started,
+    )
+
+
 def evaluate_run(args) -> dict[str, Any]:
     started = time.perf_counter()
     output = Path(args.output)
@@ -354,6 +406,15 @@ def _parser() -> argparse.ArgumentParser:
     train.add_argument("--device", default="cpu")
     train.add_argument("--output", required=True)
     train.add_argument("--force", action="store_true")
+    stream_train = subcommands.add_parser("stream-train")
+    stream_train.add_argument("--config", required=True)
+    stream_train.add_argument("--stream-config", required=True)
+    stream_train.add_argument("--family-config", required=True)
+    stream_train.add_argument("--seed", type=int, default=7)
+    stream_train.add_argument("--device", default="cpu")
+    stream_train.add_argument("--output", required=True)
+    stream_train.add_argument("--quick", action="store_true")
+    stream_train.add_argument("--force", action="store_true")
     evaluate = subcommands.add_parser("evaluate")
     evaluate.add_argument("--data", required=True)
     evaluate.add_argument("--checkpoint", required=True)
@@ -383,6 +444,7 @@ def main(argv: list[str] | None = None) -> int:
         {
             "generate": generate_run,
             "train": train_run,
+            "stream-train": stream_train_run,
             "evaluate": evaluate_run,
             "inspect": inspect_run,
             "demo": demo_run,

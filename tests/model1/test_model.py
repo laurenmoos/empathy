@@ -3,9 +3,9 @@ from pathlib import Path
 import pytest
 import torch
 
-from perception_env.model1.config import load_model1_config
-from perception_env.model1.model import Model1
-from perception_env.model1.types import TrajectoryMixture
+from empathy.model1.config import load_model1_config
+from empathy.model1.model import Model1
+from empathy.model1.types import TrajectoryMixture
 
 
 def _inputs(batch: int = 2):

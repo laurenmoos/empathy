@@ -1,7 +1,7 @@
 import json
 
-from perception_env.physics.world import WorldSchema
-from perception_env.reasoning.visualize import render_world_card
+from empathy.physics.world import WorldSchema
+from empathy.reasoning.visualize import render_world_card
 
 
 def test_world_card_is_reproducible_and_names_every_operator(tmp_path) -> None:

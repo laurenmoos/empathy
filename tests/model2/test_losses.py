@@ -3,8 +3,8 @@ import math
 import pytest
 import torch
 
-from perception_env.model2.contracts import WorldPrediction
-from perception_env.model2.losses import world_code_loss
+from empathy.model2.contracts import WorldPrediction
+from empathy.model2.losses import world_code_loss
 
 
 def test_analytic_activity_and_masked_parameter_loss():

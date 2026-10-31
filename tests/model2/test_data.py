@@ -4,10 +4,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from perception_env.model2.config import FixtureConfig, TrainingConfig, load_config
-from perception_env.model2.contracts import BeliefInputs, WorldTargets
-from perception_env.model2.data import BeliefDataset, collate_examples, save_dataset
-from perception_env.physics.world import WorldSchema
+from empathy.model2.config import FixtureConfig, TrainingConfig, load_config
+from empathy.model2.contracts import BeliefInputs, WorldTargets
+from empathy.model2.data import BeliefDataset, collate_examples, save_dataset
+from empathy.physics.world import WorldSchema
 
 
 def test_dataset_roundtrip_only_opens_input_targets_manifest(tmp_path, monkeypatch):

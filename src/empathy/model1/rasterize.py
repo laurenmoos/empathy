@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import torch
 
-from perception_env.reasoning.beliefs import BeliefEvent
+from empathy.reasoning.beliefs import BeliefEvent
 
 from .types import BeliefPrediction, TrajectoryMixture
 

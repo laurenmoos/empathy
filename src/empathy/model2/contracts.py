@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from perception_env.physics.world import WorldSchema
-from perception_env.reasoning.records import Model2InputRecord
+from empathy.physics.world import WorldSchema
+from empathy.reasoning.records import Model2InputRecord
 
 if TYPE_CHECKING:
     import torch

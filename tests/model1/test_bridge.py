@@ -2,10 +2,10 @@ import numpy as np
 import pytest
 import torch
 
-from perception_env.model1.rasterize import belief_event_from_predictions
-from perception_env.model1.types import BeliefPrediction
-from perception_env.reasoning.beliefs import build_belief_history
-from perception_env.reasoning.records import Model2InputRecord, belief_entropy
+from empathy.model1.rasterize import belief_event_from_predictions
+from empathy.model1.types import BeliefPrediction
+from empathy.reasoning.beliefs import build_belief_history
+from empathy.reasoning.records import Model2InputRecord, belief_entropy
 
 
 def test_bridge_exports_only_collapsed_beliefs() -> None:

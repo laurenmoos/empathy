@@ -3,15 +3,15 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from perception_env.model2.config import FixtureConfig
-from perception_env.model2.data import BeliefDataset
-from perception_env.model2.fixtures import (
+from empathy.model2.config import FixtureConfig
+from empathy.model2.data import BeliefDataset
+from empathy.model2.fixtures import (
     build_fixture_event,
     generate_fixtures,
     split_world_groups,
 )
-from perception_env.physics.simulate import BallState
-from perception_env.physics.world import WorldSchema
+from empathy.physics.simulate import BallState
+from empathy.physics.world import WorldSchema
 
 
 def tiny_config():
@@ -98,8 +98,8 @@ def test_input_manifest_does_not_contain_first_order_event_payload(tmp_path):
 def test_fixture_dataset_trains_real_cnn(tmp_path):
     import json
 
-    from perception_env.model2.config import TrainingConfig
-    from perception_env.model2.train import train_model
+    from empathy.model2.config import TrainingConfig
+    from empathy.model2.train import train_model
 
     generated = generate_fixtures(tiny_config(), tmp_path / "data")
     run = train_model(generated.root, TrainingConfig(epochs=2, batch_size=1), tmp_path / "run")
@@ -111,7 +111,7 @@ def test_fixture_dataset_trains_real_cnn(tmp_path):
 def test_shipped_smoke_configuration_completes_requested_world_bank(tmp_path):
     from pathlib import Path
 
-    from perception_env.model2.config import load_config
+    from empathy.model2.config import load_config
 
     config, _, _ = load_config(Path("configs/model2/smoke_v1.yaml"))
     result = generate_fixtures(config, tmp_path / "smoke")

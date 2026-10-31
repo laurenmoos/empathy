@@ -33,7 +33,7 @@ class VisualArtifact:
 def _save_visual(fig: plt.Figure, path: Path, metadata: dict[str, Any]) -> VisualArtifact:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=96, bbox_inches="tight", metadata={"Software": "perception-env"})
+    fig.savefig(path, dpi=96, bbox_inches="tight", metadata={"Software": "empathy"})
     plt.close(fig)
     metadata_path = path.with_suffix(".json")
     metadata_path.write_text(json.dumps(metadata, indent=2, sort_keys=True))

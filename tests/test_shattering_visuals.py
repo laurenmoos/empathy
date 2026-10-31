@@ -2,9 +2,9 @@ from itertools import product
 
 import numpy as np
 
-from perception_env.reasoning.reachability import Probe
-from perception_env.reasoning.shattering import LabelMatrix, search_shattered_set
-from perception_env.reasoning.visualize import render_shattering_matrix
+from empathy.reasoning.reachability import Probe
+from empathy.reasoning.shattering import LabelMatrix, search_shattered_set
+from empathy.reasoning.visualize import render_shattering_matrix
 
 
 def test_shattering_matrix_groups_rows_and_highlights_selected_probes(tmp_path) -> None:

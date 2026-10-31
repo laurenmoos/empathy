@@ -6,16 +6,16 @@ import pytest
 import torch
 import yaml
 
-from perception_env.model1.config import load_model1_config
-from perception_env.model1.data import Model1ExampleRecord
-from perception_env.model1.stream_train import (
+from empathy.model1.config import load_model1_config
+from empathy.model1.data import Model1ExampleRecord
+from empathy.model1.stream_train import (
     Model1ReplayBuffer,
     StreamTrainingConfig,
     generate_environment_batches,
     load_stream_training_config,
     train_model1_stream,
 )
-from perception_env.model1.train import load_checkpoint
+from empathy.model1.train import load_checkpoint
 
 
 def _stream_config(**overrides) -> StreamTrainingConfig:

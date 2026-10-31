@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "perception-env"
+name = "empathy"
 version = "0.1.0"
 description = "Visually inspectable toy worlds for second-order perceptual coherence research"
 readme = "README.md"
@@ -25,10 +25,10 @@ dev = [
 ]
 
 [project.scripts]
-perception-env = "perception_env.cli:main"
+empathy = "empathy.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/perception_env"]
+packages = ["src/empathy"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

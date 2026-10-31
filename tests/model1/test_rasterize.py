@@ -1,7 +1,7 @@
 import torch
 
-from perception_env.model1.rasterize import rasterize_actual_path, rasterize_mixture
-from perception_env.model1.types import TrajectoryMixture
+from empathy.model1.rasterize import rasterize_actual_path, rasterize_mixture
+from empathy.model1.types import TrajectoryMixture
 
 
 def test_rasterizer_mixes_modes_and_preserves_interior_mass() -> None:

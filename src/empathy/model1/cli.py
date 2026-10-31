@@ -17,9 +17,9 @@ from typing import Any
 import numpy as np
 import torch
 
-from perception_env.physics.families import load_family
-from perception_env.reasoning.beliefs import BeliefEvent, build_belief_history
-from perception_env.reasoning.records import Model2InputRecord, belief_entropy
+from empathy.physics.families import load_family
+from empathy.reasoning.beliefs import BeliefEvent, build_belief_history
+from empathy.reasoning.records import Model2InputRecord, belief_entropy
 
 from .config import load_model1_config
 from .data import Model1Dataset, generate_model1_dataset
@@ -58,7 +58,7 @@ def _array_hash(arrays: dict[str, np.ndarray]) -> str:
 
 def _versions() -> dict[str, str]:
     versions = {"torch": torch.__version__, "numpy": np.__version__}
-    for name in ("perception-env", "matplotlib", "pillow", "pyyaml"):
+    for name in ("empathy", "matplotlib", "pillow", "pyyaml"):
         try:
             versions[name] = importlib.metadata.version(name)
         except importlib.metadata.PackageNotFoundError:

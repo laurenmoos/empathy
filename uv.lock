@@ -1068,7 +1068,7 @@ wheels = [
 ]
 
 [[package]]
-name = "perception-env"
+name = "empathy"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

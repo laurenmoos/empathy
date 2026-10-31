@@ -1,8 +1,8 @@
 import numpy as np
 
-from perception_env.physics.config import RenderConfig, SimulationConfig
-from perception_env.physics.world import WorldSchema
-from perception_env.reasoning.reachability import (
+from empathy.physics.config import RenderConfig, SimulationConfig
+from empathy.physics.world import WorldSchema
+from empathy.reasoning.reachability import (
     EntryStateGrid,
     Probe,
     enumerate_reachable,

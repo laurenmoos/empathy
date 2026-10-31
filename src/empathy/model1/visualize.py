@@ -10,7 +10,7 @@ from typing import Any
 import matplotlib.pyplot as plt
 import numpy as np
 
-from perception_env.reasoning.visualize import VisualArtifact
+from empathy.reasoning.visualize import VisualArtifact
 
 from .evaluate import EvaluationSummary, Model1PredictionRecord
 
@@ -18,7 +18,7 @@ from .evaluate import EvaluationSummary, Model1PredictionRecord
 def _save(fig: plt.Figure, path: Path, metadata: dict[str, Any]) -> VisualArtifact:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=96, bbox_inches="tight", metadata={"Software": "perception-env"})
+    fig.savefig(path, dpi=96, bbox_inches="tight", metadata={"Software": "empathy"})
     plt.close(fig)
     sidecar = path.with_suffix(".json")
     sidecar.write_text(json.dumps(metadata, indent=2, sort_keys=True))

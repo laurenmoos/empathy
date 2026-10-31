@@ -5,10 +5,10 @@ import numpy as np
 import pytest
 import torch
 
-from perception_env.model2.config import FixtureConfig, TrainingConfig
-from perception_env.model2.first_order_ablation import train_first_order_control
-from perception_env.model2.fixtures import generate_fixtures
-from perception_env.model2.train import load_model
+from empathy.model2.config import FixtureConfig, TrainingConfig
+from empathy.model2.first_order_ablation import train_first_order_control
+from empathy.model2.fixtures import generate_fixtures
+from empathy.model2.train import load_model
 
 
 def test_privileged_control_is_isolated_and_cannot_load_as_production(tmp_path):
@@ -40,5 +40,5 @@ def test_privileged_control_is_isolated_and_cannot_load_as_production(tmp_path):
     with pytest.raises(ValueError, match="architecture"):
         load_model(run.best_checkpoint)
     for name in ("network", "train", "data", "evaluate", "adapters"):
-        source = Path(f"src/perception_env/model2/{name}.py").read_text()
+        source = Path(f"src/empathy/model2/{name}.py").read_text()
         assert "first_order_ablation import" not in source

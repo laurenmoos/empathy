@@ -1,4 +1,4 @@
-"""Package-local entry point: python -m perception_env.model2.cli."""
+"""Package-local entry point: python -m empathy.model2.cli."""
 
 from __future__ import annotations
 
@@ -100,7 +100,7 @@ def build_demo(config_path: Path, output: Path, *, seed: int | None = None) -> d
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="perception-env model2")
+    parser = argparse.ArgumentParser(prog="empathy model2")
     commands = parser.add_subparsers(dest="command", required=True)
     for name in ("fixtures", "train", "evaluate", "controls", "inspect", "demo"):
         command = commands.add_parser(name)

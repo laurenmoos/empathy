@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from perception_env.model2.activation_adapter import (
+from empathy.model2.activation_adapter import (
     ActivationAdapterConfig,
     ActivationAdapterTrainingConfig,
     ActivationBeliefAdapter,

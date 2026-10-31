@@ -3,13 +3,13 @@ import json
 import numpy as np
 import pytest
 
-from perception_env.model2.data import array_hash
-from perception_env.model2.visualize import render_evaluation
+from empathy.model2.data import array_hash
+from empathy.model2.visualize import render_evaluation
 
 
 def test_saved_visuals_never_call_oracle_or_inference(tmp_path, monkeypatch):
-    import perception_env.model2.evaluate as evaluation
-    import perception_env.model2.train as training
+    import empathy.model2.evaluate as evaluation
+    import empathy.model2.train as training
 
     def forbidden(*args, **kwargs):
         raise AssertionError("rendering must read saved results only")
@@ -63,7 +63,7 @@ def test_saved_visuals_never_call_oracle_or_inference(tmp_path, monkeypatch):
 
 
 def test_exemplars_include_success_failure_empty_and_equivalent_when_available():
-    from perception_env.model2.visualize import select_exemplars
+    from empathy.model2.visualize import select_exemplars
 
     metrics = {
         "per_example": [

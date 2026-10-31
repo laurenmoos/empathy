@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from perception_env.model1 import config as config_module
-from perception_env.model1.config import load_model1_config
+from empathy.model1 import config as config_module
+from empathy.model1.config import load_model1_config
 
 
 def test_v1_config_fixes_mvp_dimensions() -> None:

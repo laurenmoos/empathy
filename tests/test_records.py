@@ -1,13 +1,13 @@
 import numpy as np
 import pytest
 
-from perception_env.physics.config import RenderConfig, SimulationConfig
-from perception_env.physics.render import Occluder, render_sequence
-from perception_env.physics.simulate import BallState, rollout
-from perception_env.physics.world import WorldSchema
-from perception_env.reasoning.beliefs import BeliefEvent
-from perception_env.reasoning.reachability import EntryStateGrid, enumerate_reachable
-from perception_env.reasoning.records import (
+from empathy.physics.config import RenderConfig, SimulationConfig
+from empathy.physics.render import Occluder, render_sequence
+from empathy.physics.simulate import BallState, rollout
+from empathy.physics.world import WorldSchema
+from empathy.reasoning.beliefs import BeliefEvent
+from empathy.reasoning.reachability import EntryStateGrid, enumerate_reachable
+from empathy.reasoning.records import (
     BenchmarkRecord,
     Model2InputRecord,
     belief_entropy,

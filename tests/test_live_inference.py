@@ -4,17 +4,17 @@ import numpy as np
 import pytest
 import torch
 
-from perception_env.live.inference import (
+from empathy.live.inference import (
     LiveInferenceEngine,
     LiveInferenceError,
     LiveParameters,
     world_from_parameters,
 )
-from perception_env.model1.config import load_model1_config
-from perception_env.model1.types import TrajectoryMixture
-from perception_env.model2.coherence import evaluate_constraint_recovery
-from perception_env.model2.contracts import BeliefInputs, WorldPrediction
-from perception_env.physics.world import WorldSchema
+from empathy.model1.config import load_model1_config
+from empathy.model1.types import TrajectoryMixture
+from empathy.model2.coherence import evaluate_constraint_recovery
+from empathy.model2.contracts import BeliefInputs, WorldPrediction
+from empathy.physics.world import WorldSchema
 
 ROOT = Path(__file__).parents[1]
 
@@ -172,7 +172,7 @@ def test_hidden_truth_changes_recovery_but_not_belief_only_guess() -> None:
     beliefs[0, -1, 2] = beliefs[0, -1, 1]
     inputs = BeliefInputs(beliefs, np.array([[False, False, False, True]]))
 
-    from perception_env.live.thinking import SMCModel2Runtime
+    from empathy.live.thinking import SMCModel2Runtime
 
     first_guess = SMCModel2Runtime(seed=9).predict(inputs)
     second_guess = SMCModel2Runtime(seed=9).predict(inputs)
@@ -189,8 +189,8 @@ def test_hidden_truth_changes_recovery_but_not_belief_only_guess() -> None:
 
 
 def test_live_smc_runtime_bounds_four_event_candidate_work(monkeypatch) -> None:
-    from perception_env.live.thinking import SMCModel2Runtime
-    from perception_env.model2 import smc
+    from empathy.live.thinking import SMCModel2Runtime
+    from empathy.model2 import smc
 
     calls = 0
 

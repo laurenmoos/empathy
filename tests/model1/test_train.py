@@ -5,9 +5,9 @@ import numpy as np
 import pytest
 import torch
 
-from perception_env.model1.config import load_model1_config
-from perception_env.model1.data import Model1ExampleRecord
-from perception_env.model1.train import _average, load_checkpoint, train_model1
+from empathy.model1.config import load_model1_config
+from empathy.model1.data import Model1ExampleRecord
+from empathy.model1.train import _average, load_checkpoint, train_model1
 
 
 def _record(index: int) -> Model1ExampleRecord:
@@ -94,7 +94,7 @@ def test_checkpoint_round_trip_and_dimension_validation(tmp_path) -> None:
     payload = torch.load(result.best_checkpoint, weights_only=False)
     assert "config" not in payload
     assert payload["metadata"]["package_versions"].get("empathy")
-    assert "perception-env" not in payload["metadata"]["package_versions"]
+    assert set(payload["metadata"]["package_versions"]) == {"torch", "numpy", "empathy"}
 
     bad = replace(config, model=replace(config.model, modes=7))
     with pytest.raises(ValueError, match="configuration"):

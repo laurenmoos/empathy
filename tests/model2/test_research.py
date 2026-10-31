@@ -1,4 +1,4 @@
-from perception_env.model2.research import assess_research_gate
+from empathy.model2.research import assess_research_gate
 
 
 def test_research_gate_requires_three_seeds_paired_worlds_and_leakage_evidence():

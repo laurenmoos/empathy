@@ -2,7 +2,7 @@ import json
 
 import numpy as np
 
-from perception_env.cli import build_demo, inspect_run
+from empathy.cli import build_demo, inspect_run
 
 
 def test_tiny_demo_builds_visual_benchmark_and_belief_only_model2_input(tmp_path) -> None:

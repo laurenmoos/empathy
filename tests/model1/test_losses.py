@@ -4,9 +4,9 @@ from pathlib import Path
 import pytest
 import torch
 
-from perception_env.model1.config import load_model1_config
-from perception_env.model1.losses import model1_loss
-from perception_env.model1.types import (
+from empathy.model1.config import load_model1_config
+from empathy.model1.losses import model1_loss
+from empathy.model1.types import (
     BeliefPrediction,
     Model1Batch,
     TrajectoryMixture,

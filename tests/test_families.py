@@ -2,8 +2,8 @@ from pathlib import Path
 
 import numpy as np
 
-from perception_env.physics.families import load_family, sample_worlds
-from perception_env.physics.world import WorldSchema
+from empathy.physics.families import load_family, sample_worlds
+from empathy.physics.world import WorldSchema
 
 CONFIG = Path("configs/world_families/v1.yaml")
 

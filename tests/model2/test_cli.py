@@ -1,6 +1,6 @@
 import json
 
-from perception_env.model2.cli import main
+from empathy.model2.cli import main
 
 
 def test_cli_rejects_existing_output_and_bad_config(tmp_path):
@@ -75,7 +75,7 @@ def test_cli_missing_torch_has_install_hint(tmp_path):
             sys.executable,
             "-c",
             'import sys; sys.modules["torch"] = None; '
-            "from perception_env.model2.cli import main; "
+            "from empathy.model2.cli import main; "
             "raise SystemExit(main(sys.argv[1:]))",
             "train",
             "--config",

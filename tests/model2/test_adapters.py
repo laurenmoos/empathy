@@ -2,12 +2,12 @@ import numpy as np
 import pytest
 import torch
 
-from perception_env.model2.activation_adapter import (
+from empathy.model2.activation_adapter import (
     ActivationAdapterConfig,
     ActivationBeliefAdapter,
     Model1ActivationPacket,
 )
-from perception_env.model2.adapters import (
+from empathy.model2.adapters import (
     Model1BeliefPacket,
     adapt_model1_activations,
     adapt_model1_events,

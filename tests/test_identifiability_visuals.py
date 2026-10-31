@@ -1,8 +1,8 @@
 import numpy as np
 from test_identifiability import fixture
 
-from perception_env.reasoning.identifiability import group_equivalent_worlds
-from perception_env.reasoning.visualize import render_equivalence_gallery
+from empathy.reasoning.identifiability import group_equivalent_worlds
+from empathy.reasoning.visualize import render_equivalence_gallery
 
 
 def test_equivalence_gallery_shows_world_codes_rasters_and_agreement(tmp_path) -> None:

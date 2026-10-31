@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from perception_env.cli import _parser, inspect_run, main
+from empathy.cli import _parser, inspect_run, main
 
 ROOT = Path(__file__).parents[1]
 PYTHON = ROOT / ".venv" / "bin" / "python"
@@ -14,7 +14,7 @@ CONFIG = ROOT / "configs" / "world_families" / "v1.yaml"
 
 def run_cli(*arguments: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [str(PYTHON), "-m", "perception_env.cli", *arguments],
+        [str(PYTHON), "-m", "empathy.cli", *arguments],
         cwd=ROOT,
         text=True,
         capture_output=True,
@@ -54,7 +54,7 @@ def test_live_demo_uses_one_tracked_checkpoint_by_default() -> None:
 
 
 def test_live_demo_delegates_only_the_model1_checkpoint(monkeypatch, tmp_path) -> None:
-    from perception_env.live import server as live_server
+    from empathy.live import server as live_server
 
     captured = {}
 

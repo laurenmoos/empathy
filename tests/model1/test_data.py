@@ -3,8 +3,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from perception_env.model1.config import load_model1_config
-from perception_env.model1.data import (
+from empathy.model1.config import load_model1_config
+from empathy.model1.data import (
     Model1Dataset,
     Model1ExampleRecord,
     collate_model1,
@@ -13,8 +13,8 @@ from perception_env.model1.data import (
     make_model1_record,
     save_example,
 )
-from perception_env.physics.simulate import BallState
-from perception_env.physics.world import WorldSchema
+from empathy.physics.simulate import BallState
+from empathy.physics.world import WorldSchema
 
 
 def _record() -> Model1ExampleRecord:

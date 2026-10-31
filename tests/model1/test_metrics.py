@@ -3,13 +3,13 @@ import math
 import pytest
 import torch
 
-from perception_env.model1.metrics import (
+from empathy.model1.metrics import (
     belief_metrics,
     calibration_report,
     displacement_metrics,
     mixture_nll,
 )
-from perception_env.model1.types import TrajectoryMixture
+from empathy.model1.types import TrajectoryMixture
 
 
 def _prediction() -> TrajectoryMixture:

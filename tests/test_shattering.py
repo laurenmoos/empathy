@@ -3,8 +3,8 @@ from itertools import product
 import numpy as np
 import pytest
 
-from perception_env.reasoning.reachability import Probe
-from perception_env.reasoning.shattering import (
+from empathy.reasoning.reachability import Probe
+from empathy.reasoning.shattering import (
     LabelMatrix,
     build_label_matrix,
     count_labelings,
@@ -126,7 +126,7 @@ def test_world_count_caps_impossible_dimensions_before_combination_search(
 ) -> None:
     import itertools
 
-    import perception_env.reasoning.shattering as module
+    import empathy.reasoning.shattering as module
 
     original = itertools.combinations
 

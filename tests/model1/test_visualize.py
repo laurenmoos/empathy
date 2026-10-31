@@ -3,13 +3,13 @@ import inspect
 import numpy as np
 from PIL import Image
 
-from perception_env.model1.evaluate import (
+from empathy.model1.evaluate import (
     EvaluationSummary,
     Model1PredictionRecord,
     load_prediction_record,
     save_prediction_record,
 )
-from perception_env.model1.visualize import (
+from empathy.model1.visualize import (
     render_calibration_plot,
     render_failure_gallery,
     render_prediction_panel,
@@ -100,7 +100,7 @@ def test_calibration_and_failure_gallery_render_from_saved_values(tmp_path) -> N
 
     assert calibration.path.stat().st_size > 0
     assert gallery.path.stat().st_size > 0
-    source = inspect.getsource(__import__("perception_env.model1.visualize", fromlist=["*"]))
+    source = inspect.getsource(__import__("empathy.model1.visualize", fromlist=["*"]))
     assert "model1.model" not in source
     assert "model1.train" not in source
-    assert "perception_env.physics.simulate" not in source
+    assert "empathy.physics.simulate" not in source

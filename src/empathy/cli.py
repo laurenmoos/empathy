@@ -74,7 +74,7 @@ def _validate_source_output(source: Path, output: Path) -> None:
 
 def _versions() -> dict[str, str]:
     result: dict[str, str] = {}
-    for package in ("perception-env", "numpy", "matplotlib", "pillow", "pyyaml"):
+    for package in ("empathy", "numpy", "matplotlib", "pillow", "pyyaml"):
         try:
             result[package] = importlib.metadata.version(package)
         except importlib.metadata.PackageNotFoundError:
@@ -494,7 +494,7 @@ def estimate_saved_run(
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="perception-env")
+    parser = argparse.ArgumentParser(prog="empathy")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     sample = subparsers.add_parser("sample", help="sample a versioned world family")
@@ -581,7 +581,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 model1_checkpoint=Path(args.model1_checkpoint),
             )
     except (OSError, ValueError, KeyError) as error:
-        print(f"perception-env: {error}", file=sys.stderr)
+        print(f"empathy: {error}", file=sys.stderr)
         return 2
     return 0
 

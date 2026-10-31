@@ -3,7 +3,7 @@ from pathlib import Path
 
 import yaml
 
-from perception_env.model1.cli import main
+from empathy.model1.cli import main
 
 
 def small_config(tmp_path: Path) -> Path:

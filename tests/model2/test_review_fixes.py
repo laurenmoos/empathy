@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from perception_env.model2.config import EvaluationConfig, TrainingConfig, load_config
+from empathy.model2.config import EvaluationConfig, TrainingConfig, load_config
 
 
 def test_torch_is_only_an_ml_extra_and_lock_matches():
@@ -14,7 +14,7 @@ def test_torch_is_only_an_ml_extra_and_lock_matches():
     assert not any(item.startswith("torch") for item in project["dependencies"])
     assert any(item.startswith("torch") for item in project["optional-dependencies"]["ml"])
     lock = tomllib.loads(Path("uv.lock").read_text())
-    package = next(p for p in lock["package"] if p["name"] == "perception-env")
+    package = next(p for p in lock["package"] if p["name"] == "empathy")
     assert not any(item["name"] == "torch" for item in package["dependencies"])
     assert package["optional-dependencies"]["ml"] == [{"name": "torch"}]
 
@@ -28,8 +28,8 @@ class BlockTorch(importlib.abc.MetaPathFinder):
         if fullname == 'torch' or fullname.startswith('torch.'):
             raise ImportError('torch deliberately unavailable')
 sys.meta_path.insert(0, BlockTorch())
-import perception_env
-from perception_env.physics.world import WorldSchema
+import empathy
+from empathy.physics.world import WorldSchema
 assert len(WorldSchema.v1().field_order) == 12
 """
     completed = subprocess.run([sys.executable, "-c", program], capture_output=True, text=True)
@@ -77,7 +77,7 @@ def test_evaluation_config_accepts_zero_dimension_and_yaml_controls(tmp_path):
 
 
 def _control_inputs(count=6):
-    from perception_env.model2.contracts import BeliefInputs
+    from empathy.model2.contracts import BeliefInputs
 
     values = np.zeros((count, 4, 3, 8, 8), dtype=np.float32)
     mask = np.ones((count, 4), dtype=bool)
@@ -92,8 +92,8 @@ def _control_inputs(count=6):
 
 
 def _control_dataset(root):
-    from perception_env.model2.contracts import WorldTargets
-    from perception_env.model2.data import save_dataset
+    from empathy.model2.contracts import WorldTargets
+    from empathy.model2.data import save_dataset
 
     inputs = _control_inputs()
     save_dataset(
@@ -110,7 +110,7 @@ def _control_dataset(root):
 
 
 def test_single_belief_control_is_latest_post_only():
-    from perception_env.model2.transforms import transform_control
+    from empathy.model2.transforms import transform_control
 
     inputs = _control_inputs()
     result = transform_control(inputs, mode="single_belief", seed=7)
@@ -122,8 +122,8 @@ def test_single_belief_control_is_latest_post_only():
 
 
 def test_shuffle_preserves_event_triples_and_replays_independent_of_batch_order():
-    from perception_env.model2.contracts import BeliefInputs
-    from perception_env.model2.transforms import transform_control
+    from empathy.model2.contracts import BeliefInputs
+    from empathy.model2.transforms import transform_control
 
     inputs = _control_inputs()
     result = transform_control(inputs, mode="shuffled_history", seed=7)
@@ -148,9 +148,9 @@ def test_shuffle_preserves_event_triples_and_replays_independent_of_batch_order(
 def test_controls_train_and_checkpoint_replays_exactly_one_transform(tmp_path, mode):
     import torch
 
-    from perception_env.model2.network import InverseWorldCNN
-    from perception_env.model2.train import load_model, predict, train_model
-    from perception_env.model2.transforms import transform_control
+    from empathy.model2.network import InverseWorldCNN
+    from empathy.model2.train import load_model, predict, train_model
+    from empathy.model2.transforms import transform_control
 
     inputs = _control_dataset(tmp_path / "data")
     run = train_model(
@@ -175,7 +175,7 @@ def test_standalone_checkpoints_contain_split_runtime_and_selection_provenance(t
 
     import torch
 
-    from perception_env.model2.train import train_model
+    from empathy.model2.train import train_model
 
     _control_dataset(tmp_path / "data")
     run = train_model(tmp_path / "data", TrainingConfig(epochs=2, batch_size=2), tmp_path / "run")

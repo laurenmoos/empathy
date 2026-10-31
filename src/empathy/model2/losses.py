@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import torch
 from torch.nn import functional as F
 
-from perception_env.physics.world import WorldSchema
+from empathy.physics.world import WorldSchema
 
 from .contracts import SchemaLayout, WorldPrediction
 

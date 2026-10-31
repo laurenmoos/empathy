@@ -4,8 +4,8 @@ from pathlib import Path
 import numpy as np
 import yaml
 
-from perception_env.model1.cli import main
-from perception_env.reasoning.records import Model2InputRecord
+from empathy.model1.cli import main
+from empathy.reasoning.records import Model2InputRecord
 
 
 def test_quick_demo_is_reproducible_and_exports_belief_only_fixture(tmp_path) -> None:

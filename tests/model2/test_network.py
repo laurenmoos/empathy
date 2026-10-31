@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from perception_env.model2.network import InverseWorldCNN
+from empathy.model2.network import InverseWorldCNN
 
 
 def test_cnn_shapes_gradients_and_padding_invariance():

@@ -11,10 +11,10 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from perception_env.physics.config import RenderConfig
-from perception_env.physics.world import WorldSchema
-from perception_env.reasoning.reachability import Probe, rasterize_endpoints
-from perception_env.reasoning.shattering import LabelMatrix, search_shattered_set
+from empathy.physics.config import RenderConfig
+from empathy.physics.world import WorldSchema
+from empathy.reasoning.reachability import Probe, rasterize_endpoints
+from empathy.reasoning.shattering import LabelMatrix, search_shattered_set
 
 from .config import EvaluationConfig
 from .contracts import BeliefInputs, SchemaLayout, WorldPrediction, WorldTargets

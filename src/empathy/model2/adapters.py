@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 import torch
 
-from perception_env.reasoning.beliefs import BeliefEvent, build_belief_history
+from empathy.reasoning.beliefs import BeliefEvent, build_belief_history
 
 from .activation_adapter import ActivationBeliefAdapter, Model1ActivationPacket
 from .contracts import BeliefInputs

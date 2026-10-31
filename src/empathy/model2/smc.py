@@ -7,9 +7,9 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from perception_env.physics.config import SimulationConfig
-from perception_env.physics.simulate import BallState, rollout
-from perception_env.physics.world import WorldCode, WorldSchema
+from empathy.physics.config import SimulationConfig
+from empathy.physics.simulate import BallState, rollout
+from empathy.physics.world import WorldCode, WorldSchema
 
 from .activation_adapter import ActivationBeliefAdapter, Model1ActivationPacket
 from .adapters import adapt_model1_activations

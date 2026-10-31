@@ -3,15 +3,15 @@ import inspect
 import numpy as np
 import torch
 
-from perception_env.model2.activation_adapter import (
+from empathy.model2.activation_adapter import (
     ActivationAdapterConfig,
     ActivationBeliefAdapter,
     Model1ActivationPacket,
 )
-from perception_env.model2.adapters import adapt_model1_activations
-from perception_env.model2.contracts import BeliefInputs
-from perception_env.model2.smc import BeliefWorldSMC, SMCConfig
-from perception_env.physics.world import WorldSchema
+from empathy.model2.adapters import adapt_model1_activations
+from empathy.model2.contracts import BeliefInputs
+from empathy.model2.smc import BeliefWorldSMC, SMCConfig
+from empathy.physics.world import WorldSchema
 
 
 def _inputs(post: np.ndarray | None = None, pre: np.ndarray | None = None) -> BeliefInputs:

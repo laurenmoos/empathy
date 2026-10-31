@@ -4,13 +4,13 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from perception_env.model1.config import load_model1_config
-from perception_env.model1.data import Model1ExampleRecord
-from perception_env.model1.evaluate import (
+from empathy.model1.config import load_model1_config
+from empathy.model1.data import Model1ExampleRecord
+from empathy.model1.evaluate import (
     evaluate_model1,
     load_prediction_record,
 )
-from perception_env.model1.train import train_model1
+from empathy.model1.train import train_model1
 
 
 def record(index: int, family: str) -> Model1ExampleRecord:

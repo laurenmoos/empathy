@@ -2,9 +2,9 @@ import numpy as np
 import pytest
 import torch
 
-from perception_env.model2.contracts import WorldPrediction
-from perception_env.model2.decode import decode_prediction
-from perception_env.physics.world import WorldSchema
+from empathy.model2.contracts import WorldPrediction
+from empathy.model2.decode import decode_prediction
+from empathy.physics.world import WorldSchema
 
 
 def test_decoder_neutral_ties_one_sided_and_inactive_zeros():

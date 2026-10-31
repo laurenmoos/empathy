@@ -5,12 +5,12 @@ import numpy as np
 import pytest
 import torch
 
-from perception_env.model2.config import TrainingConfig
-from perception_env.model2.contracts import BeliefInputs, WorldTargets
-from perception_env.model2.data import save_dataset
-from perception_env.model2.network import InverseWorldCNN
-from perception_env.model2.train import load_model, predict, train_model
-from perception_env.physics.world import WorldSchema
+from empathy.model2.config import TrainingConfig
+from empathy.model2.contracts import BeliefInputs, WorldTargets
+from empathy.model2.data import save_dataset
+from empathy.model2.network import InverseWorldCNN
+from empathy.model2.train import load_model, predict, train_model
+from empathy.physics.world import WorldSchema
 
 
 def learning_dataset(root):

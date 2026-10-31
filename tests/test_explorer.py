@@ -42,7 +42,13 @@ def test_explorer_uses_minimal_numeric_controls_and_plain_layer_names() -> None:
     assert "<title>Empathy</title>" in source
     assert "<header><h1>Empathy</h1></header>" in source
     assert "text-align: center" in source
-    assert "#secondOrderPanel { border-top: 0; }" in source
+    for decorative_rule in (
+        "border-bottom: 1px solid #565d56",
+        "border-bottom: 1px solid #737a73",
+        "border-top: 1px solid var(--line)",
+        "border-bottom: 1px solid var(--line)",
+    ):
+        assert decorative_rule not in source
     assert "reset" not in parser.ids
     assert "Reset stream" not in source
     assert "<h2>Seeing</h2>" in source

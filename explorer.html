@@ -12,7 +12,6 @@
       --muted: #777970;
       --forest: #3d433d;
       --forest-muted: #d0d1cb;
-      --line: #b4b3a9;
       --canvas: #dbd8d0;
       --belief: #8b9186;
     }
@@ -24,7 +23,7 @@
       background: var(--paper);
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-    header { padding: 1rem 1.35rem; color: #f2efe7; background: var(--forest); border-bottom: 1px solid #565d56; text-align: center; }
+    header { padding: 1rem 1.35rem; color: #f2efe7; background: var(--forest); text-align: center; }
     h1 { margin: 0; font: 500 1.18rem/1.1 Georgia, serif; letter-spacing: -.02em; }
     main { display: grid; grid-template-columns: 15rem minmax(0, 1fr); min-height: calc(100vh - 3.2rem); }
     aside { padding: 1.35rem; color: #f2efe7; background: var(--forest); }
@@ -35,10 +34,9 @@
       width: 100%;
       padding: .48rem .55rem;
       color: #f2efe7;
-      background: transparent;
+      background: rgb(242 239 231 / 6%);
       border: 0;
-      border-bottom: 1px solid #737a73;
-      border-radius: 0;
+      border-radius: 2px;
       font: 650 .72rem ui-monospace, monospace;
     }
     button {
@@ -67,15 +65,13 @@
     .panel {
       min-width: 0;
       padding-top: .75rem;
-      border-top: 1px solid var(--line);
       background: transparent;
     }
-    #secondOrderPanel { border-top: 0; }
     .panel-head { min-height: 2.5rem; margin-bottom: .65rem; }
     .panel-head span { display: block; margin-top: .25rem; color: var(--muted); font-size: .68rem; line-height: 1.35; }
     canvas { display: block; width: 100%; aspect-ratio: 1.2; background: var(--canvas); }
-    .comparison { margin-top: .35rem; }
-    .comparison-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 1rem; padding: .85rem 0; border-top: 1px solid var(--line); }
+    .comparison { display: grid; gap: .35rem; margin-top: .35rem; }
+    .comparison-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 1rem; padding: .55rem 0; }
     .constraint-label { display: block; }
     .constraint-name { font: 500 .72rem Georgia, serif; }
     .constraint-direction {
@@ -98,7 +94,6 @@
     }
     @media (max-width: 760px) {
       main { grid-template-columns: 1fr; }
-      aside { border-right: 0; border-bottom: 1px solid var(--line); }
       .layers { grid-template-columns: 1fr; }
     }
   </style>

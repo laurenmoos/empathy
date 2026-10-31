@@ -101,3 +101,33 @@ def test_live_inference_rejects_trajectory_that_exits_after_reappearance() -> No
 
     with pytest.raises(LiveInferenceError, match="out_of_bounds"):
         engine.infer(LiveParameters(gravity=-0.3, wind=0.1, damping=0.0))
+
+
+def test_engine_exposes_thinking_sessions_only_with_an_online_runtime() -> None:
+    config = load_model1_config(ROOT / "configs" / "model1" / "v1.yaml")
+
+    class Runtime:
+        weight_update_count = 0
+
+        def predict(self, inputs):
+            return WorldPrediction(torch.zeros((1, 5)), torch.zeros((1, 7)))
+
+        def train_step(self, inputs, target):
+            self.weight_update_count += 1
+            return {"loss": 1.0, "weight_update_count": self.weight_update_count}
+
+    runtime = Runtime()
+    engine = LiveInferenceEngine(
+        FakeModel1(),
+        config,
+        runtime.predict,
+        model2_runtime=runtime,
+    )
+
+    session = engine.thinking_session(LiveParameters())
+
+    assert session.parameters == LiveParameters()
+    with pytest.raises(RuntimeError, match="online Model 2"):
+        LiveInferenceEngine(FakeModel1(), config, runtime.predict).thinking_session(
+            LiveParameters()
+        )

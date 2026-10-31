@@ -21,7 +21,6 @@ from .model2.adapters import Model1BeliefPacket, adapt_model1_events
 from .model2.contracts import BeliefInputs, WorldPrediction
 from .model2.decode import decode_prediction
 from .model2.train import load_model as load_model2
-from .model2.train import predict as predict_model2
 from .render import Occluder, render_sequence
 from .simulate import BallState, rollout
 from .world import WorldCode, WorldSchema
@@ -29,6 +28,9 @@ from .world import WorldCode, WorldSchema
 
 class LiveInferenceError(ValueError):
     """A requested world cannot produce a valid learned inference event."""
+
+
+DEFAULT_LIVE_INITIAL_STATE = BallState(0.1, 0.5, 0.18, 0.0)
 
 
 @dataclass(frozen=True)
@@ -133,11 +135,14 @@ class LiveInferenceEngine:
         model1,
         model1_config: Model1Config,
         model2_predict: Callable[[BeliefInputs], WorldPrediction],
+        *,
+        model2_runtime=None,
     ) -> None:
         self.model1 = model1
         self.model1_config = model1_config
         self.model2_predict = model2_predict
-        self._lock = threading.Lock()
+        self.model2_runtime = model2_runtime
+        self._lock = threading.RLock()
 
     @classmethod
     def from_checkpoints(cls, model1_checkpoint: Path, model2_checkpoint: Path):
@@ -145,12 +150,38 @@ class LiveInferenceEngine:
         config: Model1Config = payload["config"]
         model1, _ = load_checkpoint(model1_checkpoint, expected_config=config, device="cpu")
         model2 = load_model2(model2_checkpoint, device="cpu")
-        return cls(model1, config, lambda inputs: predict_model2(model2, inputs))
+        from .live_thinking import OnlineModel2Runtime
 
-    def _record(self, parameters: LiveParameters) -> tuple[Model1ExampleRecord, np.ndarray]:
+        runtime = OnlineModel2Runtime(model2)
+        return cls(
+            model1,
+            config,
+            runtime.predict,
+            model2_runtime=runtime,
+        )
+
+    def thinking_session(self, parameters: LiveParameters):
+        """Create one fixed-world stream backed by the loaded online Model 2 runtime."""
+        if self.model2_runtime is None:
+            raise RuntimeError("thinking sessions require an online Model 2 runtime")
+        from .live_thinking import LiveThinkingSession
+
+        return LiveThinkingSession(
+            self.model1,
+            self.model1_config,
+            self.model2_runtime,
+            parameters,
+            model_lock=self._lock,
+        )
+
+    def _record(
+        self,
+        parameters: LiveParameters,
+        initial_state: BallState = DEFAULT_LIVE_INITIAL_STATE,
+    ) -> tuple[Model1ExampleRecord, np.ndarray]:
         world = world_from_parameters(parameters)
         simulation = SimulationConfig(dt=0.1, steps=40, seed=0)
-        trajectory = rollout(BallState(0.1, 0.5, 0.18, 0.0), world, simulation)
+        trajectory = rollout(initial_state, world, simulation)
         if not trajectory.valid:
             raise LiveInferenceError(
                 f"world trajectory is invalid: {trajectory.termination_reason.value}"

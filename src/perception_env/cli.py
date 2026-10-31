@@ -532,11 +532,7 @@ def _parser() -> argparse.ArgumentParser:
     live.add_argument("--root", default=".")
     live.add_argument(
         "--model1-checkpoint",
-        default="artifacts/model1-learned-demo/training/best.pt",
-    )
-    live.add_argument(
-        "--model2-checkpoint",
-        default="artifacts/model2-learned-demo/training/best.pt",
+        default="checkpoints/model1.pt",
     )
     return parser
 
@@ -583,7 +579,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                 port=args.port,
                 root=Path(args.root),
                 model1_checkpoint=Path(args.model1_checkpoint),
-                model2_checkpoint=Path(args.model2_checkpoint),
             )
     except (OSError, ValueError, KeyError) as error:
         print(f"perception-env: {error}", file=sys.stderr)

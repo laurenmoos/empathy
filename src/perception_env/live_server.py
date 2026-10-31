@@ -235,10 +235,9 @@ def run_live_server(
     port: int,
     root: Path,
     model1_checkpoint: Path,
-    model2_checkpoint: Path,
 ) -> None:
-    """Load each model once, then serve inference requests until interrupted."""
-    engine = LiveInferenceEngine.from_checkpoints(model1_checkpoint, model2_checkpoint)
+    """Load the learned rollout model once, then serve until interrupted."""
+    engine = LiveInferenceEngine.from_checkpoint(model1_checkpoint)
     server = create_server(host, port, root, engine)
     print(f"Perception environment: http://{host}:{server.server_port}/")
     try:

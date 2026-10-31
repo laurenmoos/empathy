@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from perception_env.cli import inspect_run
+from perception_env.cli import _parser, inspect_run, main
 
 ROOT = Path(__file__).parents[1]
 PYTHON = ROOT / ".venv" / "bin" / "python"
@@ -43,6 +43,52 @@ def test_help_lists_all_research_commands() -> None:
 def test_root_cli_delegates_model_help() -> None:
     assert run_cli("model1", "--help").returncode == 0
     assert run_cli("model2", "--help").returncode == 0
+
+
+def test_live_demo_uses_one_tracked_checkpoint_by_default() -> None:
+    args = _parser().parse_args(["live-demo"])
+
+    assert args.model1_checkpoint == "checkpoints/model1.pt"
+    assert (ROOT / args.model1_checkpoint).is_file()
+    assert not hasattr(args, "model2_checkpoint")
+
+
+def test_live_demo_delegates_only_the_model1_checkpoint(monkeypatch, tmp_path) -> None:
+    from perception_env import live_server
+
+    captured = {}
+
+    def fake_run_live_server(*, host, port, root, model1_checkpoint) -> None:
+        captured.update(
+            host=host,
+            port=port,
+            root=root,
+            model1_checkpoint=model1_checkpoint,
+        )
+
+    monkeypatch.setattr(live_server, "run_live_server", fake_run_live_server)
+
+    result = main(
+        [
+            "live-demo",
+            "--host",
+            "127.0.0.2",
+            "--port",
+            "9001",
+            "--root",
+            str(tmp_path),
+            "--model1-checkpoint",
+            "custom.pt",
+        ]
+    )
+
+    assert result == 0
+    assert captured == {
+        "host": "127.0.0.2",
+        "port": 9001,
+        "root": tmp_path,
+        "model1_checkpoint": Path("custom.pt"),
+    }
 
 
 def test_missing_configuration_returns_clear_error(tmp_path) -> None:

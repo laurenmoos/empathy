@@ -144,11 +144,10 @@ class LiveInferenceEngine:
         self._lock = threading.RLock()
 
     @classmethod
-    def from_checkpoints(cls, model1_checkpoint: Path, model2_checkpoint: Path):
+    def from_checkpoint(cls, model1_checkpoint: Path):
         payload = torch.load(Path(model1_checkpoint), map_location="cpu", weights_only=False)
         config: Model1Config = payload["config"]
         model1, _ = load_checkpoint(model1_checkpoint, expected_config=config, device="cpu")
-        del model2_checkpoint
         from .live_thinking import SMCModel2Runtime
 
         runtime = SMCModel2Runtime()

@@ -14,6 +14,7 @@ from perception_env.live_server import (
     process_session_close,
     process_session_next,
     process_session_start,
+    run_live_server,
 )
 
 
@@ -31,6 +32,42 @@ class FakeEngine:
         if parameters.wind == -1.0:
             raise LiveInferenceError("world has no valid reappearance")
         return FakeResult()
+
+
+def test_server_bootstrap_loads_only_the_model1_checkpoint(monkeypatch, tmp_path) -> None:
+    loaded = []
+
+    class FakeServer:
+        server_port = 0
+
+        def serve_forever(self) -> None:
+            raise KeyboardInterrupt
+
+        def server_close(self) -> None:
+            return None
+
+    def from_checkpoint(path):
+        loaded.append(path)
+        return FakeEngine()
+
+    monkeypatch.setattr(
+        "perception_env.live_server.LiveInferenceEngine.from_checkpoint",
+        from_checkpoint,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "perception_env.live_server.create_server",
+        lambda host, port, root, engine: FakeServer(),
+    )
+
+    run_live_server(
+        host="127.0.0.1",
+        port=0,
+        root=tmp_path,
+        model1_checkpoint=Path("model1.pt"),
+    )
+
+    assert loaded == [Path("model1.pt")]
 
 
 def test_inference_request_runs_injected_engine_without_a_socket() -> None:

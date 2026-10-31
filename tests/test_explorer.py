@@ -4,6 +4,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
 EXPLORER = ROOT / "explorer.html"
+EXPLORER_STATE = ROOT / "explorer_state.js"
 
 
 class ExplorerParser(HTMLParser):
@@ -11,6 +12,7 @@ class ExplorerParser(HTMLParser):
         super().__init__()
         self.ids: set[str] = set()
         self.canvases: set[str] = set()
+        self.input_types: list[str] = []
         self.external_urls: list[str] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
@@ -20,6 +22,8 @@ class ExplorerParser(HTMLParser):
             self.ids.add(element_id)
             if tag == "canvas":
                 self.canvases.add(element_id)
+        if tag == "input" and values.get("type"):
+            self.input_types.append(values["type"])
         for name in ("src", "href"):
             value = values.get(name)
             if value and value.startswith(("http://", "https://")):
@@ -31,6 +35,29 @@ def parsed_explorer() -> tuple[str, ExplorerParser]:
     parser = ExplorerParser()
     parser.feed(source)
     return source, parser
+
+
+def test_explorer_uses_minimal_numeric_controls_and_plain_layer_names() -> None:
+    source, parser = parsed_explorer()
+
+    assert parser.input_types == ["number", "number", "number"]
+    assert "<h2>Ground truth</h2>" in source
+    assert "<h2>Belief space</h2>" in source
+    assert "<h2>Second-order perception</h2>" in source
+    for unwanted in (
+        "Choose one world",
+        "down ↔ up",
+        "left ↔ right",
+        "Set the world",
+        "adaptation within one fixed world",
+        "Model 1",
+        "Model 2",
+        "Waiting for a belief",
+    ):
+        assert unwanted not in source
+    state_source = EXPLORER_STATE.read_text()
+    assert "Model 1" not in state_source
+    assert "Model 2" not in state_source
 
 
 def test_explorer_has_three_visually_disjoint_perceptual_layers() -> None:
@@ -46,10 +73,9 @@ def test_explorer_has_three_visually_disjoint_perceptual_layers() -> None:
     } <= parser.ids
     assert parser.canvases == {"worldCanvas", "beliefCanvas"}
     assert not parser.external_urls
-    assert "Ground-truth world" in source
-    assert "Model 1 · Belief space" in source
-    assert "Model 2 · Second-order perception" in source
-    assert "Model 2 never sees the world panel" in source
+    assert "Ground truth" in source
+    assert "Belief space" in source
+    assert "Second-order perception" in source
     assert "drawBeliefOverlay" not in source
     assert 'globalCompositeOperation = "screen"' not in source
 
@@ -73,7 +99,7 @@ def test_stream_controls_start_sessions_and_queue_offset_episodes() -> None:
     assert "episodeQueue" in source
     assert "requestNextEpisode();" in source
     assert "Play thinking stream" in source
-    assert "adaptation within one fixed world" in source
+    assert "Initial offset" in source
 
 
 def test_thought_steps_and_online_updates_have_visible_state() -> None:
@@ -131,7 +157,7 @@ def test_frame_narration_preserves_stream_failures() -> None:
 const {frameNarration} = require('./explorer_state.js');
 const failure = 'Stream stopped: Network unavailable';
 if (frameNarration(false, false, failure) !== failure) process.exit(1);
-if (frameNarration(true, false, null) !== 'Model 1 is expanding possible hidden paths.') {
+if (frameNarration(true, false, null) !== 'Possible hidden paths are expanding.') {
   process.exit(2);
 }
 """

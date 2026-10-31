@@ -28,11 +28,16 @@
     main { display: grid; grid-template-columns: 16rem minmax(0, 1fr); min-height: calc(100vh - 3.2rem); }
     aside { padding: 1rem; border-right: 1px solid var(--line); background: rgba(4, 11, 13, .35); }
     h2 { margin: 0; font-size: .92rem; }
-    .intro { margin: .4rem 0 .9rem; color: var(--muted); font-size: .74rem; line-height: 1.45; }
-    .control { display: grid; gap: .3rem; margin-top: .75rem; color: var(--muted); font-size: .72rem; }
-    .control-line { display: flex; justify-content: space-between; gap: .8rem; }
-    output { color: var(--aqua); font: 650 .72rem ui-monospace, monospace; }
-    input[type="range"] { width: 100%; accent-color: var(--aqua); }
+    .control { display: grid; grid-template-columns: 1fr 5.5rem; align-items: center; gap: .8rem; margin-top: .75rem; color: var(--muted); font-size: .72rem; }
+    input[type="number"] {
+      width: 100%;
+      padding: .48rem .55rem;
+      color: var(--aqua);
+      background: #101b1f;
+      border: 1px solid rgba(174, 217, 216, .22);
+      border-radius: 8px;
+      font: 650 .72rem ui-monospace, monospace;
+    }
     button {
       width: 100%;
       padding: .62rem .7rem;
@@ -98,26 +103,24 @@
   <main>
     <aside>
       <h2>Fixed world</h2>
-      <p class="intro">Choose one world, then watch repeated episodes begin from new offsets.</p>
       <label class="control">
-        <span class="control-line"><span>Gravity · down ↔ up</span><output id="gravityValue">−0.06</output></span>
-        <input id="gravity" type="range" min="-0.30" max="0.30" step="0.02" value="-0.06">
+        <span>Gravity</span>
+        <input id="gravity" type="number" min="-0.30" max="0.30" step="0.02" value="-0.06">
       </label>
       <label class="control">
-        <span class="control-line"><span>Wind · left ↔ right</span><output id="windValue">0.00</output></span>
-        <input id="wind" type="range" min="-0.30" max="0.30" step="0.05" value="0.00">
+        <span>Wind</span>
+        <input id="wind" type="number" min="-0.30" max="0.30" step="0.05" value="0.00">
       </label>
       <label class="control">
-        <span class="control-line"><span>Damping</span><output id="dampingValue">0.00</output></span>
-        <input id="damping" type="range" min="0" max="0.60" step="0.05" value="0.00">
+        <span>Damping</span>
+        <input id="damping" type="number" min="0" max="0.60" step="0.05" value="0.00">
       </label>
       <div class="buttons">
         <button class="primary" id="streamToggle">Play thinking stream</button>
         <button id="reset">Reset stream</button>
       </div>
-      <p class="status" id="statusMessage">Set the world, then start the stream.</p>
+      <p class="status" id="statusMessage">Ready.</p>
       <section class="session-note">
-        <strong>adaptation within one fixed world</strong>
         <div class="session-grid">
           <div><small>Episode</small><b id="episodeReadout">—</b></div>
           <div><small>Initial offset · y / vx / vy</small><b id="offsetReadout">—</b></div>
@@ -128,16 +131,16 @@
     <section class="layers">
       <article class="panel" id="worldPanel">
         <div class="panel-head">
-          <h2>Ground-truth world</h2>
+          <h2>Ground truth</h2>
           <span id="worldPhase">Waiting for an episode</span>
         </div>
         <canvas id="worldCanvas" width="640" height="640"></canvas>
-        <p class="legend"><i class="dot" style="background:white"></i>The actual rollout. We can peek; Model 2 cannot.</p>
+        <p class="legend"><i class="dot" style="background:white"></i>Actual rollout.</p>
       </article>
 
       <article class="panel" id="beliefPanel">
         <div class="panel-head">
-          <h2>Model 1 · Belief space</h2>
+          <h2>Belief space</h2>
           <span id="thoughtReadout">No belief yet</span>
         </div>
         <canvas id="beliefCanvas" width="640" height="640"></canvas>
@@ -146,10 +149,9 @@
 
       <article class="panel" id="secondOrderPanel">
         <div class="panel-head">
-          <h2>Model 2 · Second-order perception</h2>
-          <span>Model 2 never sees the world panel. It reads only Model 1’s belief revisions.</span>
+          <h2>Second-order perception</h2>
         </div>
-        <div class="readout" id="operatorReadout">Waiting for a belief</div>
+        <div class="readout" id="operatorReadout">—</div>
         <div class="comparison">
           <div class="comparison-row heading"><span>Operator</span><span>Ground-truth parameters</span><span>Pre-update guess</span></div>
           <div id="comparisonRows"></div>
@@ -395,7 +397,7 @@
     }
 
     function clearSecondOrder() {
-      $("operatorReadout").textContent = "Waiting for a belief";
+      $("operatorReadout").textContent = "—";
       $("comparisonRows").replaceChildren();
       $("latentUpdates").textContent = "0";
       $("weightUpdates").textContent = "0";
@@ -579,16 +581,10 @@
       stopAndClear("Stream reset. Start again when ready.");
     });
 
-    function showControlValue(id) {
-      const value = Number($(id).value);
-      $(`${id}Value`).textContent = value.toFixed(2).replace("-", "−");
-    }
     ["gravity", "wind", "damping"].forEach(id => {
       $(id).addEventListener("input", () => {
-        showControlValue(id);
         stopAndClear("Parameters changed. Start a new thinking stream.");
       });
-      showControlValue(id);
     });
 
     clearAllLayers();

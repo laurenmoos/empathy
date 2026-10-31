@@ -72,25 +72,22 @@
     .panel-head { min-height: 2.5rem; margin-bottom: .65rem; }
     .panel-head span { display: block; margin-top: .25rem; color: var(--muted); font-size: .68rem; line-height: 1.35; }
     canvas { display: block; width: 100%; aspect-ratio: 1.2; background: var(--canvas); }
-    .readout { min-height: 2.4em; font: 500 .76rem ui-monospace, monospace; color: var(--forest); }
-    .coherence { margin: .8rem 0 1.1rem; padding: .75rem 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-    .coherence-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
-    .coherence-label { color: var(--muted); font: 500 .68rem/1.2 Georgia, serif; }
-    .coherence-score { color: var(--forest); font: 600 1rem/1 ui-monospace, monospace; }
-    .coherence-track { height: 3px; margin-top: .55rem; overflow: hidden; background: #d2d0c7; }
-    .coherence-fill { display: block; width: 0; height: 100%; background: #697267; transition: width .35s ease; }
-    .coherence-detail { min-height: 1.2em; margin-top: .45rem; color: var(--muted); font-size: .62rem; }
-    .comparison { margin-top: .7rem; }
-    .comparison-row { display: grid; grid-template-columns: 1fr .85fr .85fr; gap: .25rem; padding: .55rem 0; border-top: 1px solid var(--line); font-size: .66rem; }
-    .comparison-row.heading { color: var(--muted); border-top: 0; }
-    .comparison-row span:not(:first-child) { font-family: ui-monospace, monospace; }
-    .constraint-cell { display: grid; gap: .35rem; padding-right: .6rem; }
-    .constraint-name { display: flex; align-items: center; gap: .4rem; }
-    .constraint-dot { width: .38rem; height: .38rem; border: 1px solid #8f938a; border-radius: 50%; }
-    .constraint-closeness { height: 2px; overflow: hidden; background: #d2d0c7; }
-    .constraint-closeness-fill { display: block; width: 0; height: 100%; transition: width .35s ease, background-color .35s ease; }
-    .comparison-row.recovered .constraint-dot { border-color: #697267; background: #697267; }
-    .comparison-row.missed .constraint-dot { border-color: #9b8778; background: transparent; }
+    .comparison { margin-top: .35rem; }
+    .constraint-legend { display: flex; justify-content: flex-end; gap: .8rem; margin-bottom: .4rem; color: var(--muted); font-size: .57rem; }
+    .comparison-row { display: grid; grid-template-columns: 4.5rem minmax(7rem, 1fr) 5.2rem; align-items: center; gap: .65rem; padding: .8rem 0; border-top: 1px solid var(--line); font-size: .66rem; }
+    .constraint-label { display: grid; gap: .2rem; }
+    .constraint-name { font: 500 .72rem Georgia, serif; }
+    .constraint-direction { color: var(--muted); font-size: .55rem; }
+    .movement-toward .constraint-direction { color: #667864; }
+    .movement-away .constraint-direction { color: #967568; }
+    .constraint-axis { position: relative; height: 1rem; }
+    .constraint-axis::before { content: ""; position: absolute; left: 0; right: 0; top: calc(50% - .5px); height: 1px; background: #b9b8ae; }
+    .constraint-target { position: absolute; top: .08rem; width: 1px; height: .84rem; background: #3d433d; transform: translateX(-.5px); }
+    .constraint-previous { position: absolute; top: .36rem; width: .3rem; height: .3rem; border: 1px solid #aaa99f; border-radius: 50%; transform: translateX(-50%); }
+    .constraint-guess { position: absolute; top: .28rem; width: .46rem; height: .46rem; border-radius: 50%; background: #858a81; transform: translateX(-50%); transition: left .35s ease, background-color .35s ease; }
+    .movement-toward .constraint-guess { background: #6d806a; }
+    .movement-away .constraint-guess { background: #9a7567; }
+    .constraint-values { color: var(--muted); text-align: right; font: 500 .59rem ui-monospace, monospace; white-space: nowrap; }
     @media (max-width: 1080px) {
       .layers { grid-template-columns: 1fr; }
     }
@@ -138,17 +135,8 @@
         <div class="panel-head">
           <h2>Second-order perception</h2>
         </div>
-        <div class="readout" id="operatorReadout">—</div>
-        <div class="coherence" aria-live="polite">
-          <div class="coherence-head">
-            <span class="coherence-label">Coherence</span>
-            <strong class="coherence-score" id="coherenceScore"></strong>
-          </div>
-          <div class="coherence-track"><span class="coherence-fill" id="coherenceFill"></span></div>
-          <div class="coherence-detail" id="coherenceDetail"></div>
-        </div>
         <div class="comparison">
-          <div class="comparison-row heading"><span>Constraint</span><span>Ground-truth parameters</span><span>Belief-only guess</span></div>
+          <div class="constraint-legend"><span>hidden |</span><span>search ●</span></div>
           <div id="comparisonRows"></div>
         </div>
       </article>
@@ -169,9 +157,9 @@
     ];
     const DEFAULT_OCCLUDER = [0.35, 0.55, 0.05, 0.95];
     const worldSlots = [
-      {name: "gravity", operator: "vertical_acceleration", parameter: "a_y", parameterIndex: 0, minimum: -1, maximum: 1},
-      {name: "wind", operator: "horizontal_acceleration", parameter: "a_x", parameterIndex: 1, minimum: -1, maximum: 1},
-      {name: "damping", operator: "damping", parameter: "lambda", parameterIndex: 2, minimum: 0, maximum: 1}
+      {name: "gravity", operator: "vertical_acceleration", parameter: "a_y", parameterIndex: 0, minimum: -1, maximum: 1, displayMinimum: -.30, displayMaximum: .30},
+      {name: "wind", operator: "horizontal_acceleration", parameter: "a_x", parameterIndex: 1, minimum: -1, maximum: 1, displayMinimum: -.30, displayMaximum: .30},
+      {name: "damping", operator: "damping", parameter: "lambda", parameterIndex: 2, minimum: 0, maximum: 1, displayMinimum: 0, displayMaximum: .60}
     ];
 
     let sessionId = null;
@@ -427,10 +415,6 @@
     }
 
     function clearSecondOrder() {
-      $("operatorReadout").textContent = "";
-      $("coherenceScore").textContent = "";
-      $("coherenceFill").style.width = "0%";
-      $("coherenceDetail").textContent = "";
       $("comparisonRows").replaceChildren();
     }
 
@@ -563,77 +547,83 @@
       return Math.min(2, Math.floor(progress * 3));
     }
 
-    function worldSlotValue(operators, slot) {
+    function worldSlotNumber(operators, slot) {
       const operator = operators[slot.operator];
-      if (!operator || !operator.active) return "0.00";
-      return Number(operator.parameters[slot.parameter]).toFixed(2);
+      if (!operator || !operator.active) return 0;
+      return Number(operator.parameters[slot.parameter]);
     }
 
-    function predictedParameterValue(parameters, slot) {
+    function predictedParameterNumber(parameters, slot) {
       const normalized = Math.max(0, Math.min(1, Number(parameters[slot.parameterIndex])));
-      return (slot.minimum + normalized * (slot.maximum - slot.minimum)).toFixed(2);
+      return slot.minimum + normalized * (slot.maximum - slot.minimum);
     }
 
-    function closenessColor(value) {
-      const closeness = Math.max(0, Math.min(1, value));
-      const hue = 34 + closeness * 58;
-      return `hsl(${hue.toFixed(0)} 18% 48%)`;
+    function axisPosition(value, slot) {
+      const clipped = Math.max(slot.displayMinimum, Math.min(slot.displayMaximum, value));
+      return (clipped - slot.displayMinimum)
+        / (slot.displayMaximum - slot.displayMinimum) * 100;
     }
 
-    function comparisonElements(actual, predictedParameters, recovery) {
+    function movementDirection(actual, current, previous) {
+      if (previous === null) return "new";
+      const before = Math.abs(previous - actual);
+      const after = Math.abs(current - actual);
+      if (after < before - 1e-6) return "toward";
+      if (after > before + 1e-6) return "away";
+      return "steady";
+    }
+
+    function comparisonElements(actual, predictedParameters, previousParameters) {
       return worldSlots.map(slot => {
+        const actualValue = worldSlotNumber(actual, slot);
+        const predictedValue = predictedParameterNumber(predictedParameters, slot);
+        const previousValue = previousParameters === null
+          ? null : predictedParameterNumber(previousParameters, slot);
+        const movement = movementDirection(actualValue, predictedValue, previousValue);
         const row = document.createElement("div");
         row.className = "comparison-row";
-        const status = recovery.constraints.find(item => item.name === slot.name);
-        row.classList.add(status.recovered ? "recovered" : "missed");
-        const cell = document.createElement("span");
-        cell.className = "constraint-cell";
+        row.classList.add(`movement-${movement}`);
+        const label = document.createElement("span");
+        label.className = "constraint-label";
         const name = document.createElement("span");
         name.className = "constraint-name";
-        const dot = document.createElement("i");
-        dot.className = "constraint-dot";
-        dot.setAttribute("aria-label", status.recovered ? "recovered" : "missed");
-        name.append(dot, document.createTextNode(slot.name));
-        const axisTrack = document.createElement("span");
-        axisTrack.className = "constraint-closeness";
-        const axisFill = document.createElement("i");
-        axisFill.className = "constraint-closeness-fill";
-        axisFill.style.width = `${(status.closeness * 100).toFixed(1)}%`;
-        axisFill.style.backgroundColor = closenessColor(status.closeness);
-        axisTrack.append(axisFill);
-        cell.append(name, axisTrack);
-        row.append(cell);
-        [worldSlotValue(actual, slot), predictedParameterValue(predictedParameters, slot)].forEach(value => {
-          const cell = document.createElement("span");
-          cell.textContent = value;
-          row.append(cell);
-        });
+        name.textContent = slot.name;
+        const direction = document.createElement("span");
+        direction.className = "constraint-direction";
+        direction.textContent = movement === "toward" ? "toward"
+          : movement === "away" ? "away" : movement === "steady" ? "steady" : "first guess";
+        label.append(name, direction);
+        const axis = document.createElement("span");
+        axis.className = "constraint-axis";
+        const target = document.createElement("i");
+        target.className = "constraint-target";
+        target.style.left = `${axisPosition(actualValue, slot).toFixed(1)}%`;
+        if (previousValue !== null) {
+          const previous = document.createElement("i");
+          previous.className = "constraint-previous";
+          previous.style.left = `${axisPosition(previousValue, slot).toFixed(1)}%`;
+          axis.append(previous);
+        }
+        const guess = document.createElement("i");
+        guess.className = "constraint-guess";
+        guess.style.left = `${axisPosition(predictedValue, slot).toFixed(1)}%`;
+        axis.append(target, guess);
+        const values = document.createElement("span");
+        values.className = "constraint-values";
+        values.textContent = `${actualValue.toFixed(2)} → ${predictedValue.toFixed(2)}`;
+        row.append(label, axis, values);
         return row;
       });
     }
 
-    function worldSummary(parameters) {
-      return worldSlots
-        .map(slot => `${slot.name} ${predictedParameterValue(parameters, slot)}`)
-        .join(" · ");
-    }
-
-    function updateCoherence(recovery) {
-      $("coherenceScore").textContent = `${Math.round(recovery.score * 100)}%`;
-      $("coherenceFill").style.width = `${(recovery.score * 100).toFixed(1)}%`;
-      $("coherenceFill").style.backgroundColor = closenessColor(recovery.score);
-      $("coherenceDetail").textContent =
-        `${Math.round(recovery.score * 100)}% mean closeness to hidden parameters`;
-    }
-
     function updateSecondOrder(step) {
-      $("operatorReadout").textContent = worldSummary(step.predicted_parameters);
-      updateCoherence(step.constraint_recovery);
+      const previousParameters = step.index > 0
+        ? currentEpisode.thought_steps[step.index - 1].predicted_parameters : null;
       $("comparisonRows").replaceChildren(
         ...comparisonElements(
           currentEpisode.ground_truth.operators,
           step.predicted_parameters,
-          step.constraint_recovery
+          previousParameters
         )
       );
     }

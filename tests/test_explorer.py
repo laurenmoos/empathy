@@ -133,7 +133,7 @@ def test_stream_controls_start_sessions_and_queue_offset_episodes() -> None:
 def test_world_guess_shows_all_three_numeric_parameters() -> None:
     source, parser = parsed_explorer()
 
-    assert "operatorReadout" in parser.ids
+    assert "operatorReadout" not in parser.ids
     assert {
         "latentUpdates",
         "weightUpdates",
@@ -147,32 +147,27 @@ def test_world_guess_shows_all_three_numeric_parameters() -> None:
         "reappearance revision",
     ):
         assert label in source
-    assert "Ground-truth parameters" in source
-    assert "Belief-only guess" in source
+    assert "hidden |" in source
+    assert "search ●" in source
     assert "function updateSecondOrder" in source
-    assert "function predictedParameterValue" in source
+    assert "function predictedParameterNumber" in source
     assert "step.predicted_parameters" in source
     assert 'return "inactive"' not in source
 
 
-def test_second_order_panel_visualizes_constraint_coherence_without_new_canvas() -> None:
+def test_second_order_panel_shows_constraint_direction_without_summary_block() -> None:
     source, parser = parsed_explorer()
 
-    assert {
-        "coherenceScore",
-        "coherenceFill",
-        "coherenceDetail",
-    } <= parser.ids
+    assert {"coherenceScore", "coherenceFill", "coherenceDetail"}.isdisjoint(parser.ids)
     assert parser.canvases == {"perceptionCanvas"}
-    assert "Coherence" in source
-    assert "mean closeness to hidden parameters" in source
-    assert "step.constraint_recovery" in source
-    assert 'row.classList.add(status.recovered ? "recovered" : "missed")' in source
-    assert "function updateCoherence" in source
-    assert "function closenessColor" in source
-    assert "constraint-closeness-fill" in source
-    assert 'axisFill.style.width = `${(status.closeness * 100).toFixed(1)}%`' in source
-    assert '$("coherenceFill").style.width = `${(recovery.score * 100).toFixed(1)}%`' in source
+    assert "function movementDirection" in source
+    assert "constraint-axis" in source
+    assert "constraint-target" in source
+    assert "constraint-guess" in source
+    assert "constraint-previous" in source
+    assert 'direction.textContent = movement === "toward" ? "toward"' in source
+    assert 'row.classList.add(`movement-${movement}`)' in source
+    assert "mean closeness to hidden parameters" not in source
 
 
 def test_parameter_edits_invalidate_the_stream_and_clear_all_layers() -> None:

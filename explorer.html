@@ -448,24 +448,61 @@
       perceptionCtx.restore();
     }
 
-    function drawInitialCondition([x, y, vx, vy]) {
-      const px = x * perceptionCanvas.width;
-      const py = (1 - y) * perceptionCanvas.height;
-      const tipX = px + vx * perceptionCanvas.width * .38;
-      const tipY = py - vy * perceptionCanvas.height * .38;
+    function clipToOccluder([xMin, xMax, yMin, yMax], draw) {
       perceptionCtx.save();
-      perceptionCtx.strokeStyle = "#4f554f";
-      perceptionCtx.fillStyle = "#dbd8d0";
-      perceptionCtx.globalAlpha = .75;
-      perceptionCtx.lineWidth = 1.2;
       perceptionCtx.beginPath();
-      perceptionCtx.moveTo(px, py);
-      perceptionCtx.lineTo(tipX, tipY);
-      perceptionCtx.stroke();
+      perceptionCtx.rect(
+        xMin * perceptionCanvas.width,
+        (1 - yMax) * perceptionCanvas.height,
+        (xMax - xMin) * perceptionCanvas.width,
+        (yMax - yMin) * perceptionCanvas.height
+      );
+      perceptionCtx.clip();
+      try {
+        draw();
+      } finally {
+        perceptionCtx.restore();
+      }
+    }
+
+    function boundaryPoint(path, boundaryX) {
+      for (let index = 1; index < path.length; index += 1) {
+        const [previousX, previousY] = path[index - 1];
+        const [currentX, currentY] = path[index];
+        if ((previousX <= boundaryX && currentX >= boundaryX)
+            || (previousX >= boundaryX && currentX <= boundaryX)) {
+          const span = currentX - previousX;
+          const amount = Math.abs(span) < 1e-9 ? 0 : (boundaryX - previousX) / span;
+          return [boundaryX, previousY + amount * (currentY - previousY)];
+        }
+      }
+      return null;
+    }
+
+    function drawPoint(point) {
+      if (!point) return;
+      const [x, y] = point;
       perceptionCtx.beginPath();
-      perceptionCtx.arc(px, py, 3, 0, Math.PI * 2);
+      perceptionCtx.arc(
+        x * perceptionCanvas.width,
+        (1 - y) * perceptionCanvas.height,
+        3,
+        0,
+        Math.PI * 2
+      );
       perceptionCtx.fill();
       perceptionCtx.stroke();
+    }
+
+    function drawEntryExitPoints(truth) {
+      const entry = boundaryPoint(truth.path, truth.occluder[0]);
+      const exit = boundaryPoint(truth.path, truth.occluder[1]);
+      perceptionCtx.save();
+      perceptionCtx.fillStyle = "#dbd8d0";
+      perceptionCtx.strokeStyle = "#4f554f";
+      perceptionCtx.lineWidth = 1.2;
+      if (currentFrame >= truth.hidden_start) drawPoint(entry);
+      if (currentFrame >= truth.reappearance_step) drawPoint(exit);
       perceptionCtx.restore();
     }
 
@@ -496,14 +533,16 @@
       return Math.max(0, Math.min(1, 1 - entropy / Math.log(weights.length)));
     }
 
-    function drawBeliefSuperposition(step) {
+    function drawBeliefSuperposition(step, occluder) {
       const confidence = beliefConfidence(step.path_weights);
-      step.paths.forEach((path, index) => {
-        const weight = step.path_weights[index];
-        const broadWidth = 5 + (1 - confidence) * 11 + (1 - weight) * 3;
-        const broadAlpha = .07 + confidence * .12 + weight * .12;
-        strokePath(path, broadWidth, broadAlpha);
-        strokePath(path, 1.2 + weight * 2.2, .12 + confidence * .28 + weight * .38);
+      clipToOccluder(occluder, () => {
+        step.paths.forEach((path, index) => {
+          const weight = step.path_weights[index];
+          const broadWidth = 5 + (1 - confidence) * 11 + (1 - weight) * 3;
+          const broadAlpha = .07 + confidence * .12 + weight * .12;
+          strokePath(path, broadWidth, broadAlpha);
+          strokePath(path, 1.2 + weight * 2.2, .12 + confidence * .28 + weight * .38);
+        });
       });
     }
 
@@ -516,14 +555,16 @@
       const index = thoughtIndex();
       if (index >= 0) {
         const step = currentEpisode.thought_steps[index];
-        drawBeliefSuperposition(step);
+        drawBeliefSuperposition(step, truth.occluder);
         if (index !== currentThought) {
           currentThought = index;
           updateSecondOrder(step);
         }
       }
-      drawGroundTruthPath(truth.path);
-      drawInitialCondition(currentEpisode.initial_state);
+      if (currentFrame >= truth.reappearance_step) {
+        clipToOccluder(truth.occluder, () => drawGroundTruthPath(truth.path));
+      }
+      drawEntryExitPoints(truth);
     }
 
     function thoughtIndex() {

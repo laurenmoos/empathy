@@ -343,11 +343,11 @@ class LiveThinkingSession:
                     .numpy()
                     .astype(np.float32)
                 )
-                observed_prefix = full_path[: record.hidden_start + 1]
-                prefixes = np.broadcast_to(
-                    observed_prefix, (len(visual_paths), *observed_prefix.shape)
+                entry_position = full_path[record.hidden_start]
+                entries = np.broadcast_to(
+                    entry_position, (len(visual_paths), 1, 2)
                 ).copy()
-                visual_paths = np.concatenate((prefixes, visual_paths), axis=1)
+                visual_paths = np.concatenate((entries, visual_paths), axis=1)
                 steps.append(
                     LiveThoughtStep(
                         index,

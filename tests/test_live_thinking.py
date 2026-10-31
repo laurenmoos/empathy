@@ -52,6 +52,11 @@ class RecordingWorldRuntime:
         self.weight_update_count += 1
         return {"loss": 0.25, "weight_update_count": self.weight_update_count}
 
+    def complete_event(self, inputs: BeliefInputs) -> dict[str, float]:
+        self.order.append("complete")
+        assert inputs is self.inputs[-1]
+        return {"loss": 0.25, "weight_update_count": self.weight_update_count}
+
 
 def _session(runtime=None, **kwargs) -> LiveThinkingSession:
     return LiveThinkingSession(
@@ -76,19 +81,26 @@ def test_episode_thinks_in_four_belief_only_steps_before_training() -> None:
         "full belief",
         "reappearance revision",
     ]
-    assert runtime.order == ["predict", "predict", "predict", "predict", "train"]
+    assert runtime.order == ["predict", "predict", "predict", "predict", "complete"]
     assert all(isinstance(inputs, BeliefInputs) for inputs in runtime.inputs)
     assert all(set(inputs.__dict__) == {"beliefs", "history_mask"} for inputs in runtime.inputs)
     assert episode.thought_steps[-1].guessed_flat[0] == 1
-    assert episode.training == {"loss": 0.25, "weight_update_count": 1}
+    assert episode.training == {"loss": 0.25, "weight_update_count": 0}
     assert episode.latent_update_count == 4
-    assert episode.weight_update_count == 1
+    assert episode.weight_update_count == 0
     payload = episode.to_payload()
-    path = payload["ground_truth"]["path"]
+    ground_truth = payload["ground_truth"]
+    path = ground_truth["path"]
+    assert "frames_base64" not in ground_truth
+    assert ground_truth["occluder"] == pytest.approx([0.35, 0.55, 0.05, 0.95])
     assert len(path) > 1
     assert all(len(point) == 2 for point in path)
     assert all(0.0 <= coordinate <= 1.0 for point in path for coordinate in point)
     assert payload["thought_steps"][0]["predicted_parameters"] == [0.5] * 7
+    recovery = payload["thought_steps"][0]["constraint_recovery"]
+    assert recovery["total"] == 3
+    assert recovery["recovered"] == 3
+    assert recovery["score"] == 1.0
     assert len(payload["thought_steps"][0]["paths"]) == 1
     assert len(payload["thought_steps"][2]["paths"]) == 4
     assert payload["thought_steps"][0]["paths"][0][0] == pytest.approx(path[0])

@@ -21,9 +21,11 @@ from .model1.data import collate_model1
 from .model1.rasterize import rasterize_mixture
 from .model1.types import TrajectoryMixture
 from .model2.adapters import Model1BeliefPacket, adapt_model1_events
+from .model2.coherence import ConstraintRecovery, evaluate_constraint_recovery
 from .model2.contracts import BeliefInputs, WorldPrediction
 from .model2.decode import decode_prediction
 from .model2.losses import world_code_loss
+from .model2.smc import BeliefWorldSMC, SMCConfig, SMCResult
 from .model2.train import predict as predict_model2
 from .simulate import BallState
 from .world import WorldSchema
@@ -34,9 +36,7 @@ class Model2Runtime(Protocol):
 
     def predict(self, inputs: BeliefInputs) -> WorldPrediction: ...
 
-    def train_step(
-        self, inputs: BeliefInputs, target_world_flat: np.ndarray
-    ) -> dict[str, float | int]: ...
+    def complete_event(self, inputs: BeliefInputs) -> dict[str, float | int]: ...
 
 
 class OnlineModel2Runtime:
@@ -84,6 +84,44 @@ class OnlineModel2Runtime:
                 "weight_update_count": self.weight_update_count,
             }
 
+    def complete_event(self, inputs: BeliefInputs) -> dict[str, float | int]:
+        del inputs
+        return {"loss": 0.0, "weight_update_count": self.weight_update_count}
+
+
+class SMCModel2Runtime:
+    """Expose the README's belief-only particle search through the live runtime."""
+
+    def __init__(self, *, seed: int = 7, config: SMCConfig | None = None) -> None:
+        self.config = config or SMCConfig(seed=seed)
+        self.weight_update_count = 0
+        self._last_result: SMCResult | None = None
+
+    def fork(self) -> SMCModel2Runtime:
+        return SMCModel2Runtime(config=self.config)
+
+    def infer(self, inputs: BeliefInputs) -> SMCResult:
+        self._last_result = BeliefWorldSMC(self.config).infer(inputs)
+        return self._last_result
+
+    def predict(self, inputs: BeliefInputs) -> WorldPrediction:
+        flat = self.infer(inputs).best_world
+        activity_indices = (0, 2, 4, 6, 9)
+        parameter_indices = (1, 3, 5, 7, 8, 10, 11)
+        activity = torch.tensor(flat[list(activity_indices)], dtype=torch.float32)[None]
+        parameters = torch.tensor(flat[list(parameter_indices)], dtype=torch.float32)[None]
+        logits = torch.where(activity.bool(), torch.tensor(10.0), torch.tensor(-10.0))
+        return WorldPrediction(logits, parameters)
+
+    def complete_event(self, inputs: BeliefInputs) -> dict[str, float | int]:
+        if self._last_result is None:
+            self.infer(inputs)
+        assert self._last_result is not None
+        return {
+            "loss": float(self._last_result.event_discrepancies[0].mean()),
+            "weight_update_count": self.weight_update_count,
+        }
+
 
 @dataclass(frozen=True, eq=False)
 class LiveThoughtStep:
@@ -95,6 +133,7 @@ class LiveThoughtStep:
     guessed_parameters: np.ndarray
     paths: np.ndarray
     path_weights: np.ndarray
+    constraint_recovery: ConstraintRecovery
 
     def to_payload(self) -> dict[str, object]:
         height, width = self.belief.shape
@@ -112,6 +151,7 @@ class LiveThoughtStep:
             "paths": self.paths.tolist(),
             "path_weights": self.path_weights.tolist(),
             "operators": _operator_payload(self.guessed_flat),
+            "constraint_recovery": self.constraint_recovery.to_payload(),
         }
 
 
@@ -120,6 +160,7 @@ class LiveThinkingEpisode:
     episode_index: int
     initial_state: BallState
     frames: np.ndarray
+    occluder: tuple[float, float, float, float]
     hidden_start: int
     hidden_end: int
     reappearance_step: int
@@ -148,7 +189,7 @@ class LiveThinkingEpisode:
                 "hidden_start": self.hidden_start,
                 "hidden_end": self.hidden_end,
                 "reappearance_step": self.reappearance_step,
-                "frames_base64": _encoded_u8(self.frames),
+                "occluder": list(self.occluder),
                 "world_flat": self.ground_truth_flat.tolist(),
                 "path": self.ground_truth_path.tolist(),
                 "operators": _operator_payload(self.ground_truth_flat),
@@ -315,11 +356,12 @@ class LiveThinkingSession:
                         .cpu()
                         .numpy()
                         .astype(np.float32),
+                        evaluate_constraint_recovery(record.world_flat, guessed),
                     )
                 )
                 previous = belief
             assert final_inputs is not None
-            training = self.model2_runtime.train_step(final_inputs, record.world_flat)
+            training = self.model2_runtime.complete_event(final_inputs)
             final_packet = Model1BeliefPacket(
                 episode_id="live-thinking",
                 event_ordinal=self._episode_index,
@@ -332,6 +374,10 @@ class LiveThinkingSession:
                 episode_index=self._episode_index,
                 initial_state=initial,
                 frames=frames,
+                occluder=tuple(
+                    float(self.model1_config.dataset.occluder[name])
+                    for name in ("x_min", "x_max", "y_min", "y_max")
+                ),
                 hidden_start=record.hidden_start,
                 hidden_end=record.hidden_end,
                 reappearance_step=record.reappearance_step,

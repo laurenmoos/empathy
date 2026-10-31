@@ -20,7 +20,6 @@ from .model1.train import load_checkpoint
 from .model2.adapters import Model1BeliefPacket, adapt_model1_events
 from .model2.contracts import BeliefInputs, WorldPrediction
 from .model2.decode import decode_prediction
-from .model2.train import load_model as load_model2
 from .render import Occluder, render_sequence
 from .simulate import BallState, rollout
 from .world import WorldCode, WorldSchema
@@ -149,10 +148,10 @@ class LiveInferenceEngine:
         payload = torch.load(Path(model1_checkpoint), map_location="cpu", weights_only=False)
         config: Model1Config = payload["config"]
         model1, _ = load_checkpoint(model1_checkpoint, expected_config=config, device="cpu")
-        model2 = load_model2(model2_checkpoint, device="cpu")
-        from .live_thinking import OnlineModel2Runtime
+        del model2_checkpoint
+        from .live_thinking import SMCModel2Runtime
 
-        runtime = OnlineModel2Runtime(model2)
+        runtime = SMCModel2Runtime()
         return cls(
             model1,
             config,

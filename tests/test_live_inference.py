@@ -12,6 +12,7 @@ from perception_env.live_inference import (
 )
 from perception_env.model1.config import load_model1_config
 from perception_env.model1.types import TrajectoryMixture
+from perception_env.model2.coherence import evaluate_constraint_recovery
 from perception_env.model2.contracts import BeliefInputs, WorldPrediction
 from perception_env.world import WorldSchema
 
@@ -163,3 +164,25 @@ def test_each_thinking_session_forks_fresh_online_model_state() -> None:
     assert first.model2_runtime is not second.model2_runtime
     assert first.model2_runtime.weight_update_count == 0
     assert second.model2_runtime.weight_update_count == 0
+
+
+def test_hidden_truth_changes_recovery_but_not_belief_only_guess() -> None:
+    beliefs = np.zeros((1, 4, 3, 16, 16), dtype=np.float32)
+    beliefs[0, -1, 1, 8, 4:12] = 1.0
+    beliefs[0, -1, 2] = beliefs[0, -1, 1]
+    inputs = BeliefInputs(beliefs, np.array([[False, False, False, True]]))
+
+    from perception_env.live_thinking import SMCModel2Runtime
+
+    first_guess = SMCModel2Runtime(seed=9).predict(inputs)
+    second_guess = SMCModel2Runtime(seed=9).predict(inputs)
+    assert torch.equal(first_guess.activity_logits, second_guess.activity_logits)
+    assert torch.equal(first_guess.normalized_parameters, second_guess.normalized_parameters)
+
+    schema = WorldSchema.v1()
+    neutral = schema.world().to_flat(schema)
+    gravity = schema.world(vertical_acceleration={"a_y": -0.2}).to_flat(schema)
+    guess_flat = SMCModel2Runtime(seed=9).infer(inputs).best_world
+    assert evaluate_constraint_recovery(neutral, guess_flat) != evaluate_constraint_recovery(
+        gravity, guess_flat
+    )

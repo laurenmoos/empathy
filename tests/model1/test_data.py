@@ -10,8 +10,11 @@ from perception_env.model1.data import (
     collate_model1,
     generate_model1_dataset,
     load_example,
+    make_model1_record,
     save_example,
 )
+from perception_env.simulate import BallState
+from perception_env.world import WorldSchema
 
 
 def _record() -> Model1ExampleRecord:
@@ -137,3 +140,49 @@ def test_generator_reports_exhausted_attempts(tmp_path) -> None:
             seed=7,
             quick=True,
         )
+
+
+def test_supplied_world_generates_varied_episodes_with_shared_world_id() -> None:
+    config = load_model1_config(Path("configs/model1/v1.yaml"))
+    world = WorldSchema.v1().world()
+
+    lower, lower_reason = make_model1_record(
+        config,
+        world,
+        BallState(0.1, 0.44, 0.18, 0.0),
+        example_id="stream-0-0",
+        split="stream",
+        family_level="W0",
+        seed=11,
+    )
+    upper, upper_reason = make_model1_record(
+        config,
+        world,
+        BallState(0.1, 0.56, 0.18, 0.0),
+        example_id="stream-0-1",
+        split="stream",
+        family_level="W0",
+        seed=12,
+    )
+
+    assert lower_reason is upper_reason is None
+    assert lower is not None and upper is not None
+    assert lower.world_id == upper.world_id
+    assert not np.array_equal(lower.frames, upper.frames)
+
+
+def test_supplied_invalid_trajectory_returns_rejection_reason() -> None:
+    config = load_model1_config(Path("configs/model1/v1.yaml"))
+
+    record, reason = make_model1_record(
+        config,
+        WorldSchema.v1().world(),
+        BallState(0.1, 1.2, 0.18, 0.0),
+        example_id="invalid",
+        split="stream",
+        family_level="W0",
+        seed=13,
+    )
+
+    assert record is None
+    assert reason

@@ -19,6 +19,7 @@ from perception_env.families import load_family, sample_worlds
 from perception_env.reachability import EntryStateGrid, enumerate_reachable
 from perception_env.render import Occluder, render_sequence
 from perception_env.simulate import BallState, rollout
+from perception_env.world import WorldCode, WorldSchema
 
 from .config import Model1Config
 from .types import Model1Batch
@@ -108,19 +109,18 @@ def _world_id(values: np.ndarray) -> str:
     return hashlib.sha256(np.asarray(values, dtype=np.float64).tobytes()).hexdigest()[:16]
 
 
-def _make_record(
+def make_model1_record(
     config: Model1Config,
-    family_config: Path,
-    level: str,
+    world: WorldCode,
+    initial: BallState,
+    *,
+    example_id: str,
     split: str,
-    index: int,
+    family_level: str,
     seed: int,
 ) -> tuple[Model1ExampleRecord | None, str | None]:
-    rng = np.random.default_rng(seed)
-    family = load_family(family_config, level)
-    world = sample_worlds(family, 1, seed)[0]
-    ranges = config.dataset.initial_state
-    initial = BallState(*(float(rng.uniform(*ranges[name])) for name in ("x", "y", "vx", "vy")))
+    schema = WorldSchema.v1()
+    schema.validate(world)
     simulation = SimulationConfig(dt=0.1, steps=40, seed=seed)
     trajectory = rollout(initial, world, simulation)
     if not trajectory.valid:
@@ -159,19 +159,18 @@ def _make_record(
     )
     local_simulation = SimulationConfig(dt=simulation.dt, steps=horizon - 1, seed=seed)
     reachability = enumerate_reachable(
-        grid, world, (horizon - 1,), local_simulation, context_id=f"{split}-{index}"
+        grid, world, (horizon - 1,), local_simulation, context_id=example_id
     )
     valid_paths = [item for item in reachability.trajectories if item.valid]
     if not valid_paths:
         return None, "no_reachable_paths"
     oracle = superpose(valid_paths, np.ones(len(valid_paths)), render_config)
-    flat = world.to_flat(family.schema).astype(np.float32)
-    record_id = f"{split}-{index:06d}"
+    flat = world.to_flat(schema).astype(np.float32)
     return (
         Model1ExampleRecord(
-            example_id=record_id,
+            example_id=example_id,
             split=split,
-            family_level=level,
+            family_level=family_level,
             seed=seed,
             world_id=_world_id(flat),
             world_flat=flat,
@@ -185,6 +184,32 @@ def _make_record(
             actual_path_belief=_path_belief(target, target_mask, config.dataset.frame_size),
         ),
         None,
+    )
+
+
+def _make_record(
+    config: Model1Config,
+    family_config: Path,
+    level: str,
+    split: str,
+    index: int,
+    seed: int,
+) -> tuple[Model1ExampleRecord | None, str | None]:
+    rng = np.random.default_rng(seed)
+    family = load_family(family_config, level)
+    world = sample_worlds(family, 1, seed)[0]
+    ranges = config.dataset.initial_state
+    initial = BallState(
+        *(float(rng.uniform(*ranges[name])) for name in ("x", "y", "vx", "vy"))
+    )
+    return make_model1_record(
+        config,
+        world,
+        initial,
+        example_id=f"{split}-{index:06d}",
+        split=split,
+        family_level=level,
+        seed=seed,
     )
 
 

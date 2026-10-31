@@ -6,84 +6,84 @@
   <title>Perception Environment</title>
   <style>
     :root {
-      color-scheme: dark;
-      --ink: #edf7f6;
-      --muted: #91a7aa;
-      --panel: #101b1f;
-      --line: rgba(174, 217, 216, .16);
-      --aqua: #63e6d5;
-      --violet: #ad92ff;
-      --amber: #ffc56d;
+      color-scheme: light;
+      --paper: #ece8df;
+      --ink: #333832;
+      --muted: #777970;
+      --forest: #3d433d;
+      --forest-muted: #d0d1cb;
+      --line: #b4b3a9;
+      --canvas: #dbd8d0;
+      --belief: #8b9186;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       min-height: 100vh;
       color: var(--ink);
-      background: #091013;
+      background: var(--paper);
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-    header { padding: .9rem 1.2rem; border-bottom: 1px solid var(--line); }
-    h1 { margin: 0; font-size: 1.15rem; letter-spacing: -.03em; }
-    main { display: grid; grid-template-columns: 16rem minmax(0, 1fr); min-height: calc(100vh - 3.2rem); }
-    aside { padding: 1rem; border-right: 1px solid var(--line); background: rgba(4, 11, 13, .35); }
-    h2 { margin: 0; font-size: .92rem; }
-    .control { display: grid; grid-template-columns: 1fr 5.5rem; align-items: center; gap: .8rem; margin-top: .75rem; color: var(--muted); font-size: .72rem; }
+    header { padding: 1rem 1.35rem; color: #f2efe7; background: var(--forest); border-bottom: 1px solid #565d56; }
+    h1 { margin: 0; font: 500 1.18rem/1.1 Georgia, serif; letter-spacing: -.02em; }
+    main { display: grid; grid-template-columns: 15rem minmax(0, 1fr); min-height: calc(100vh - 3.2rem); }
+    aside { padding: 1.35rem; color: #f2efe7; background: var(--forest); }
+    h2 { margin: 0; font: 500 .95rem/1.2 Georgia, serif; }
+    aside h2 { margin-bottom: 1.35rem; }
+    .control { display: grid; grid-template-columns: 1fr 4.8rem; align-items: center; gap: .8rem; margin-top: .9rem; color: var(--forest-muted); font-size: .72rem; }
     input[type="number"] {
       width: 100%;
       padding: .48rem .55rem;
-      color: var(--aqua);
-      background: #101b1f;
-      border: 1px solid rgba(174, 217, 216, .22);
-      border-radius: 8px;
+      color: #f2efe7;
+      background: transparent;
+      border: 0;
+      border-bottom: 1px solid #737a73;
+      border-radius: 0;
       font: 650 .72rem ui-monospace, monospace;
     }
     button {
       width: 100%;
       padding: .62rem .7rem;
-      color: var(--ink);
-      background: #18262a;
-      border: 1px solid rgba(174, 217, 216, .22);
-      border-radius: 9px;
+      color: var(--forest-muted);
+      background: transparent;
+      border: 1px solid #737a73;
+      border-radius: 2px;
       font: inherit;
       font-weight: 700;
       cursor: pointer;
     }
-    button.primary { color: #06201d; background: var(--aqua); border-color: transparent; }
+    button.primary { color: var(--forest); background: #d9d9d1; border-color: transparent; }
     button:disabled { cursor: wait; opacity: .6; }
     .buttons { display: grid; gap: .45rem; margin-top: .9rem; }
-    .status { min-height: 3.6em; margin: .65rem 0 0; color: var(--muted); font-size: .7rem; line-height: 1.4; }
+    .status { min-height: 3.6em; margin: .65rem 0 0; color: #aeb2aa; font-size: .7rem; line-height: 1.4; }
     .layers {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(16rem, .78fr);
-      gap: .8rem;
-      padding: 1rem;
+      grid-template-columns: minmax(0, 1.6fr) minmax(17rem, .7fr);
+      gap: 1.4rem;
+      padding: 1.5rem;
       align-items: start;
     }
     .panel {
       min-width: 0;
-      padding: .85rem;
-      border: 1px solid var(--line);
-      border-radius: 15px;
-      background: var(--panel);
+      padding-top: .75rem;
+      border-top: 1px solid var(--line);
+      background: transparent;
     }
     .panel-head { min-height: 2.5rem; margin-bottom: .65rem; }
     .panel-head span { display: block; margin-top: .25rem; color: var(--muted); font-size: .68rem; line-height: 1.35; }
-    canvas { display: block; width: 100%; aspect-ratio: 1; border-radius: 10px; background: #05090b; }
-    .readout { min-height: 2.4em; font: 650 .76rem ui-monospace, monospace; color: var(--violet); }
+    canvas { display: block; width: 100%; aspect-ratio: 1.2; background: var(--canvas); }
+    .readout { min-height: 2.4em; font: 500 .76rem ui-monospace, monospace; color: var(--forest); }
     .comparison { margin-top: .7rem; }
-    .comparison-row { display: grid; grid-template-columns: 1fr .85fr .85fr; gap: .25rem; padding: .42rem 0; border-top: 1px solid var(--line); font-size: .64rem; }
+    .comparison-row { display: grid; grid-template-columns: 1fr .85fr .85fr; gap: .25rem; padding: .55rem 0; border-top: 1px solid var(--line); font-size: .66rem; }
     .comparison-row.heading { color: var(--muted); border-top: 0; }
     .comparison-row span:not(:first-child) { font-family: ui-monospace, monospace; }
     @media (max-width: 1080px) {
-      .layers { grid-template-columns: 1fr 1fr; }
-      #secondOrderPanel { grid-column: 1 / -1; }
+      .layers { grid-template-columns: 1fr; }
     }
     @media (max-width: 760px) {
       main { grid-template-columns: 1fr; }
       aside { border-right: 0; border-bottom: 1px solid var(--line); }
       .layers { grid-template-columns: 1fr; }
-      #secondOrderPanel { grid-column: auto; }
     }
   </style>
 </head>
@@ -112,20 +112,12 @@
     </aside>
 
     <section class="layers">
-      <article class="panel" id="worldPanel">
+      <article class="panel" id="perceptionPanel">
         <div class="panel-head">
-          <h2>Ground truth</h2>
+          <h2>Ground truth + beliefs</h2>
           <span id="worldPhase"></span>
         </div>
-        <canvas id="worldCanvas" width="640" height="640"></canvas>
-      </article>
-
-      <article class="panel" id="beliefPanel">
-        <div class="panel-head">
-          <h2>Beliefs</h2>
-          <span id="thoughtReadout"></span>
-        </div>
-        <canvas id="beliefCanvas" width="640" height="640"></canvas>
+        <canvas id="perceptionCanvas" width="768" height="640"></canvas>
       </article>
 
       <article class="panel" id="secondOrderPanel">
@@ -144,10 +136,8 @@
   <script src="explorer_state.js"></script>
   <script>
     const $ = id => document.getElementById(id);
-    const worldCanvas = $("worldCanvas");
-    const worldCtx = worldCanvas.getContext("2d");
-    const beliefCanvas = $("beliefCanvas");
-    const beliefCtx = beliefCanvas.getContext("2d");
+    const perceptionCanvas = $("perceptionCanvas");
+    const perceptionCtx = perceptionCanvas.getContext("2d");
     const {frameNarration} = PerceptionUIState;
     const EXPECTED_THOUGHT_LABELS = [
       "first possibility",
@@ -156,9 +146,9 @@
       "reappearance revision"
     ];
     const worldSlots = [
-      {name: "gravity", operator: "vertical_acceleration", parameter: "a_y"},
-      {name: "wind", operator: "horizontal_acceleration", parameter: "a_x"},
-      {name: "damping", operator: "damping", parameter: "lambda"}
+      {name: "gravity", operator: "vertical_acceleration", parameter: "a_y", parameterIndex: 0, minimum: -1, maximum: 1},
+      {name: "wind", operator: "horizontal_acceleration", parameter: "a_x", parameterIndex: 1, minimum: -1, maximum: 1},
+      {name: "damping", operator: "damping", parameter: "lambda", parameterIndex: 2, minimum: 0, maximum: 1}
     ];
 
     let sessionId = null;
@@ -198,6 +188,12 @@
       if (!truth || ![truth.width, truth.height, truth.frame_count].every(Number.isInteger)) {
         throw new Error("ground-truth dimensions must be integers");
       }
+      if (!Array.isArray(truth.path) || truth.path.length < 2
+          || !truth.path.every(point => Array.isArray(point)
+            && point.length === 2
+            && point.every(value => Number.isFinite(value) && value >= 0 && value <= 1))) {
+        throw new Error("ground-truth path must contain normalized x/y points");
+      }
       if (!Number.isInteger(truth.hidden_start)
           || !Number.isInteger(truth.hidden_end)
           || !Number.isInteger(truth.reappearance_step)
@@ -221,6 +217,11 @@
           throw new Error("thought step order or dimensions are invalid");
         }
         validateWorldVector(step.predicted_world_flat, "predicted world");
+        if (!Array.isArray(step.predicted_parameters)
+            || step.predicted_parameters.length !== 7
+            || !step.predicted_parameters.every(Number.isFinite)) {
+          throw new Error("predicted parameters must contain seven finite values");
+        }
         const beliefBytes = decodeBytes(step.belief_u8);
         if (beliefBytes.length !== step.width * step.height) {
           throw new Error("belief byte length does not match dimensions");
@@ -340,14 +341,15 @@
         const cursor = index * 4;
         if (colorize) {
           const intensity = Math.sqrt(value / 255);
-          image.data[cursor] = 173;
-          image.data[cursor + 1] = 146;
-          image.data[cursor + 2] = 255;
-          image.data[cursor + 3] = Math.round(intensity * 240);
+          image.data[cursor] = 139;
+          image.data[cursor + 1] = 145;
+          image.data[cursor + 2] = 134;
+          image.data[cursor + 3] = Math.round(intensity * 205);
         } else {
-          image.data[cursor] = value;
-          image.data[cursor + 1] = value;
-          image.data[cursor + 2] = value;
+          const intensity = value / 255;
+          image.data[cursor] = Math.round(219 + (61 - 219) * intensity);
+          image.data[cursor + 1] = Math.round(216 + (67 - 216) * intensity);
+          image.data[cursor + 2] = Math.round(208 + (61 - 208) * intensity);
           image.data[cursor + 3] = 255;
         }
       });
@@ -355,42 +357,73 @@
       return buffer;
     }
 
-    function clearWorldCanvas() {
-      worldCtx.fillStyle = "#05090b";
-      worldCtx.fillRect(0, 0, worldCanvas.width, worldCanvas.height);
+    function clearPerceptionCanvas() {
+      perceptionCtx.fillStyle = "#dbd8d0";
+      perceptionCtx.fillRect(0, 0, perceptionCanvas.width, perceptionCanvas.height);
       $("worldPhase").textContent = "";
     }
 
-    function clearBeliefCanvas() {
-      beliefCtx.fillStyle = "#05090b";
-      beliefCtx.fillRect(0, 0, beliefCanvas.width, beliefCanvas.height);
-      $("thoughtReadout").textContent = "";
-    }
-
     function clearSecondOrder() {
-      $("operatorReadout").textContent = "—";
+      $("operatorReadout").textContent = "";
       $("comparisonRows").replaceChildren();
     }
 
     function clearAllLayers() {
-      clearWorldCanvas();
-      clearBeliefCanvas();
+      clearPerceptionCanvas();
       clearSecondOrder();
     }
 
-    function drawWorld() {
-      if (!currentEpisode) return clearWorldCanvas();
+    function drawGroundTruthPath(path) {
+      perceptionCtx.save();
+      perceptionCtx.beginPath();
+      path.forEach(([x, y], index) => {
+        const px = x * perceptionCanvas.width;
+        const py = (1 - y) * perceptionCanvas.height;
+        if (index === 0) perceptionCtx.moveTo(px, py);
+        else perceptionCtx.lineTo(px, py);
+      });
+      perceptionCtx.strokeStyle = "#333832";
+      perceptionCtx.lineWidth = 2.2;
+      perceptionCtx.lineCap = "round";
+      perceptionCtx.lineJoin = "round";
+      perceptionCtx.stroke();
+      perceptionCtx.restore();
+    }
+
+    function drawBeliefFuzz(step) {
+      const buffer = imageBuffer(step.width, step.height, step.beliefBytes, true);
+      perceptionCtx.save();
+      perceptionCtx.imageSmoothingEnabled = true;
+      perceptionCtx.imageSmoothingQuality = "high";
+      perceptionCtx.filter = "blur(5px)";
+      perceptionCtx.globalAlpha = .78;
+      perceptionCtx.drawImage(buffer, 0, 0, perceptionCanvas.width, perceptionCanvas.height);
+      perceptionCtx.restore();
+    }
+
+    function drawPerception() {
+      if (!currentEpisode) return clearPerceptionCanvas();
       const truth = currentEpisode.ground_truth;
       const frameSize = truth.width * truth.height;
       const offset = currentFrame * frameSize;
       const frame = truth.frameBytes.slice(offset, offset + frameSize);
       const buffer = imageBuffer(truth.width, truth.height, frame);
-      worldCtx.fillStyle = "#05090b";
-      worldCtx.fillRect(0, 0, worldCanvas.width, worldCanvas.height);
-      worldCtx.imageSmoothingEnabled = true;
-      worldCtx.imageSmoothingQuality = "high";
-      worldCtx.drawImage(buffer, 0, 0, worldCanvas.width, worldCanvas.height);
+      perceptionCtx.fillStyle = "#dbd8d0";
+      perceptionCtx.fillRect(0, 0, perceptionCanvas.width, perceptionCanvas.height);
+      perceptionCtx.imageSmoothingEnabled = true;
+      perceptionCtx.imageSmoothingQuality = "high";
+      perceptionCtx.drawImage(buffer, 0, 0, perceptionCanvas.width, perceptionCanvas.height);
       const hidden = currentFrame >= truth.hidden_start && currentFrame <= truth.hidden_end;
+      const index = thoughtIndex();
+      if (index >= 0) {
+        const step = currentEpisode.thought_steps[index];
+        drawBeliefFuzz(step);
+        if (index !== currentThought) {
+          currentThought = index;
+          updateSecondOrder(step);
+        }
+      }
+      drawGroundTruthPath(truth.path);
       $("worldPhase").textContent = hidden
         ? "Ball hidden · the world continues"
         : currentFrame >= truth.reappearance_step
@@ -413,34 +446,22 @@
       return Math.min(2, Math.floor(progress * 3));
     }
 
-    function drawBelief() {
-      const index = thoughtIndex();
-      if (!currentEpisode || index < 0) return clearBeliefCanvas();
-      const step = currentEpisode.thought_steps[index];
-      const buffer = imageBuffer(step.width, step.height, step.beliefBytes, true);
-      beliefCtx.fillStyle = "#05090b";
-      beliefCtx.fillRect(0, 0, beliefCanvas.width, beliefCanvas.height);
-      beliefCtx.imageSmoothingEnabled = true;
-      beliefCtx.imageSmoothingQuality = "high";
-      beliefCtx.drawImage(buffer, 0, 0, beliefCanvas.width, beliefCanvas.height);
-      $("thoughtReadout").textContent = `${index + 1}/4 · ${step.label}`;
-      if (index !== currentThought) {
-        currentThought = index;
-        updateSecondOrder(step);
-      }
-    }
-
     function worldSlotValue(operators, slot) {
       const operator = operators[slot.operator];
-      if (!operator || !operator.active) return "inactive";
+      if (!operator || !operator.active) return "0.00";
       return Number(operator.parameters[slot.parameter]).toFixed(2);
     }
 
-    function comparisonElements(actual, predicted) {
+    function predictedParameterValue(parameters, slot) {
+      const normalized = Math.max(0, Math.min(1, Number(parameters[slot.parameterIndex])));
+      return (slot.minimum + normalized * (slot.maximum - slot.minimum)).toFixed(2);
+    }
+
+    function comparisonElements(actual, predictedParameters) {
       return worldSlots.map(slot => {
         const row = document.createElement("div");
         row.className = "comparison-row";
-        [slot.name, worldSlotValue(actual, slot), worldSlotValue(predicted, slot)].forEach(value => {
+        [slot.name, worldSlotValue(actual, slot), predictedParameterValue(predictedParameters, slot)].forEach(value => {
           const cell = document.createElement("span");
           cell.textContent = value;
           row.append(cell);
@@ -449,23 +470,24 @@
       });
     }
 
-    function worldSummary(operators) {
-      const active = worldSlots
-        .filter(slot => operators[slot.operator]?.active)
-        .map(slot => `${slot.name} ${worldSlotValue(operators, slot)}`);
-      return active.length ? active.join(" · ") : "constant motion";
+    function worldSummary(parameters) {
+      return worldSlots
+        .map(slot => `${slot.name} ${predictedParameterValue(parameters, slot)}`)
+        .join(" · ");
     }
 
     function updateSecondOrder(step) {
-      $("operatorReadout").textContent = worldSummary(step.operators);
+      $("operatorReadout").textContent = worldSummary(step.predicted_parameters);
       $("comparisonRows").replaceChildren(
-        ...comparisonElements(currentEpisode.ground_truth.operators, step.operators)
+        ...comparisonElements(
+          currentEpisode.ground_truth.operators,
+          step.predicted_parameters
+        )
       );
     }
 
     function draw() {
-      drawWorld();
-      drawBelief();
+      drawPerception();
     }
 
     function animate(timestamp) {
@@ -504,8 +526,7 @@
       playing = false;
       fetching = false;
       statusOverride = message;
-      clearWorldCanvas();
-      clearBeliefCanvas();
+      clearPerceptionCanvas();
       clearSecondOrder();
       $("statusMessage").textContent = message;
       $("streamToggle").disabled = false;

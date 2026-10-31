@@ -41,8 +41,7 @@ def test_explorer_uses_minimal_numeric_controls_and_plain_layer_names() -> None:
     source, parser = parsed_explorer()
 
     assert parser.input_types == ["number", "number", "number"]
-    assert "<h2>Ground truth</h2>" in source
-    assert "<h2>Beliefs</h2>" in source
+    assert "<h2>Ground truth + beliefs</h2>" in source
     assert "<h2>Second-order perception</h2>" in source
     for unwanted in (
         "Choose one world",
@@ -71,24 +70,24 @@ def test_explorer_uses_minimal_numeric_controls_and_plain_layer_names() -> None:
     assert "Model 2" not in state_source
 
 
-def test_explorer_has_three_visually_disjoint_perceptual_layers() -> None:
+def test_explorer_combines_ground_truth_path_and_belief_fuzz() -> None:
     source, parser = parsed_explorer()
 
     assert {
-        "worldPanel",
-        "worldCanvas",
-        "beliefPanel",
-        "beliefCanvas",
+        "perceptionPanel",
+        "perceptionCanvas",
         "secondOrderPanel",
         "comparisonRows",
     } <= parser.ids
-    assert parser.canvases == {"worldCanvas", "beliefCanvas"}
+    assert {"worldPanel", "worldCanvas", "beliefPanel", "beliefCanvas"}.isdisjoint(
+        parser.ids
+    )
+    assert parser.canvases == {"perceptionCanvas"}
     assert not parser.external_urls
-    assert "Ground truth" in source
-    assert "Beliefs" in source
+    assert "Ground truth + beliefs" in source
     assert "Second-order perception" in source
-    assert "drawBeliefOverlay" not in source
-    assert 'globalCompositeOperation = "screen"' not in source
+    assert "function drawGroundTruthPath" in source
+    assert "function drawBeliefFuzz" in source
 
 
 def test_stream_controls_start_sessions_and_queue_offset_episodes() -> None:
@@ -110,10 +109,10 @@ def test_stream_controls_start_sessions_and_queue_offset_episodes() -> None:
     assert "Play thinking stream" in source
 
 
-def test_thought_steps_and_world_guess_have_visible_state() -> None:
+def test_world_guess_shows_all_three_numeric_parameters() -> None:
     source, parser = parsed_explorer()
 
-    assert {"thoughtReadout", "operatorReadout"} <= parser.ids
+    assert "operatorReadout" in parser.ids
     assert {
         "latentUpdates",
         "weightUpdates",
@@ -130,6 +129,9 @@ def test_thought_steps_and_world_guess_have_visible_state() -> None:
     assert "Ground-truth parameters" in source
     assert "Pre-update guess" in source
     assert "function updateSecondOrder" in source
+    assert "function predictedParameterValue" in source
+    assert "step.predicted_parameters" in source
+    assert 'return "inactive"' not in source
 
 
 def test_parameter_edits_invalidate_the_stream_and_clear_all_layers() -> None:
@@ -138,8 +140,7 @@ def test_parameter_edits_invalidate_the_stream_and_clear_all_layers() -> None:
     assert "requestSerial += 1;" in source
     assert "sessionId = null;" in source
     assert "episodeQueue.length = 0;" in source
-    assert "clearWorldCanvas();" in source
-    assert "clearBeliefCanvas();" in source
+    assert "clearPerceptionCanvas();" in source
     assert "clearSecondOrder();" in source
     assert "Parameters changed. Start a new thinking stream." in source
 

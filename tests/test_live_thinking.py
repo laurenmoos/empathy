@@ -83,6 +83,12 @@ def test_episode_thinks_in_four_belief_only_steps_before_training() -> None:
     assert episode.training == {"loss": 0.25, "weight_update_count": 1}
     assert episode.latent_update_count == 4
     assert episode.weight_update_count == 1
+    payload = episode.to_payload()
+    path = payload["ground_truth"]["path"]
+    assert len(path) > 1
+    assert all(len(point) == 2 for point in path)
+    assert all(0.0 <= coordinate <= 1.0 for point in path for coordinate in point)
+    assert payload["thought_steps"][0]["predicted_parameters"] == [0.5] * 7
 
 
 def test_successive_episodes_vary_offsets_and_keep_completed_event_history() -> None:

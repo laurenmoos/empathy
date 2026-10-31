@@ -92,6 +92,7 @@ class LiveThoughtStep:
     pre_belief: np.ndarray
     belief: np.ndarray
     guessed_flat: np.ndarray
+    guessed_parameters: np.ndarray
 
     def to_payload(self) -> dict[str, object]:
         height, width = self.belief.shape
@@ -105,6 +106,7 @@ class LiveThoughtStep:
             ),
             "belief_u8": _encoded_u8(np.clip(np.rint(self.belief * 255), 0, 255)),
             "predicted_world_flat": self.guessed_flat.tolist(),
+            "predicted_parameters": self.guessed_parameters.tolist(),
             "operators": _operator_payload(self.guessed_flat),
         }
 
@@ -119,6 +121,7 @@ class LiveThinkingEpisode:
     reappearance_step: int
     thought_steps: tuple[LiveThoughtStep, ...]
     ground_truth_flat: np.ndarray
+    ground_truth_path: np.ndarray
     training: dict[str, float | int]
     latent_update_count: int
     weight_update_count: int
@@ -143,6 +146,7 @@ class LiveThinkingEpisode:
                 "reappearance_step": self.reappearance_step,
                 "frames_base64": _encoded_u8(self.frames),
                 "world_flat": self.ground_truth_flat.tolist(),
+                "path": self.ground_truth_path.tolist(),
                 "operators": _operator_payload(self.ground_truth_flat),
             },
             "thought_steps": [step.to_payload() for step in self.thought_steps],
@@ -273,11 +277,25 @@ class LiveThinkingSession:
                 )
                 final_inputs = adapt_model1_events([*self._history, packet])
                 prediction = self.model2_runtime.predict(final_inputs)
+                guessed_parameters = (
+                    prediction.normalized_parameters[0]
+                    .detach()
+                    .cpu()
+                    .numpy()
+                    .astype(np.float32)
+                )
                 guessed = decode_prediction(prediction, WorldSchema.v1()).flat[0].astype(
                     np.float32
                 )
                 steps.append(
-                    LiveThoughtStep(index, label, previous.copy(), belief.copy(), guessed)
+                    LiveThoughtStep(
+                        index,
+                        label,
+                        previous.copy(),
+                        belief.copy(),
+                        guessed,
+                        guessed_parameters,
+                    )
                 )
                 previous = belief
             assert final_inputs is not None
@@ -299,6 +317,7 @@ class LiveThinkingSession:
                 reappearance_step=record.reappearance_step,
                 thought_steps=tuple(steps),
                 ground_truth_flat=record.world_flat,
+                ground_truth_path=record.target_states[record.target_mask, :2].copy(),
                 training=training,
                 latent_update_count=self._latent_updates,
                 weight_update_count=self.model2_runtime.weight_update_count,

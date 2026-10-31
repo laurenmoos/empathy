@@ -33,30 +33,11 @@ def test_help_lists_all_research_commands() -> None:
         "demo",
         "model1",
         "model2",
-        "stream-demo",
+        "live-demo",
     ]
     assert all(command in result.stdout for command in commands)
+    assert "stream-demo" not in result.stdout
     assert result.stderr == ""
-
-
-def test_stream_demo_command_builds_visual_timeline(tmp_path) -> None:
-    output = tmp_path / "stream"
-    result = run_cli(
-        "stream-demo",
-        "--output",
-        str(output),
-        "--seed",
-        "5",
-        "--events",
-        "2",
-    )
-
-    assert result.returncode == 0, result.stderr
-    assert (output / "index.html").exists()
-    assert (output / "streaming-timeline.png").exists()
-    manifest = json.loads((output / "manifest.json").read_text())
-    assert manifest["event_count"] == 2
-    assert manifest["runtime"] == "deterministic_fixture"
 
 
 def test_root_cli_delegates_model_help() -> None:

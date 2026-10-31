@@ -526,12 +526,6 @@ def _parser() -> argparse.ArgumentParser:
     subparsers.add_parser("model1", help="train and inspect the trajectory-belief model")
     subparsers.add_parser("model2", help="train and inspect the inverse-world model")
 
-    stream = subparsers.add_parser("stream-demo", help="render continual belief revision")
-    stream.add_argument("--seed", type=int, default=7)
-    stream.add_argument("--events", type=int, default=4)
-    stream.add_argument("--output", required=True)
-    stream.add_argument("--force", action="store_true")
-
     live = subparsers.add_parser("live-demo", help="serve the interactive learned-inference demo")
     live.add_argument("--host", default="127.0.0.1")
     live.add_argument("--port", type=int, default=8765)
@@ -581,15 +575,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                 force=args.force,
                 quick=args.quick,
             )
-        elif args.command == "stream-demo":
-            from .streaming_demo import run_quick_streaming_demo
-
-            output = Path(args.output)
-            if output.exists() and args.force:
-                if output.resolve() in {Path.cwd().resolve(), Path("/").resolve()}:
-                    raise ValueError("refusing to replace a broad output directory")
-                shutil.rmtree(output)
-            run_quick_streaming_demo(output, seed=args.seed, event_count=args.events)
         elif args.command == "live-demo":
             from .live_server import run_live_server
 

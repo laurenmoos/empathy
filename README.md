@@ -10,7 +10,9 @@ After the Model 1 and Model 2 checkpoints below have been created, launch the li
 .venv/bin/perception-env live-demo
 ```
 
-Then open [http://localhost:8765](http://localhost:8765). Set gravity, wind, and damping and click **Run & guess**. The page simulates that exact world, overlays Model 1's learned hidden-path superposition beneath the occluder, and compares the physical parameters you chose with Model 2's belief-only guess. Walls and the occluder are fixed scene geometry, not adjustable operators in this interface.
+Then open [http://localhost:8765](http://localhost:8765). Set gravity, wind, and damping and click **Play thinking stream**. The selected world stays fixed while episodes start from new deterministic height and velocity offsets. Three disjoint panels show the ground-truth rollout, Model 1's progressively accumulated hidden-path beliefs, and Model 2's pre-update world guess.
+
+Model 2 receives only four-event histories of belief images. After each episode's guess is captured, one small online weight update uses the true world as its training target; latent belief updates and weight updates are displayed separately. This is an adaptation demonstration, not evidence of general continual learning: because one session contains a single fixed world, Model 2 can eventually learn a constant answer. Testing generalization requires unannounced world changes and held-out, no-update episodes. Walls and the occluder remain fixed scene geometry rather than controls.
 
 ## Install and run
 

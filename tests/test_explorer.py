@@ -32,99 +32,94 @@ def parsed_explorer() -> tuple[str, ExplorerParser]:
     return source, parser
 
 
-def test_explorer_is_one_live_parameter_inference_interface() -> None:
+def test_explorer_has_three_visually_disjoint_perceptual_layers() -> None:
+    source, parser = parsed_explorer()
+
+    assert {
+        "worldPanel",
+        "worldCanvas",
+        "beliefPanel",
+        "beliefCanvas",
+        "secondOrderPanel",
+        "comparisonRows",
+    } <= parser.ids
+    assert parser.canvases == {"worldCanvas", "beliefCanvas"}
+    assert not parser.external_urls
+    assert "Ground-truth world" in source
+    assert "Model 1 · Belief space" in source
+    assert "Model 2 · Second-order perception" in source
+    assert "Model 2 never sees the world panel" in source
+    assert "drawBeliefOverlay" not in source
+    assert 'globalCompositeOperation = "screen"' not in source
+
+
+def test_stream_controls_start_sessions_and_queue_offset_episodes() -> None:
     source, parser = parsed_explorer()
 
     assert {
         "gravity",
-        "gravityValue",
         "wind",
-        "windValue",
         "damping",
-        "dampingValue",
-        "runInference",
-        "playback",
+        "streamToggle",
         "reset",
-        "worldCanvas",
+        "episodeReadout",
+        "offsetReadout",
     } <= parser.ids
-    assert parser.canvases == {"worldCanvas"}
-    assert not parser.external_urls
-    assert "requestAnimationFrame" in source
-    assert "Set the world" in source
-    assert 'fetch("/api/infer"' in source
-    assert 'gravity: Number($("gravity").value)' in source
-    assert 'wind: Number($("wind").value)' in source
-    assert 'damping: Number($("damping").value)' in source
-    assert "Observed rollout + Model 1 beliefs" in source
-    assert "Model 2 · Second-order perception" in source
-    for removed in (
-        "simulationMode",
-        "runLearned",
-        "modelOnePanel",
-        "beliefCanvas",
-        "view-switch",
-        "rolloutSelect",
-        "learned-example.json",
-    ):
-        assert removed not in source
+    assert 'postJson("/api/session/start"' in source
+    assert 'postJson("/api/session/next"' in source
+    assert "async function startSession" in source
+    assert "async function requestNextEpisode" in source
+    assert "episodeQueue" in source
+    assert "requestNextEpisode();" in source
+    assert "Play thinking stream" in source
+    assert "adaptation within one fixed world" in source
 
 
-def test_live_request_has_loading_error_and_comparison_states() -> None:
-    source, _ = parsed_explorer()
-
-    assert '"Content-Type": "application/json"' in source
-    assert "JSON.stringify(parameters)" in source
-    assert "response.ok" in source
-    assert "payload.error" in source
-    assert '$("runInference").disabled = true' in source
-    assert '$("runInference").disabled = false' in source
-    assert "requestSerial += 1;" in source
-    assert "learnedData = null;" in source
-    assert "clearWorldCanvas" in source
-    assert "Ground-truth parameters" in source
-    assert "Guessed parameters" in source
-    assert 'return "inactive"' in source
-
-
-def test_learned_square_frames_preserve_their_aspect_ratio() -> None:
-    source, _ = parsed_explorer()
-
-    assert "const side = Math.min(worldCanvas.width, worldCanvas.height);" in source
-    assert "drawImage(buffer, 0, 0, worldCanvas.width, worldCanvas.height)" not in source
-    assert 'worldCtx.imageSmoothingQuality = "high";' in source
-
-
-def test_beliefs_are_composited_into_the_observed_rollout() -> None:
+def test_thought_steps_and_online_updates_have_visible_state() -> None:
     source, parser = parsed_explorer()
 
     assert {
-        "truthPanel",
-        "modelTwoPanel",
-        "truthPhase",
-        "beliefLegend",
-        "comparisonRows",
+        "thoughtReadout",
+        "operatorReadout",
+        "latentUpdates",
+        "weightUpdates",
+        "onlineLoss",
     } <= parser.ids
-    assert "drawBeliefOverlay" in source
-    assert "worldCtx.globalCompositeOperation = \"screen\";" in source
-    assert "worldCtx.drawImage(beliefBuffer" in source
-    assert "learnedFrame >= truth.hidden_start && learnedFrame <= truth.hidden_end" in source
-    assert "purple = Model 1’s possible hidden paths" in source
-    assert "learnedFrame >= truth.reappearance_step" in source
-    assert 'payload.schema_version !== "live-inference-v1"' in source
-    assert "validateLiveResult" in source
-    assert "Couldn’t run inference" in source
-    assert "runInference" in source
+    for label in (
+        "first possibility",
+        "more possibilities",
+        "full belief",
+        "reappearance revision",
+    ):
+        assert label in source
     assert "Ground-truth parameters" in source
-    assert "Guessed parameters" in source
-    assert "normalized parameters" not in source
-    assert "beliefPhase" not in parser.ids
-    assert "Belief state" not in source
+    assert "Pre-update guess" in source
+    assert "latent_update_count" in source
+    assert "weight_update_count" in source
+    assert "training.loss" in source
+    assert "function updateLearningReadout" in source
+    assert "index === 3" in source
 
 
-def test_belief_overlay_renders_byte_values_without_clipping() -> None:
+def test_parameter_edits_invalidate_the_stream_and_clear_all_layers() -> None:
     source, _ = parsed_explorer()
 
-    assert "const normalized = value / 255;" in source
-    assert "Math.sqrt(normalized)" in source
-    assert 'worldCtx.imageSmoothingQuality = "high";' in source
+    assert "requestSerial += 1;" in source
+    assert "sessionId = null;" in source
+    assert "episodeQueue.length = 0;" in source
+    assert "clearWorldCanvas();" in source
+    assert "clearBeliefCanvas();" in source
+    assert "clearSecondOrder();" in source
+    assert "Parameters changed. Start a new thinking stream." in source
 
+
+def test_live_episode_validation_checks_frames_beliefs_and_four_thoughts() -> None:
+    source, _ = parsed_explorer()
+
+    assert 'payload.schema_version !== "live-thinking-v1"' in source
+    assert "payload.thought_steps.length !== 4" in source
+    assert "frame byte length" in source
+    assert "belief byte length" in source
+    assert "predicted_world_flat" in source
+    assert "initial_state" in source
+    assert "requestAnimationFrame" in source

@@ -131,3 +131,35 @@ def test_engine_exposes_thinking_sessions_only_with_an_online_runtime() -> None:
         LiveInferenceEngine(FakeModel1(), config, runtime.predict).thinking_session(
             LiveParameters()
         )
+
+
+def test_each_thinking_session_forks_fresh_online_model_state() -> None:
+    config = load_model1_config(ROOT / "configs" / "model1" / "v1.yaml")
+
+    class Runtime:
+        weight_update_count = 7
+
+        def __init__(self):
+            self.forks = 0
+
+        def predict(self, inputs):
+            return WorldPrediction(torch.zeros((1, 5)), torch.zeros((1, 7)))
+
+        def fork(self):
+            self.forks += 1
+            child = Runtime()
+            child.weight_update_count = 0
+            return child
+
+    runtime = Runtime()
+    engine = LiveInferenceEngine(
+        FakeModel1(), config, runtime.predict, model2_runtime=runtime
+    )
+
+    first = engine.thinking_session(LiveParameters())
+    second = engine.thinking_session(LiveParameters())
+
+    assert runtime.forks == 2
+    assert first.model2_runtime is not second.model2_runtime
+    assert first.model2_runtime.weight_update_count == 0
+    assert second.model2_runtime.weight_update_count == 0

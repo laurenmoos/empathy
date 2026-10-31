@@ -3,16 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Perception Environment Explorer</title>
+  <title>Perception Environment</title>
   <style>
     :root {
       color-scheme: dark;
-      --ink: #ecf6f5;
+      --ink: #edf7f6;
       --muted: #91a7aa;
       --panel: #101b1f;
       --line: rgba(174, 217, 216, .16);
       --aqua: #63e6d5;
       --violet: #ad92ff;
+      --amber: #ffc56d;
     }
     * { box-sizing: border-box; }
     body {
@@ -22,109 +23,73 @@
       background: #091013;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-    header { padding: 1rem 1.4rem; border-bottom: 1px solid var(--line); }
-    h1 { margin: 0; font-size: 1.3rem; letter-spacing: -.03em; }
-    main {
-      display: grid;
-      grid-template-columns: minmax(15rem, 18rem) minmax(0, 1fr);
-      min-height: calc(100vh - 3.6rem);
-    }
-    aside {
-      padding: 1rem;
-      border-right: 1px solid var(--line);
-      background: rgba(4, 11, 13, .35);
-    }
-    h2 { margin: 0; font-size: 1rem; }
-    .intro { margin: .45rem 0 1rem; color: var(--muted); font-size: .78rem; line-height: 1.45; }
-    label { display: grid; gap: .35rem; color: var(--muted); font-size: .75rem; }
-    .control { margin-top: .85rem; }
-    .control-line { display: flex; justify-content: space-between; gap: 1rem; }
-    .control output { color: var(--aqua); font: 650 .76rem ui-monospace, monospace; }
+    header { padding: .9rem 1.2rem; border-bottom: 1px solid var(--line); }
+    h1 { margin: 0; font-size: 1.15rem; letter-spacing: -.03em; }
+    main { display: grid; grid-template-columns: 16rem minmax(0, 1fr); min-height: calc(100vh - 3.2rem); }
+    aside { padding: 1rem; border-right: 1px solid var(--line); background: rgba(4, 11, 13, .35); }
+    h2 { margin: 0; font-size: .92rem; }
+    .intro { margin: .4rem 0 .9rem; color: var(--muted); font-size: .74rem; line-height: 1.45; }
+    .control { display: grid; gap: .3rem; margin-top: .75rem; color: var(--muted); font-size: .72rem; }
+    .control-line { display: flex; justify-content: space-between; gap: .8rem; }
+    output { color: var(--aqua); font: 650 .72rem ui-monospace, monospace; }
     input[type="range"] { width: 100%; accent-color: var(--aqua); }
     button {
       width: 100%;
-      padding: .65rem .75rem;
+      padding: .62rem .7rem;
       color: var(--ink);
       background: #18262a;
       border: 1px solid rgba(174, 217, 216, .22);
       border-radius: 9px;
       font: inherit;
+      font-weight: 700;
+      cursor: pointer;
     }
-    button { cursor: pointer; font-weight: 700; }
     button.primary { color: #06201d; background: var(--aqua); border-color: transparent; }
-    .buttons { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; margin-top: .7rem; }
-    .buttons .primary { grid-column: 1 / -1; }
     button:disabled { cursor: wait; opacity: .6; }
-    .status { min-height: 2.5em; margin: .7rem 0 0; color: var(--muted); font-size: .72rem; line-height: 1.35; }
-    .model-two {
-      margin-top: 1.2rem;
-      padding-top: 1rem;
-      border-top: 1px solid var(--line);
-    }
-    .model-two > small { display: block; margin: .45rem 0 .25rem; color: var(--muted); }
-    .model-two > b { font: 650 .82rem ui-monospace, monospace; }
-    .comparison { margin-top: .8rem; }
-    .comparison-row {
+    .buttons { display: grid; gap: .45rem; margin-top: .9rem; }
+    .status { min-height: 3.6em; margin: .65rem 0 0; color: var(--muted); font-size: .7rem; line-height: 1.4; }
+    .session-note { margin-top: 1rem; padding-top: .8rem; border-top: 1px solid var(--line); }
+    .session-note strong { display: block; color: var(--amber); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; }
+    .session-grid { display: grid; gap: .55rem; margin-top: .65rem; }
+    .session-grid small { display: block; color: var(--muted); font-size: .65rem; }
+    .session-grid b { font: 650 .72rem ui-monospace, monospace; }
+    .layers {
       display: grid;
-      grid-template-columns: 1.2fr 1fr 1fr;
-      gap: .35rem;
-      padding: .45rem 0;
-      border-top: 1px solid var(--line);
-      font-size: .68rem;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(16rem, .78fr);
+      gap: .8rem;
+      padding: 1rem;
+      align-items: start;
     }
-    .comparison-row.heading { color: var(--muted); border-top: 0; }
-    .comparison-row span:not(:first-child) { font-family: ui-monospace, monospace; }
-    .stage { padding: 1.2rem; }
-    figure {
-      margin: 0;
-      padding: .9rem;
+    .panel {
+      min-width: 0;
+      padding: .85rem;
       border: 1px solid var(--line);
-      border-radius: 16px;
+      border-radius: 15px;
       background: var(--panel);
     }
-    figcaption {
-      display: flex;
-      justify-content: space-between;
-      gap: 1rem;
-      padding: .1rem .2rem .75rem;
-      font-size: .9rem;
+    .panel-head { min-height: 3.2rem; margin-bottom: .65rem; }
+    .panel-head span { display: block; margin-top: .25rem; color: var(--muted); font-size: .68rem; line-height: 1.35; }
+    canvas { display: block; width: 100%; aspect-ratio: 1; border-radius: 10px; background: #05090b; }
+    .legend { margin-top: .65rem; color: var(--muted); font-size: .67rem; line-height: 1.45; }
+    .dot { display: inline-block; width: .55rem; height: .55rem; margin-right: .25rem; border-radius: 50%; }
+    .readout { min-height: 2.4em; font: 650 .76rem ui-monospace, monospace; color: var(--violet); }
+    .comparison { margin-top: .7rem; }
+    .comparison-row { display: grid; grid-template-columns: 1fr .85fr .85fr; gap: .25rem; padding: .42rem 0; border-top: 1px solid var(--line); font-size: .64rem; }
+    .comparison-row.heading { color: var(--muted); border-top: 0; }
+    .comparison-row span:not(:first-child) { font-family: ui-monospace, monospace; }
+    .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; margin-top: .8rem; }
+    .metric { padding: .55rem; border: 1px solid var(--line); border-radius: 9px; background: rgba(5, 12, 14, .65); }
+    .metric small { display: block; color: var(--muted); font-size: .61rem; }
+    .metric b { font: 650 .7rem ui-monospace, monospace; }
+    @media (max-width: 1080px) {
+      .layers { grid-template-columns: 1fr 1fr; }
+      #secondOrderPanel { grid-column: 1 / -1; }
     }
-    figcaption span { color: var(--muted); font-size: .75rem; }
-    canvas {
-      display: block;
-      width: 100%;
-      aspect-ratio: 16 / 8;
-      border-radius: 10px;
-      background: #05090b;
-    }
-    .legend {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      margin-top: .75rem;
-      color: var(--muted);
-      font-size: .73rem;
-    }
-    .dot {
-      display: inline-block;
-      width: .65rem;
-      height: .65rem;
-      margin-right: .3rem;
-      border-radius: 50%;
-      vertical-align: -.05rem;
-    }
-    .metrics { margin-top: .75rem; }
-    .metric { padding: .75rem; border: 1px solid var(--line); border-radius: 10px; background: rgba(5, 12, 14, .6); }
-    .metric small { display: block; margin-bottom: .25rem; color: var(--muted); }
-    .metric b { font: 650 .8rem ui-monospace, monospace; }
-    @media (max-width: 820px) {
+    @media (max-width: 760px) {
       main { grid-template-columns: 1fr; }
       aside { border-right: 0; border-bottom: 1px solid var(--line); }
-    }
-    @media (max-width: 560px) {
-      header, aside, .stage { padding: .75rem; }
-      .metrics { grid-template-columns: 1fr; }
-      figcaption { align-items: flex-start; flex-direction: column; gap: .2rem; }
+      .layers { grid-template-columns: 1fr; }
+      #secondOrderPanel { grid-column: auto; }
     }
   </style>
 </head>
@@ -132,8 +97,8 @@
   <header><h1>Perception environment</h1></header>
   <main>
     <aside>
-      <h2>Set the world</h2>
-      <p class="intro">Choose the forces, then let the two models infer this world from the occluded rollout.</p>
+      <h2>Fixed world</h2>
+      <p class="intro">Choose one world, then watch repeated episodes begin from new offsets.</p>
       <label class="control">
         <span class="control-line"><span>Gravity · down ↔ up</span><output id="gravityValue">−0.06</output></span>
         <input id="gravity" type="range" min="-0.30" max="0.30" step="0.02" value="-0.06">
@@ -147,38 +112,55 @@
         <input id="damping" type="range" min="0" max="0.60" step="0.05" value="0.00">
       </label>
       <div class="buttons">
-        <button class="primary" id="runInference">Run &amp; guess</button>
-        <button id="playback">Pause</button>
-        <button id="reset">Reset</button>
+        <button class="primary" id="streamToggle">Play thinking stream</button>
+        <button id="reset">Reset stream</button>
       </div>
-      <p class="status" id="statusMessage">Running the initial world…</p>
-
-      <section class="model-two" id="modelTwoPanel" aria-label="Model 2 output">
-        <h2>Model 2 · Second-order perception</h2>
-        <small>Model 2 sees Model 1’s belief image—not the rollout or these settings.</small>
-        <b id="operatorReadout">Waiting for beliefs</b>
-        <div class="comparison">
-          <div class="comparison-row heading"><span>Operator</span><span>Ground-truth parameters</span><span>Guessed parameters</span></div>
-          <div id="comparisonRows"></div>
+      <p class="status" id="statusMessage">Set the world, then start the stream.</p>
+      <section class="session-note">
+        <strong>adaptation within one fixed world</strong>
+        <div class="session-grid">
+          <div><small>Episode</small><b id="episodeReadout">—</b></div>
+          <div><small>Initial offset · y / vx / vy</small><b id="offsetReadout">—</b></div>
         </div>
       </section>
     </aside>
 
-    <section class="stage">
-      <figure id="truthPanel">
-        <figcaption>
-          <strong>Observed rollout + Model 1 beliefs</strong>
-          <span id="truthPhase">loading</span>
-        </figcaption>
-        <canvas id="worldCanvas" width="1200" height="600"></canvas>
-        <div class="legend" id="beliefLegend">
-          <span><i class="dot" style="background:white"></i>white = observed ball</span>
-          <span><i class="dot" style="background:var(--violet)"></i>purple = Model 1’s possible hidden paths</span>
+    <section class="layers">
+      <article class="panel" id="worldPanel">
+        <div class="panel-head">
+          <h2>Ground-truth world</h2>
+          <span id="worldPhase">Waiting for an episode</span>
+        </div>
+        <canvas id="worldCanvas" width="640" height="640"></canvas>
+        <p class="legend"><i class="dot" style="background:white"></i>The actual rollout. We can peek; Model 2 cannot.</p>
+      </article>
+
+      <article class="panel" id="beliefPanel">
+        <div class="panel-head">
+          <h2>Model 1 · Belief space</h2>
+          <span id="thoughtReadout">No belief yet</span>
+        </div>
+        <canvas id="beliefCanvas" width="640" height="640"></canvas>
+        <p class="legend"><i class="dot" style="background:var(--violet)"></i>Possible hidden paths accumulate, then revise at reappearance.</p>
+      </article>
+
+      <article class="panel" id="secondOrderPanel">
+        <div class="panel-head">
+          <h2>Model 2 · Second-order perception</h2>
+          <span>Model 2 never sees the world panel. It reads only Model 1’s belief revisions.</span>
+        </div>
+        <div class="readout" id="operatorReadout">Waiting for a belief</div>
+        <div class="comparison">
+          <div class="comparison-row heading"><span>Operator</span><span>Ground-truth parameters</span><span>Pre-update guess</span></div>
+          <div id="comparisonRows"></div>
         </div>
         <div class="metrics">
-          <div class="metric"><small>Playhead</small><b id="timeReadout">frame 1</b></div>
+          <div class="metric"><small>Latent updates</small><b id="latentUpdates">0</b></div>
+          <div class="metric"><small>Weight updates</small><b id="weightUpdates">0</b></div>
+          <div class="metric"><small>Latest online loss</small><b id="onlineLoss">—</b></div>
+          <div class="metric"><small>Thought step</small><b id="thoughtStepMetric">—</b></div>
         </div>
-      </figure>
+      </article>
     </section>
   </main>
 
@@ -186,19 +168,30 @@
     const $ = id => document.getElementById(id);
     const worldCanvas = $("worldCanvas");
     const worldCtx = worldCanvas.getContext("2d");
-    let learnedData = null;
-    let learnedFrame = 0;
-    let playing = false;
-    let accumulator = 0;
-    let previousTimestamp = 0;
-    let statusOverride = null;
-    let requestSerial = 0;
-
+    const beliefCanvas = $("beliefCanvas");
+    const beliefCtx = beliefCanvas.getContext("2d");
+    const EXPECTED_THOUGHT_LABELS = [
+      "first possibility",
+      "more possibilities",
+      "full belief",
+      "reappearance revision"
+    ];
     const worldSlots = [
       {name: "gravity", operator: "vertical_acceleration", parameter: "a_y"},
       {name: "wind", operator: "horizontal_acceleration", parameter: "a_x"},
       {name: "damping", operator: "damping", parameter: "lambda"}
     ];
+
+    let sessionId = null;
+    let episodeQueue = [];
+    let currentEpisode = null;
+    let currentFrame = 0;
+    let currentThought = -1;
+    let playing = false;
+    let fetching = false;
+    let requestSerial = 0;
+    let accumulator = 0;
+    let previousTimestamp = 0;
 
     function decodeBytes(encoded) {
       const raw = atob(encoded);
@@ -211,19 +204,19 @@
       }
     }
 
-    function validateLiveResult(payload) {
-      if (!payload || payload.schema_version !== "live-inference-v1") {
-        throw new Error("inference response must use the live v1 schema");
+    function validateLiveEpisode(payload) {
+      if (!payload || payload.schema_version !== "live-thinking-v1") {
+        throw new Error("episode response must use the live thinking v1 schema");
+      }
+      if (!Number.isInteger(payload.episode_index)
+          || !Array.isArray(payload.initial_state)
+          || payload.initial_state.length !== 4
+          || !payload.initial_state.every(Number.isFinite)) {
+        throw new Error("episode index and initial_state are invalid");
       }
       const truth = payload.ground_truth;
-      const model1 = payload.model1;
-      const model2 = payload.model2;
-      if (!truth || !model1 || !model2) throw new Error("rollout is missing a required model stage");
-      if (![truth.width, truth.height, truth.frame_count].every(Number.isInteger)) {
+      if (!truth || ![truth.width, truth.height, truth.frame_count].every(Number.isInteger)) {
         throw new Error("ground-truth dimensions must be integers");
-      }
-      if (truth.width < 1 || truth.height < 1 || truth.frame_count < 1) {
-        throw new Error("ground-truth dimensions must be positive");
       }
       if (!Number.isInteger(truth.hidden_start)
           || !Number.isInteger(truth.hidden_end)
@@ -234,25 +227,249 @@
           || truth.reappearance_step >= truth.frame_count) {
         throw new Error("hidden interval and reappearance must index the clip");
       }
-      if (![model1.width, model1.height].every(value => Number.isInteger(value) && value > 0)) {
-        throw new Error("belief dimensions must be positive integers");
-      }
       validateWorldVector(truth.world_flat, "actual world");
-      validateWorldVector(model2.predicted_world_flat, "predicted world");
       const frameBytes = decodeBytes(truth.frames_base64);
-      const preBelief = decodeBytes(model1.pre_belief_u8);
-      const postBelief = decodeBytes(model1.post_belief_u8);
       if (frameBytes.length !== truth.width * truth.height * truth.frame_count) {
-        throw new Error("ground-truth byte length does not match its dimensions");
+        throw new Error("frame byte length does not match dimensions");
       }
-      if (preBelief.length !== model1.width * model1.height
-          || postBelief.length !== model1.width * model1.height) {
-        throw new Error("belief byte length does not match its dimensions");
+      if (!Array.isArray(payload.thought_steps) || payload.thought_steps.length !== 4) {
+        throw new Error("episode must contain four thought steps");
       }
-      if (!truth.operators || !model2.operators) {
-        throw new Error("inference response is missing physical operator values");
+      const thoughtSteps = payload.thought_steps.map((step, index) => {
+        if (!step || step.label !== EXPECTED_THOUGHT_LABELS[index]
+            || !Number.isInteger(step.width) || !Number.isInteger(step.height)) {
+          throw new Error("thought step order or dimensions are invalid");
+        }
+        validateWorldVector(step.predicted_world_flat, "predicted world");
+        const beliefBytes = decodeBytes(step.belief_u8);
+        if (beliefBytes.length !== step.width * step.height) {
+          throw new Error("belief byte length does not match dimensions");
+        }
+        return {...step, beliefBytes};
+      });
+      if (!payload.training || !Number.isFinite(payload.training.loss)
+          || !Number.isInteger(payload.latent_update_count)
+          || !Number.isInteger(payload.weight_update_count)) {
+        throw new Error("online update metadata is invalid");
       }
-      return {...payload, frameBytes, preBelief, postBelief};
+      return {...payload, ground_truth: {...truth, frameBytes}, thought_steps: thoughtSteps};
+    }
+
+    function selectedParameters() {
+      return {
+        gravity: Number($("gravity").value),
+        wind: Number($("wind").value),
+        damping: Number($("damping").value)
+      };
+    }
+
+    async function postJson(url, body) {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(body)
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || `request failed: ${response.status}`);
+      return payload;
+    }
+
+    async function startSession() {
+      const serial = ++requestSerial;
+      sessionId = null;
+      episodeQueue.length = 0;
+      currentEpisode = null;
+      currentFrame = 0;
+      currentThought = -1;
+      playing = false;
+      fetching = false;
+      clearAllLayers();
+      $("streamToggle").disabled = true;
+      $("statusMessage").textContent = "Starting a fixed-world thinking session…";
+      try {
+        const payload = await postJson("/api/session/start", selectedParameters());
+        if (serial !== requestSerial) return;
+        if (payload.schema_version !== "live-session-v1" || typeof payload.session_id !== "string") {
+          throw new Error("session response is invalid");
+        }
+        sessionId = payload.session_id;
+        playing = true;
+        $("statusMessage").textContent = "Generating the first offset episode…";
+        await requestNextEpisode();
+      } catch (error) {
+        if (serial !== requestSerial) return;
+        playing = false;
+        sessionId = null;
+        $("statusMessage").textContent = `Couldn’t start the stream: ${error.message}`;
+      } finally {
+        if (serial === requestSerial) $("streamToggle").disabled = false;
+        updateControls();
+      }
+    }
+
+    async function requestNextEpisode() {
+      if (!sessionId || fetching) return;
+      const serial = requestSerial;
+      const targetSession = sessionId;
+      fetching = true;
+      try {
+        const payload = await postJson("/api/session/next", {session_id: targetSession});
+        if (serial !== requestSerial || targetSession !== sessionId) return;
+        const episode = validateLiveEpisode(payload);
+        if (!currentEpisode) setCurrentEpisode(episode);
+        else episodeQueue.push(episode);
+      } catch (error) {
+        if (serial !== requestSerial) return;
+        playing = false;
+        $("statusMessage").textContent = `Stream stopped: ${error.message}`;
+      } finally {
+        if (serial === requestSerial) fetching = false;
+        updateControls();
+      }
+    }
+
+    function setCurrentEpisode(episode) {
+      currentEpisode = episode;
+      currentFrame = 0;
+      currentThought = -1;
+      accumulator = 0;
+      $("episodeReadout").textContent = String(episode.episode_index + 1);
+      const [, y, vx, vy] = episode.initial_state;
+      $("offsetReadout").textContent = `${y.toFixed(2)} / ${vx.toFixed(2)} / ${vy.toFixed(2)}`;
+      $("statusMessage").textContent = "The ball is approaching the occluder.";
+      draw();
+      requestNextEpisode();
+    }
+
+    function advanceEpisode() {
+      if (episodeQueue.length) {
+        setCurrentEpisode(episodeQueue.shift());
+        return;
+      }
+      $("statusMessage").textContent = "Generating another offset…";
+      requestNextEpisode();
+    }
+
+    function imageBuffer(width, height, values, colorize = false) {
+      const buffer = document.createElement("canvas");
+      buffer.width = width;
+      buffer.height = height;
+      const ctx = buffer.getContext("2d");
+      const image = ctx.createImageData(width, height);
+      values.forEach((value, index) => {
+        const cursor = index * 4;
+        if (colorize) {
+          const intensity = Math.sqrt(value / 255);
+          image.data[cursor] = 173;
+          image.data[cursor + 1] = 146;
+          image.data[cursor + 2] = 255;
+          image.data[cursor + 3] = Math.round(intensity * 240);
+        } else {
+          image.data[cursor] = value;
+          image.data[cursor + 1] = value;
+          image.data[cursor + 2] = value;
+          image.data[cursor + 3] = 255;
+        }
+      });
+      ctx.putImageData(image, 0, 0);
+      return buffer;
+    }
+
+    function clearWorldCanvas() {
+      worldCtx.fillStyle = "#05090b";
+      worldCtx.fillRect(0, 0, worldCanvas.width, worldCanvas.height);
+      $("worldPhase").textContent = "Waiting for an episode";
+    }
+
+    function clearBeliefCanvas() {
+      beliefCtx.fillStyle = "#05090b";
+      beliefCtx.fillRect(0, 0, beliefCanvas.width, beliefCanvas.height);
+      $("thoughtReadout").textContent = "No belief yet";
+      $("thoughtStepMetric").textContent = "—";
+    }
+
+    function clearSecondOrder() {
+      $("operatorReadout").textContent = "Waiting for a belief";
+      $("comparisonRows").replaceChildren();
+      $("latentUpdates").textContent = "0";
+      $("weightUpdates").textContent = "0";
+      $("onlineLoss").textContent = "—";
+    }
+
+    function clearAllLayers() {
+      clearWorldCanvas();
+      clearBeliefCanvas();
+      clearSecondOrder();
+      $("episodeReadout").textContent = "—";
+      $("offsetReadout").textContent = "—";
+    }
+
+    function drawWorld() {
+      if (!currentEpisode) return clearWorldCanvas();
+      const truth = currentEpisode.ground_truth;
+      const frameSize = truth.width * truth.height;
+      const offset = currentFrame * frameSize;
+      const frame = truth.frameBytes.slice(offset, offset + frameSize);
+      const buffer = imageBuffer(truth.width, truth.height, frame);
+      worldCtx.fillStyle = "#05090b";
+      worldCtx.fillRect(0, 0, worldCanvas.width, worldCanvas.height);
+      worldCtx.imageSmoothingEnabled = true;
+      worldCtx.imageSmoothingQuality = "high";
+      worldCtx.drawImage(buffer, 0, 0, worldCanvas.width, worldCanvas.height);
+      const hidden = currentFrame >= truth.hidden_start && currentFrame <= truth.hidden_end;
+      $("worldPhase").textContent = hidden
+        ? "Ball hidden · the world continues"
+        : currentFrame >= truth.reappearance_step
+          ? "Ball reappeared · evidence arrives"
+          : "Ball visible";
+      $("statusMessage").textContent = hidden
+        ? "Model 1 is expanding possible hidden paths."
+        : currentFrame >= truth.reappearance_step
+          ? "Evidence arrived. The guess is scored, then Model 2 learns."
+          : "The ball is approaching the occluder.";
+    }
+
+    function thoughtIndex() {
+      if (!currentEpisode) return -1;
+      const truth = currentEpisode.ground_truth;
+      if (currentFrame < truth.hidden_start) return -1;
+      if (currentFrame >= truth.reappearance_step) return 3;
+      const hiddenLength = Math.max(1, truth.hidden_end - truth.hidden_start + 1);
+      const progress = (currentFrame - truth.hidden_start) / hiddenLength;
+      return Math.min(2, Math.floor(progress * 3));
+    }
+
+    function drawBelief() {
+      const index = thoughtIndex();
+      updateLearningReadout(index);
+      if (!currentEpisode || index < 0) return clearBeliefCanvas();
+      const step = currentEpisode.thought_steps[index];
+      const buffer = imageBuffer(step.width, step.height, step.beliefBytes, true);
+      beliefCtx.fillStyle = "#05090b";
+      beliefCtx.fillRect(0, 0, beliefCanvas.width, beliefCanvas.height);
+      beliefCtx.imageSmoothingEnabled = true;
+      beliefCtx.imageSmoothingQuality = "high";
+      beliefCtx.drawImage(buffer, 0, 0, beliefCanvas.width, beliefCanvas.height);
+      $("thoughtReadout").textContent = `${index + 1}/4 · ${step.label}`;
+      $("thoughtStepMetric").textContent = `${index + 1} / 4`;
+      if (index !== currentThought) {
+        currentThought = index;
+        updateSecondOrder(step);
+      }
+    }
+
+    function updateLearningReadout(index) {
+      if (!currentEpisode) return;
+      const completedLatent = currentEpisode.latent_update_count - 4;
+      const completedWeights = currentEpisode.weight_update_count - 1;
+      $("latentUpdates").textContent = String(completedLatent + Math.max(0, index + 1));
+      if (index === 3) {
+        $("weightUpdates").textContent = String(currentEpisode.weight_update_count);
+        $("onlineLoss").textContent = currentEpisode.training.loss.toFixed(4);
+      } else {
+        $("weightUpdates").textContent = String(completedWeights);
+        $("onlineLoss").textContent = "pending reveal";
+      }
     }
 
     function worldSlotValue(operators, slot) {
@@ -274,193 +491,81 @@
       });
     }
 
-    function learnedWorldSummary(operators) {
+    function worldSummary(operators) {
       const active = worldSlots
         .filter(slot => operators[slot.operator]?.active)
         .map(slot => `${slot.name} ${worldSlotValue(operators, slot)}`);
       return active.length ? active.join(" · ") : "constant motion";
     }
 
-    function imageBuffer(width, height, values, colorize = false) {
-      const buffer = document.createElement("canvas");
-      buffer.width = width;
-      buffer.height = height;
-      const ctx = buffer.getContext("2d");
-      const image = ctx.createImageData(width, height);
-      values.forEach((value, index) => {
-        const cursor = index * 4;
-        if (colorize) {
-          const normalized = value / 255;
-          const intensity = Math.sqrt(normalized);
-          image.data[cursor] = 173;
-          image.data[cursor + 1] = 146;
-          image.data[cursor + 2] = 255;
-          image.data[cursor + 3] = Math.round(intensity * 230);
-        } else {
-          image.data[cursor] = value;
-          image.data[cursor + 1] = value;
-          image.data[cursor + 2] = value;
-          image.data[cursor + 3] = 255;
-        }
-      });
-      ctx.putImageData(image, 0, 0);
-      return buffer;
-    }
-
-    function drawBeliefOverlay(left, top, side) {
-      const truth = learnedData.ground_truth;
-      if (!(learnedFrame >= truth.hidden_start && learnedFrame <= truth.hidden_end)) return;
-      const postObservation = learnedFrame >= truth.reappearance_step;
-      const values = postObservation ? learnedData.postBelief : learnedData.preBelief;
-      const beliefBuffer = imageBuffer(
-        learnedData.model1.width,
-        learnedData.model1.height,
-        values,
-        true
+    function updateSecondOrder(step) {
+      $("operatorReadout").textContent = worldSummary(step.operators);
+      $("comparisonRows").replaceChildren(
+        ...comparisonElements(currentEpisode.ground_truth.operators, step.operators)
       );
-      worldCtx.save();
-      worldCtx.globalCompositeOperation = "screen";
-      worldCtx.globalAlpha = .92;
-      worldCtx.imageSmoothingEnabled = true;
-      worldCtx.imageSmoothingQuality = "high";
-      worldCtx.drawImage(beliefBuffer, left, top, side, side);
-      worldCtx.restore();
-    }
-
-    function drawLearnedWorld() {
-      if (!learnedData) {
-        clearWorldCanvas();
-        return;
-      }
-      const truth = learnedData.ground_truth;
-      const frameSize = truth.width * truth.height;
-      const offset = learnedFrame * frameSize;
-      const frame = learnedData.frameBytes.slice(offset, offset + frameSize);
-      const buffer = imageBuffer(truth.width, truth.height, frame);
-      worldCtx.fillStyle = "#05090b";
-      worldCtx.fillRect(0, 0, worldCanvas.width, worldCanvas.height);
-      const side = Math.min(worldCanvas.width, worldCanvas.height);
-      const left = (worldCanvas.width - side) / 2;
-      const top = (worldCanvas.height - side) / 2;
-      worldCtx.imageSmoothingEnabled = true;
-      worldCtx.imageSmoothingQuality = "high";
-      worldCtx.drawImage(buffer, left, top, side, side);
-      drawBeliefOverlay(left, top, side);
-    }
-
-    function clearWorldCanvas() {
-      worldCtx.fillStyle = "#05090b";
-      worldCtx.fillRect(0, 0, worldCanvas.width, worldCanvas.height);
-      $("truthPhase").textContent = "waiting for a run";
-      $("timeReadout").textContent = "—";
-    }
-
-    function updateOutputs() {
-      if (!learnedData) {
-        if (statusOverride) $("statusMessage").textContent = statusOverride;
-        $("playback").textContent = "Play";
-        return;
-      }
-      const truth = learnedData.ground_truth;
-      const postObservation = learnedFrame >= truth.reappearance_step;
-      const hidden = learnedFrame >= truth.hidden_start && learnedFrame <= truth.hidden_end;
-      $("timeReadout").textContent = `frame ${learnedFrame + 1} of ${truth.frame_count}`;
-      $("truthPhase").textContent = hidden ? "ball hidden · Model 1 belief visible" : "ground truth visible";
-      $("playback").textContent = playing ? "Pause" : "Play";
-      $("statusMessage").textContent = statusOverride || (hidden
-        ? "The ball is hidden. Purple shows Model 1’s belief beneath the occluder."
-        : postObservation
-          ? "The ball has reappeared. Model 1 has revised its belief."
-          : "The observed ball is approaching the occluder.");
     }
 
     function draw() {
-      drawLearnedWorld();
-      updateOutputs();
-    }
-
-    function showInference(candidate) {
-      const comparison = comparisonElements(
-        candidate.ground_truth.operators,
-        candidate.model2.operators
-      );
-      learnedData = candidate;
-      learnedFrame = 0;
-      accumulator = 0;
-      $("comparisonRows").replaceChildren(...comparison);
-      $("operatorReadout").textContent = learnedWorldSummary(candidate.model2.operators);
-      draw();
-    }
-
-    function selectedParameters() {
-      return {
-        gravity: Number($("gravity").value),
-        wind: Number($("wind").value),
-        damping: Number($("damping").value)
-      };
-    }
-
-    async function runInference() {
-      const serial = ++requestSerial;
-      const parameters = selectedParameters();
-      playing = false;
-      learnedData = null;
-      statusOverride = "Running the simulation, Model 1, and Model 2…";
-      $("runInference").disabled = true;
-      $("operatorReadout").textContent = "Guessing…";
-      $("comparisonRows").replaceChildren();
-      draw();
-      try {
-        const response = await fetch("/api/infer", {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify(parameters)
-        });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || `inference failed: ${response.status}`);
-        if (serial !== requestSerial) return;
-        const prepared = validateLiveResult(payload);
-        statusOverride = null;
-        showInference(prepared);
-        playing = true;
-      } catch (error) {
-        if (serial !== requestSerial) return;
-        playing = false;
-        statusOverride = `Couldn’t run inference: ${error.message}`;
-        $("operatorReadout").textContent = "No guess available";
-        updateOutputs();
-      } finally {
-        if (serial === requestSerial) $("runInference").disabled = false;
-      }
+      drawWorld();
+      drawBelief();
     }
 
     function animate(timestamp) {
       if (!previousTimestamp) previousTimestamp = timestamp;
       const elapsed = Math.min((timestamp - previousTimestamp) / 1000, .1);
       previousTimestamp = timestamp;
-      if (playing && learnedData) {
+      if (playing && currentEpisode) {
         accumulator += elapsed;
-        if (accumulator >= .12) {
-          learnedFrame = (learnedFrame + 1) % learnedData.ground_truth.frame_count;
+        if (accumulator >= .14) {
           accumulator = 0;
+          if (currentFrame < currentEpisode.ground_truth.frame_count - 1) {
+            currentFrame += 1;
+          } else {
+            advanceEpisode();
+          }
         }
       }
       draw();
       requestAnimationFrame(animate);
     }
 
-    $("playback").addEventListener("click", () => {
-      if (!learnedData) return;
+    function updateControls() {
+      $("streamToggle").textContent = !sessionId
+        ? "Play thinking stream"
+        : playing ? "Pause thinking stream" : "Resume thinking stream";
+    }
+
+    function stopAndClear(message) {
+      requestSerial += 1;
+      sessionId = null;
+      episodeQueue.length = 0;
+      currentEpisode = null;
+      currentFrame = 0;
+      currentThought = -1;
+      playing = false;
+      fetching = false;
+      clearWorldCanvas();
+      clearBeliefCanvas();
+      clearSecondOrder();
+      $("episodeReadout").textContent = "—";
+      $("offsetReadout").textContent = "—";
+      $("statusMessage").textContent = message;
+      $("streamToggle").disabled = false;
+      updateControls();
+    }
+
+    $("streamToggle").addEventListener("click", () => {
+      if (!sessionId) {
+        startSession();
+        return;
+      }
       playing = !playing;
-      updateOutputs();
+      if (playing && !currentEpisode) requestNextEpisode();
+      updateControls();
     });
     $("reset").addEventListener("click", () => {
-      playing = false;
-      learnedFrame = 0;
-      accumulator = 0;
-      draw();
+      stopAndClear("Stream reset. Start again when ready.");
     });
-    $("runInference").addEventListener("click", runInference);
 
     function showControlValue(id) {
       const value = Number($(id).value);
@@ -468,20 +573,14 @@
     }
     ["gravity", "wind", "damping"].forEach(id => {
       $(id).addEventListener("input", () => {
-        requestSerial += 1;
         showControlValue(id);
-        playing = false;
-        learnedData = null;
-        statusOverride = "Parameters changed. Run again to update the beliefs and guess.";
-        $("operatorReadout").textContent = "Run to update";
-        $("comparisonRows").replaceChildren();
-        $("runInference").disabled = false;
-        draw();
+        stopAndClear("Parameters changed. Start a new thinking stream.");
       });
       showControlValue(id);
     });
 
-    runInference();
+    clearAllLayers();
+    updateControls();
     requestAnimationFrame(animate);
   </script>
 </body>

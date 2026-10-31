@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import threading
 from dataclasses import dataclass
 from typing import Protocol
@@ -52,6 +53,11 @@ class OnlineModel2Runtime:
     def predict(self, inputs: BeliefInputs) -> WorldPrediction:
         with self._lock:
             return predict_model2(self.model, inputs)
+
+    def fork(self) -> OnlineModel2Runtime:
+        """Start an independent adaptation stream from the loaded checkpoint state."""
+        with self._lock:
+            return OnlineModel2Runtime(copy.deepcopy(self.model).eval())
 
     def train_step(
         self, inputs: BeliefInputs, target_world_flat: np.ndarray

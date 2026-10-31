@@ -166,10 +166,15 @@ class LiveInferenceEngine:
             raise RuntimeError("thinking sessions require an online Model 2 runtime")
         from .live_thinking import LiveThinkingSession
 
+        runtime = (
+            self.model2_runtime.fork()
+            if hasattr(self.model2_runtime, "fork")
+            else self.model2_runtime
+        )
         return LiveThinkingSession(
             self.model1,
             self.model1_config,
-            self.model2_runtime,
+            runtime,
             parameters,
             model_lock=self._lock,
         )

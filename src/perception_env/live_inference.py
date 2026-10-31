@@ -182,7 +182,7 @@ class LiveInferenceEngine:
         self,
         parameters: LiveParameters,
         initial_state: BallState = DEFAULT_LIVE_INITIAL_STATE,
-    ) -> tuple[Model1ExampleRecord, np.ndarray]:
+    ) -> tuple[Model1ExampleRecord, np.ndarray, np.ndarray]:
         world = world_from_parameters(parameters)
         simulation = SimulationConfig(dt=0.1, steps=40, seed=0)
         trajectory = rollout(initial_state, world, simulation)
@@ -230,10 +230,13 @@ class LiveInferenceEngine:
             oracle_pre_belief=empty_belief,
             actual_path_belief=empty_belief,
         )
-        return record, sequence.frames
+        full_path = np.asarray(
+            [(state.x, state.y) for state in trajectory.states], dtype=np.float32
+        )
+        return record, sequence.frames, full_path
 
     def infer(self, parameters: LiveParameters) -> LiveInferenceResult:
-        record, frames = self._record(parameters)
+        record, frames, _ = self._record(parameters)
         batch = collate_model1([record], self.model1_config)
         size = self.model1_config.dataset.frame_size
         with self._lock, torch.inference_mode():

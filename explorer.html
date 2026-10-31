@@ -448,18 +448,25 @@
       perceptionCtx.restore();
     }
 
-    function progressiveGroundTruthPath(truth) {
-      if (currentFrame < truth.hidden_start) return [];
-      const duration = Math.max(1, truth.reappearance_step - truth.hidden_start);
-      const progress = Math.max(
-        0,
-        Math.min(1, (currentFrame - truth.hidden_start) / duration)
-      );
-      const count = Math.min(
-        truth.path.length,
-        Math.max(2, Math.ceil(progress * truth.path.length))
-      );
-      return truth.path.slice(0, count);
+    function drawInitialCondition([x, y, vx, vy]) {
+      const px = x * perceptionCanvas.width;
+      const py = (1 - y) * perceptionCanvas.height;
+      const tipX = px + vx * perceptionCanvas.width * .38;
+      const tipY = py - vy * perceptionCanvas.height * .38;
+      perceptionCtx.save();
+      perceptionCtx.strokeStyle = "#4f554f";
+      perceptionCtx.fillStyle = "#dbd8d0";
+      perceptionCtx.globalAlpha = .75;
+      perceptionCtx.lineWidth = 1.2;
+      perceptionCtx.beginPath();
+      perceptionCtx.moveTo(px, py);
+      perceptionCtx.lineTo(tipX, tipY);
+      perceptionCtx.stroke();
+      perceptionCtx.beginPath();
+      perceptionCtx.arc(px, py, 3, 0, Math.PI * 2);
+      perceptionCtx.fill();
+      perceptionCtx.stroke();
+      perceptionCtx.restore();
     }
 
     function strokePath(path, width, alpha) {
@@ -515,7 +522,8 @@
           updateSecondOrder(step);
         }
       }
-      drawGroundTruthPath(progressiveGroundTruthPath(truth));
+      drawGroundTruthPath(truth.path);
+      drawInitialCondition(currentEpisode.initial_state);
     }
 
     function thoughtIndex() {

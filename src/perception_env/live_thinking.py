@@ -271,10 +271,10 @@ class LiveThinkingSession:
             initial = self.initial_states[self._offset_cursor % len(self.initial_states)]
             self._offset_cursor += 1
             try:
-                record, frames = engine._record(self.parameters, initial)
+                record, frames, full_path = engine._record(self.parameters, initial)
             except LiveInferenceError:
                 continue
-            return initial, record, frames
+            return initial, record, frames, full_path
         raise LiveInferenceError("no valid offset produced an occluded reappearance")
 
     def next_episode(self) -> LiveThinkingEpisode:
@@ -284,7 +284,7 @@ class LiveThinkingSession:
                 self.model1_config,
                 self.model2_runtime.predict,
             )
-            initial, record, frames = self._next_record(engine)
+            initial, record, frames, full_path = self._next_record(engine)
             batch = collate_model1([record], self.model1_config)
             size = self.model1_config.dataset.frame_size
             with torch.inference_mode():
@@ -343,11 +343,11 @@ class LiveThinkingSession:
                     .numpy()
                     .astype(np.float32)
                 )
-                entry_position = record.target_states[0, :2].astype(np.float32)
-                entries = np.broadcast_to(
-                    entry_position, (len(visual_paths), 1, 2)
+                observed_prefix = full_path[: record.hidden_start + 1]
+                prefixes = np.broadcast_to(
+                    observed_prefix, (len(visual_paths), *observed_prefix.shape)
                 ).copy()
-                visual_paths = np.concatenate((entries, visual_paths), axis=1)
+                visual_paths = np.concatenate((prefixes, visual_paths), axis=1)
                 steps.append(
                     LiveThoughtStep(
                         index,
@@ -389,7 +389,7 @@ class LiveThinkingSession:
                 reappearance_step=record.reappearance_step,
                 thought_steps=tuple(steps),
                 ground_truth_flat=record.world_flat,
-                ground_truth_path=record.target_states[record.target_mask, :2].copy(),
+                ground_truth_path=full_path,
                 training=training,
                 latent_update_count=self._latent_updates,
                 weight_update_count=self.model2_runtime.weight_update_count,

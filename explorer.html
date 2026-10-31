@@ -72,9 +72,12 @@
     .panel-head { min-height: 2.5rem; margin-bottom: .65rem; }
     .panel-head span { display: block; margin-top: .25rem; color: var(--muted); font-size: .68rem; line-height: 1.35; }
     canvas { display: block; width: 100%; aspect-ratio: 1.2; background: var(--canvas); }
-    .comparison { margin-top: .35rem; }
-    .constraint-legend { display: flex; justify-content: flex-end; gap: .8rem; margin-bottom: .4rem; color: var(--muted); font-size: .57rem; }
-    .comparison-row { display: grid; grid-template-columns: 4.5rem minmax(7rem, 1fr) 5.2rem; align-items: center; gap: .65rem; padding: .8rem 0; border-top: 1px solid var(--line); font-size: .66rem; }
+    .comparison { --constraint-label: 4.55rem; --constraint-values: 5.45rem; --constraint-gap: .7rem; margin-top: .35rem; }
+    .constraint-legend, .comparison-row { display: grid; grid-template-columns: var(--constraint-label) minmax(7rem, 1fr) var(--constraint-values); gap: var(--constraint-gap); }
+    .constraint-legend { align-items: center; min-height: 1.3rem; color: var(--muted); font-size: .55rem; }
+    .constraint-legend-axis { grid-column: 2; text-align: center; }
+    .constraint-legend-values { grid-column: 3; text-align: center; }
+    .comparison-row { align-items: center; padding: .8rem 0; border-top: 1px solid var(--line); font-size: .66rem; }
     .constraint-label { display: grid; gap: .2rem; }
     .constraint-name { font: 500 .72rem Georgia, serif; }
     .constraint-direction { color: var(--muted); font-size: .55rem; }
@@ -87,7 +90,9 @@
     .constraint-guess { position: absolute; top: .28rem; width: .46rem; height: .46rem; border-radius: 50%; background: #858a81; transform: translateX(-50%); transition: left .35s ease, background-color .35s ease; }
     .movement-toward .constraint-guess { background: #6d806a; }
     .movement-away .constraint-guess { background: #9a7567; }
-    .constraint-values { color: var(--muted); text-align: right; font: 500 .59rem ui-monospace, monospace; white-space: nowrap; }
+    .constraint-values { display: grid; grid-template-columns: 1fr .7rem 1fr; align-items: baseline; color: var(--muted); font: 500 .59rem ui-monospace, monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .constraint-value-actual, .constraint-value-guess { text-align: right; }
+    .constraint-value-arrow { text-align: center; }
     @media (max-width: 1080px) {
       .layers { grid-template-columns: 1fr; }
     }
@@ -136,7 +141,10 @@
           <h2>Second-order perception</h2>
         </div>
         <div class="comparison">
-          <div class="constraint-legend"><span>hidden |</span><span>search ●</span></div>
+          <div class="constraint-legend">
+            <span class="constraint-legend-axis">hidden | &nbsp;&nbsp; search ●</span>
+            <span class="constraint-legend-values">hidden → search</span>
+          </div>
           <div id="comparisonRows"></div>
         </div>
       </article>
@@ -610,7 +618,16 @@
         axis.append(target, guess);
         const values = document.createElement("span");
         values.className = "constraint-values";
-        values.textContent = `${actualValue.toFixed(2)} → ${predictedValue.toFixed(2)}`;
+        const actualText = document.createElement("span");
+        actualText.className = "constraint-value-actual";
+        actualText.textContent = actualValue.toFixed(2);
+        const arrow = document.createElement("span");
+        arrow.className = "constraint-value-arrow";
+        arrow.textContent = "→";
+        const guessText = document.createElement("span");
+        guessText.className = "constraint-value-guess";
+        guessText.textContent = predictedValue.toFixed(2);
+        values.append(actualText, arrow, guessText);
         row.append(label, axis, values);
         return row;
       });

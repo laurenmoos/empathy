@@ -165,6 +165,11 @@ def test_second_order_panel_shows_constraint_direction_without_summary_block() -
     assert "constraint-target" in source
     assert "constraint-guess" in source
     assert "constraint-previous" in source
+    assert "constraint-legend-axis" in source
+    assert "constraint-legend-values" in source
+    assert "constraint-value-actual" in source
+    assert "constraint-value-arrow" in source
+    assert "constraint-value-guess" in source
     assert 'direction.textContent = movement === "toward" ? "toward"' in source
     assert 'row.classList.add(`movement-${movement}`)' in source
     assert "mean closeness to hidden parameters" not in source

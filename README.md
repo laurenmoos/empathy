@@ -1,102 +1,45 @@
-# Perception Environment
+# Pinball
 
-A visually inspectable toy environment for experiments on second-order perceptual coherence. One ball moves under deliberately simple forces, becomes occluded, and produces exact reachable sets and belief superpositions for downstream models.
+Pinball asks whether one system can partially recover another **as a perceiver**, through the intentional structure preserved in its experience. **Model 1 sees; Model 2 thinks by imagining the world that could have made Model 1 see as it did.**
 
-## Interactive parameter explorer
+## Environment
 
-After the Model 1 and Model 2 checkpoints below have been created, launch the live explorer with:
+A ball moves behind a fixed occluder. Each environment is defined by gravity, wind, and damping. These parameters compose at every time step to transform one ball state into the next, so the hidden trajectory carries their joint constraints without directly revealing their values.
 
-```bash
-.venv/bin/perception-env live-demo
-```
+## Model 1: Seeing
 
-Then open [http://localhost:8765](http://localhost:8765). Set gravity, wind, and damping and click **Play thinking stream**. The selected world stays fixed while episodes start from new deterministic height and velocity offsets. Three disjoint panels show the ground-truth rollout, Model 1's progressively accumulated hidden-path beliefs, and Model 2's pre-update world guess.
+Model 1 is a video CNN with temporal memory. From the visible frames before and after occlusion, it predicts a weighted set of possible hidden trajectories.
 
-Model 2 receives only four-event histories of belief images. After each episode's guess is captured, one small online weight update uses the true world as its training target; latent belief updates and weight updates are displayed separately. This is an adaptation demonstration, not evidence of general continual learning: because one session contains a single fixed world, Model 2 can eventually learn a constant answer. Testing generalization requires unannounced world changes and held-out, no-update episodes. Walls and the occluder remain fixed scene geometry rather than controls.
+![Within-environment adaptation loop](docs/images/within-environment-adaptation-loop.png)
 
-## Install and run
+It learns through a streaming loop. Within one environment, it predicts across episodes with varied initial conditions; completed trajectories are then revealed and used for a few updates, together with replay from earlier environments. Its weights and replay continue into the next environment.
 
-```bash
-uv sync --extra dev --extra ml
-.venv/bin/perception-env demo \
-  --config configs/world_families/v1.yaml \
-  --seed 7 \
-  --output artifacts/environment-demo
-```
+For every episode, the interface preserves three perceptual traces from Model 1's late temporal activations:
 
-Open `artifacts/environment-demo/index.html` to inspect the world cards, latent trajectories, occluded observations, belief revisions, shattering matrix, and perceptual-equivalence gallery. Add `--quick` for a smaller smoke-test run.
+- **pre-belief**: `z_pre`, recorded while the ball is hidden;
+- **post-belief**: `z_post`, recorded after it reappears;
+- **belief change**: `z_post - z_pre`.
 
-The other commands are:
+The trajectory maps remain useful outputs for training and visualization, but the activation traces become the channel into Model 2.
 
-- `sample`: save a seeded bank of flat world codes from one complexity level;
-- `inspect`: regenerate a contact sheet from saved records without rerunning simulation;
-- `estimate-shattering`: rerun the search from a demo's saved label matrix;
-- `demo`: produce the complete benchmark and visual index.
+## Model 2: Thinking
 
-## Learned models
+Model 2 receives the detached pre-belief, post-belief, and belief-change activations. It therefore encounters the internal form of Model 1's experience.
 
-The repository now contains two real PyTorch models rather than only visual stand-ins.
-Model 1 encodes an occlusion clip with a small CNN/GRU and predicts eight weighted hidden
-trajectories, which are differentiably rasterized into a belief superposition. Model 2 is a
-separate CNN whose production input is limited to four pre/post/difference belief events and a
-history mask; it predicts operator activity and normalized parameters.
+In the diagram, the pre-belief, post-belief, and difference panels are readable projections reconstructed from the underlying activation traces `z_pre`, `z_post`, and `z_post - z_pre`.
 
-Run small CPU demonstrations with:
+![Model 2 inference pipeline](docs/images/model-2-inference-pipeline.png)
 
-```bash
-.venv/bin/perception-env model1 demo \
-  --config configs/model1/v1.yaml \
-  --family-config configs/world_families/v1.yaml \
-  --seed 7 --device cpu --quick \
-  --output artifacts/model1-learned-demo
+A small evidence adapter maps these traces into a space that can be compared with simulated candidates. Sequential Monte Carlo then maintains candidate settings of gravity, wind, and damping. The simulator rolls out each candidate across possible initial states, and Model 2 gives greater weight to worlds whose consequences best explain Model 1's activation history.
 
-.venv/bin/perception-env model2 demo \
-  --config configs/model2/smoke_v1.yaml \
-  --seed 7 \
-  --output artifacts/model2-learned-demo
+This is a practical approximation to second-order perception: Model 1 sees an event, and Model 2 tries to understand the conditions under which that seeing took the form it did. The simulator search remains reflective thinking rather than immediate perception.
 
-.venv/bin/perception-env stream-demo \
-  --seed 7 --events 4 \
-  --output artifacts/streaming-demo
-```
+Model 2 recovers the **intentional structure** of Model 1's experience only as an intermediate representation in its task of reconstructing the environment reflected in those activations.
 
-The first two commands train and evaluate the actual learned models. The quick streaming command
-exercises the production belief-only feedback and persistence contracts with deterministic fixture
-runtimes; adapters and checkpoints for the learned models are available, but a trained-checkpoint
-streaming command remains the next integration step. The smoke Model 2 run is a systems check, not
-a successful research result: its possibility agreement does not yet beat the constant baseline.
+## Coherence
 
-## World code
+Model 2 is coherent when it can imagine a world whose conditions could have produced Model 1's experience. Measure coherence through parameter error and posterior concentration as episodes accumulate, plus stability across initial conditions and unseen environments.
 
-Schema `v1` has five optional operator slots: vertical acceleration, horizontal acceleration, damping, a vertical wall, and a horizontal wall. Every slot has an activity flag and normalized parameter block. Constant motion is implicit. Active force values cannot lie in a configured neutral interval, so “active but zero” is not silently confused with “inactive.”
+Because gravity, wind, and damping are compositional operators, successful recovery asks whether Model 1's activations preserve reusable physical constraints rather than individual trajectory templates. The VC-dimension connection remains a capacity analogy: recoverable dimension describes how many independent distinctions among possible worlds survive in Model 1's perceptual state.
 
-The simulator uses fixed-step semi-implicit Euler updates in this order: acceleration, damping, velocity update, position update, collision resolution. It is a controlled rule generator, not a realistic physics engine.
-
-## Possibility versus belief
-
-The reachability oracle enumerates an explicit grid of admissible hidden-entry states. Its binary occupancy image answers whether a location is reachable under a world. A belief image is different: it is a weighted superposition of sampled trajectory masks and can express concentration or uncertainty.
-
-Model 2 receives only four-event histories of:
-
-1. pre-assimilation belief;
-2. post-assimilation belief;
-3. their difference.
-
-It never receives raw frames, positions, visibility masks, detector features, or a direct reappearance marker. `Model2InputRecord` rejects those fields, and the demo exports a belief-only `model2-input.npz`.
-
-## Empirical shattering estimate
-
-Each world acts as a classifier over candidate reappearance probes. The search selects probe subsets and counts whether the sampled world bank realizes all binary labelings. The result is a context-conditioned, empirical shattering dimension—not a formal VC-dimension proof.
-
-Every report records operator support, entry-state uncertainty, event tolerance, world and probe counts, search algorithm, budget, and seeds. Multi-context searches are labeled separately and cannot be presented as context-conditioned estimates.
-
-## Visual panels
-
-- **World cards** show operator activity and physical parameters.
-- **Trajectory strips** expose latent paths, collisions, and seeds.
-- **Observation strips** separate latent motion from visible frames and occlusion timing.
-- **Belief panels** show paths, endpoint reachability, pre/post beliefs, and differences; the true endpoint stays in a separate first-order diagnostic panel.
-- **Shattering matrices** group duplicate world labelings and highlight a shattered probe subset.
-- **Equivalence galleries** show when different world codes have the same possible/impossible consequences.
-
-All canonical arrays and metadata are stored independently of the figures, so visual inspection can be repeated from saved records.
+Model 1 remains independently trained, and its activations are detached before reaching Model 2. Model 2 learns to read the experience without shaping the system that produced it.

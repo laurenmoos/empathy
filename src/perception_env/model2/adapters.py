@@ -1,12 +1,14 @@
-"""Strict belief-only producer boundary; no Model 1 network dependency."""
+"""Validated belief-image ablation and activation-derived producer boundaries."""
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 import numpy as np
+import torch
 
 from perception_env.reasoning.beliefs import BeliefEvent, build_belief_history
 
+from .activation_adapter import ActivationBeliefAdapter, Model1ActivationPacket
 from .contracts import BeliefInputs
 
 
@@ -55,5 +57,54 @@ def adapt_model1_events(events: Sequence[Model1BeliefPacket]) -> BeliefInputs:
         raise ValueError("all event resolutions must match")
     history = build_belief_history(
         [BeliefEvent(e.event_ordinal, e.pre_belief, e.post_belief) for e in events]
+    )
+    return BeliefInputs(history.tensor[None], history.mask[None])
+
+
+def adapt_model1_activations(
+    events: Sequence[Model1ActivationPacket],
+    adapter: ActivationBeliefAdapter,
+    *,
+    control_mode: str = "full",
+    seed: int = 0,
+) -> BeliefInputs:
+    if not events or not all(isinstance(event, Model1ActivationPacket) for event in events):
+        raise ValueError("a nonempty sequence of activation packets is required")
+    if not isinstance(adapter, ActivationBeliefAdapter):
+        raise TypeError("activation adapter is required")
+    if len({event.episode_id for event in events}) != 1:
+        raise ValueError("activation events must belong to one episode")
+    if len({event.checkpoint_id for event in events}) != 1:
+        raise ValueError("activation events must use one Model 1 checkpoint")
+    if any(a.event_ordinal >= b.event_ordinal for a, b in zip(events, events[1:], strict=False)):
+        raise ValueError("activation event ordinals must be strictly increasing")
+    if any(event.pre_activation.size != adapter.config.input_size for event in events):
+        raise ValueError("activation size does not match adapter")
+    if control_mode not in {"full", "shuffled"}:
+        raise ValueError("unknown activation control mode")
+    if type(seed) is not int or seed < 0:
+        raise ValueError("activation control seed must be a nonnegative integer")
+
+    device = next(adapter.parameters()).device
+    pre_values = np.stack([event.pre_activation for event in events])
+    post_values = np.stack([event.post_activation for event in events])
+    if control_mode == "shuffled":
+        permutation = np.random.default_rng(seed).permutation(adapter.config.input_size)
+        pre_values = pre_values[:, permutation].copy()
+        post_values = post_values[:, permutation].copy()
+    pre = torch.from_numpy(pre_values).to(device)
+    post = torch.from_numpy(post_values).to(device)
+    was_training = adapter.training
+    adapter.eval()
+    try:
+        with torch.inference_mode():
+            decoded = adapter(pre, post).cpu().numpy().astype(np.float32)
+    finally:
+        adapter.train(was_training)
+    history = build_belief_history(
+        [
+            BeliefEvent(event.event_ordinal, belief[0], belief[1])
+            for event, belief in zip(events, decoded, strict=True)
+        ]
     )
     return BeliefInputs(history.tensor[None], history.mask[None])

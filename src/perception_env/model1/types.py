@@ -68,6 +68,21 @@ class TrajectoryMixture:
 
 
 @dataclass(frozen=True)
+class Model1Trace:
+    prediction: TrajectoryMixture
+    activation: torch.Tensor
+
+    def validate(self) -> None:
+        self.prediction.validate()
+        if self.activation.ndim != 2:
+            raise ValueError("activation must have shape [batch, hidden]")
+        if self.activation.shape[0] != self.prediction.positions.shape[0]:
+            raise ValueError("activation batch must match prediction batch")
+        if not torch.isfinite(self.activation).all():
+            raise ValueError("activation must contain finite values")
+
+
+@dataclass(frozen=True)
 class BeliefPrediction:
     time_belief: torch.Tensor
     collapsed: torch.Tensor

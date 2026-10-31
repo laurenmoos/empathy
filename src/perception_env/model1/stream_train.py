@@ -249,6 +249,7 @@ class RecordedBeliefEvent:
     environment_index: int
     event_id: str
     weight_update_count: int
+    checkpoint_id: str
     path: Path
 
 
@@ -286,26 +287,29 @@ def _record_frozen_batch(
     weight_update_count: int,
 ) -> tuple[RecordedBeliefEvent, ...]:
     collated = collate_model1(batch.records, config).to(device)
+    checkpoint_id = _model_hash(model)
     model.eval()
     with torch.inference_mode():
-        pre_prediction = model(
+        pre_trace = model.forward_with_trace(
             collated.pre_frames, collated.pre_times, collated.pre_mask
         )
-        post_prediction = model(
+        post_trace = model.forward_with_trace(
             collated.post_frames, collated.post_times, collated.post_mask
         )
         pre = rasterize_mixture(
-            pre_prediction,
+            pre_trace.prediction,
             height=config.dataset.frame_size,
             width=config.dataset.frame_size,
             step_mask=collated.target_mask,
         ).collapsed.cpu().numpy()
         post = rasterize_mixture(
-            post_prediction,
+            post_trace.prediction,
             height=config.dataset.frame_size,
             width=config.dataset.frame_size,
             step_mask=collated.target_mask,
         ).collapsed.cpu().numpy()
+        pre_activation = pre_trace.activation.detach().cpu().numpy()
+        post_activation = post_trace.activation.detach().cpu().numpy()
     events: list[RecordedBeliefEvent] = []
     for index, record in enumerate(batch.records):
         path = events_root / f"{record.example_id}.npz"
@@ -314,6 +318,12 @@ def _record_frozen_batch(
             pre_belief=pre[index].astype(np.float32),
             post_belief=post[index].astype(np.float32),
             belief_difference=(post[index] - pre[index]).astype(np.float32),
+            pre_activation=pre_activation[index].astype(np.float32),
+            post_activation=post_activation[index].astype(np.float32),
+            activation_difference=(
+                post_activation[index] - pre_activation[index]
+            ).astype(np.float32),
+            checkpoint_id=np.asarray(checkpoint_id),
             environment_index=np.asarray(batch.environment_index, dtype=np.int64),
             weight_update_count=np.asarray(weight_update_count, dtype=np.int64),
         )
@@ -322,6 +332,7 @@ def _record_frozen_batch(
                 batch.environment_index,
                 record.example_id,
                 weight_update_count,
+                checkpoint_id,
                 path,
             )
         )

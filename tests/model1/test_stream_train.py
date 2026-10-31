@@ -203,11 +203,20 @@ def test_stream_trainer_records_each_frozen_batch_before_replay_updates(tmp_path
     assert result.checkpoint.is_file()
     assert (tmp_path / "run" / "history.jsonl").is_file()
     assert (tmp_path / "run" / "stream-summary.json").is_file()
+    assert result.events[0].checkpoint_id == result.events[1].checkpoint_id
+    assert result.events[1].checkpoint_id != result.events[2].checkpoint_id
     for event in result.events:
         with np.load(event.path, allow_pickle=False) as payload:
             assert np.array_equal(
                 payload["belief_difference"], payload["post_belief"] - payload["pre_belief"]
             )
+            assert payload["pre_activation"].shape == (16,)
+            assert payload["post_activation"].shape == (16,)
+            assert np.array_equal(
+                payload["activation_difference"],
+                payload["post_activation"] - payload["pre_activation"],
+            )
+            assert payload["checkpoint_id"].item() == event.checkpoint_id
 
 
 def test_stream_training_replays_exactly_under_same_seed(tmp_path) -> None:

@@ -51,6 +51,38 @@ def test_masked_timesteps_do_not_change_prediction() -> None:
     assert torch.equal(first.entry_state, second.entry_state)
 
 
+def test_traced_forward_exposes_the_late_temporal_activation() -> None:
+    config = load_model1_config(Path("configs/model1/v1.yaml"))
+    torch.manual_seed(13)
+    model = Model1(config.model, prediction_steps=12).eval()
+    frames, times, mask = _inputs()
+
+    trace = model.forward_with_trace(frames, times, mask)
+    prediction = model(frames, times, mask)
+
+    assert trace.activation.shape == (2, config.model.hidden_size)
+    assert trace.activation.requires_grad
+    assert torch.equal(trace.prediction.positions, prediction.positions)
+    assert torch.equal(trace.prediction.logits, prediction.logits)
+    assert torch.equal(trace.prediction.entry_state, prediction.entry_state)
+
+
+def test_masked_timesteps_do_not_change_traced_activation() -> None:
+    config = load_model1_config(Path("configs/model1/v1.yaml"))
+    torch.manual_seed(19)
+    model = Model1(config.model, prediction_steps=12).eval()
+    frames, times, mask = _inputs()
+    changed_frames = frames.clone()
+    changed_times = times.clone()
+    changed_frames[:, 4:] = 999.0
+    changed_times[:, 4:] = 999.0
+
+    first = model.forward_with_trace(frames, times, mask)
+    second = model.forward_with_trace(changed_frames, changed_times, mask)
+
+    assert torch.equal(first.activation, second.activation)
+
+
 def test_nan_padded_frames_do_not_poison_forward_or_gradients() -> None:
     config = load_model1_config(Path("configs/model1/v1.yaml"))
     model = Model1(config.model, prediction_steps=12)

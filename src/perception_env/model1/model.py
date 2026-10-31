@@ -6,7 +6,7 @@ import torch
 from torch import nn
 
 from .config import ModelConfig
-from .types import TrajectoryMixture
+from .types import Model1Trace, TrajectoryMixture
 
 
 class FrameEncoder(nn.Module):
@@ -84,9 +84,9 @@ class Model1(nn.Module):
             config.hidden_size, config.modes, prediction_steps
         )
 
-    def forward(
+    def _encode(
         self, frames: torch.Tensor, times: torch.Tensor, mask: torch.Tensor
-    ) -> TrajectoryMixture:
+    ) -> torch.Tensor:
         if frames.ndim != 5 or frames.shape[2] != 1:
             raise ValueError("frames must have shape [batch, time, 1, height, width]")
         batch, steps = frames.shape[:2]
@@ -100,12 +100,23 @@ class Model1(nn.Module):
             safe_frames.reshape(batch * steps, *safe_frames.shape[2:])
         )
         features = features.reshape(batch, steps, -1)
-        encoding = self.clip_encoder(features, safe_times, mask)
+        return self.clip_encoder(features, safe_times, mask)
+
+    def forward_with_trace(
+        self, frames: torch.Tensor, times: torch.Tensor, mask: torch.Tensor
+    ) -> Model1Trace:
+        encoding = self._encode(frames, times, mask)
         positions, logits = self.trajectory_head(encoding)
         prediction = TrajectoryMixture(
             positions=positions,
             logits=logits,
             entry_state=torch.sigmoid(self.state_head(encoding)),
         )
-        prediction.validate()
-        return prediction
+        trace = Model1Trace(prediction=prediction, activation=encoding)
+        trace.validate()
+        return trace
+
+    def forward(
+        self, frames: torch.Tensor, times: torch.Tensor, mask: torch.Tensor
+    ) -> TrajectoryMixture:
+        return self.forward_with_trace(frames, times, mask).prediction

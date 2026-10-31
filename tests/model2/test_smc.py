@@ -1,7 +1,14 @@
 import inspect
 
 import numpy as np
+import torch
 
+from perception_env.model2.activation_adapter import (
+    ActivationAdapterConfig,
+    ActivationBeliefAdapter,
+    Model1ActivationPacket,
+)
+from perception_env.model2.adapters import adapt_model1_activations
 from perception_env.model2.contracts import BeliefInputs
 from perception_env.model2.smc import BeliefWorldSMC, SMCConfig
 from perception_env.physics.world import WorldSchema
@@ -102,3 +109,28 @@ def test_single_event_likelihood_is_not_reapplied_by_rejuvenation_rounds() -> No
     assert np.array_equal(one_round.ranked_worlds, four_rounds.ranked_worlds)
     assert np.array_equal(one_round.weights, four_rounds.weights)
     assert np.array_equal(one_round.event_discrepancies, four_rounds.event_discrepancies)
+
+
+def test_activation_entry_point_reuses_the_belief_smc_search() -> None:
+    torch.manual_seed(23)
+    adapter = ActivationBeliefAdapter(
+        ActivationAdapterConfig(input_size=4, height=16, width=16, hidden_size=8)
+    ).eval()
+    events = [
+        Model1ActivationPacket(
+            "episode",
+            0,
+            "snapshot",
+            np.zeros(4, np.float32),
+            np.ones(4, np.float32),
+        )
+    ]
+    config = SMCConfig(particle_count=6, rounds=1, seed=29, grid_size=4)
+    smc = BeliefWorldSMC(config)
+
+    explicit = smc.infer(adapt_model1_activations(events, adapter))
+    activation = smc.infer_activations(events, adapter)
+
+    assert np.array_equal(activation.ranked_worlds, explicit.ranked_worlds)
+    assert np.array_equal(activation.weights, explicit.weights)
+    assert np.array_equal(activation.event_discrepancies, explicit.event_discrepancies)

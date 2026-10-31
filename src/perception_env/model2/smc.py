@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -10,6 +11,8 @@ from perception_env.physics.config import SimulationConfig
 from perception_env.physics.simulate import BallState, rollout
 from perception_env.physics.world import WorldCode, WorldSchema
 
+from .activation_adapter import ActivationBeliefAdapter, Model1ActivationPacket
+from .adapters import adapt_model1_activations
 from .contracts import BeliefInputs
 
 
@@ -294,3 +297,10 @@ class BeliefWorldSMC:
             best_world=ranked_worlds[0].copy(),
             event_discrepancies=ranked_discrepancies,
         )
+
+    def infer_activations(
+        self,
+        events: Sequence[Model1ActivationPacket],
+        adapter: ActivationBeliefAdapter,
+    ) -> SMCResult:
+        return self.infer(adapt_model1_activations(events, adapter))

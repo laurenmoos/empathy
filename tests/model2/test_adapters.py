@@ -1,8 +1,15 @@
 import numpy as np
 import pytest
+import torch
 
+from perception_env.model2.activation_adapter import (
+    ActivationAdapterConfig,
+    ActivationBeliefAdapter,
+    Model1ActivationPacket,
+)
 from perception_env.model2.adapters import (
     Model1BeliefPacket,
+    adapt_model1_activations,
     adapt_model1_events,
     parse_model1_packet,
 )
@@ -61,3 +68,68 @@ def test_adapter_rejects_inconsistent_histories(events):
 def test_packet_validates_beliefs_at_construction(value):
     with pytest.raises(ValueError):
         Model1BeliefPacket("a", 0, value, value)
+
+
+def activation_packet(ordinal=0, checkpoint="snapshot-a"):
+    return Model1ActivationPacket(
+        "activation-episode",
+        ordinal,
+        checkpoint,
+        np.full(4, ordinal / 10, np.float32),
+        np.full(4, (ordinal + 1) / 10, np.float32),
+    )
+
+
+def test_activation_adapter_builds_the_same_padded_belief_contract() -> None:
+    torch.manual_seed(3)
+    decoder = ActivationBeliefAdapter(
+        ActivationAdapterConfig(input_size=4, height=8, width=8, hidden_size=6)
+    ).eval()
+
+    inputs = adapt_model1_activations([activation_packet(0)], decoder)
+
+    assert inputs.beliefs.shape == (1, 4, 3, 8, 8)
+    assert inputs.history_mask.tolist() == [[False, False, False, True]]
+    assert not inputs.beliefs[0, :3].any()
+    np.testing.assert_array_equal(
+        inputs.beliefs[0, -1, 2],
+        inputs.beliefs[0, -1, 1] - inputs.beliefs[0, -1, 0],
+    )
+    repeated = adapt_model1_activations([activation_packet(0)], decoder)
+    np.testing.assert_array_equal(inputs.beliefs, repeated.beliefs)
+
+
+def test_activation_history_rejects_mixed_model1_checkpoints() -> None:
+    decoder = ActivationBeliefAdapter(
+        ActivationAdapterConfig(input_size=4, height=8, width=8)
+    )
+
+    with pytest.raises(ValueError, match="checkpoint"):
+        adapt_model1_activations(
+            [activation_packet(0, "a"), activation_packet(1, "b")], decoder
+        )
+
+
+def test_shuffled_activation_control_preserves_shape_but_changes_evidence() -> None:
+    torch.manual_seed(31)
+    decoder = ActivationBeliefAdapter(
+        ActivationAdapterConfig(input_size=4, height=8, width=8, hidden_size=6)
+    ).eval()
+    events = [
+        Model1ActivationPacket(
+            "activation-episode",
+            0,
+            "snapshot-a",
+            np.arange(4, dtype=np.float32),
+            np.arange(4, dtype=np.float32)[::-1],
+        )
+    ]
+
+    full = adapt_model1_activations(events, decoder)
+    shuffled = adapt_model1_activations(
+        events, decoder, control_mode="shuffled", seed=7
+    )
+
+    assert shuffled.beliefs.shape == full.beliefs.shape
+    assert shuffled.history_mask.tolist() == full.history_mask.tolist()
+    assert not np.array_equal(shuffled.beliefs, full.beliefs)

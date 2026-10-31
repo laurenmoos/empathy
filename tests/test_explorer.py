@@ -130,7 +130,7 @@ def test_stream_controls_start_sessions_and_queue_offset_episodes() -> None:
     assert "Play thinking stream" in source
 
 
-def test_world_guess_shows_all_three_numeric_parameters() -> None:
+def test_world_guess_shows_all_three_current_numeric_parameters() -> None:
     source, parser = parsed_explorer()
 
     assert "operatorReadout" not in parser.ids
@@ -151,6 +151,8 @@ def test_world_guess_shows_all_three_numeric_parameters() -> None:
     assert "movement-away" in source
     assert "function updateSecondOrder" in source
     assert "function predictedParameterNumber" in source
+    assert "function formatParameter" in source
+    assert "formatParameter(predictedValue)" in source
     assert "step.predicted_parameters" in source
     assert 'return "inactive"' not in source
 
@@ -162,8 +164,9 @@ def test_second_order_panel_shows_constraint_direction_without_summary_block() -
     assert parser.canvases == {"perceptionCanvas"}
     assert "function movementDirection" in source
     assert "constraint-direction-mark" in source
-    assert 'direction.textContent = "";' in source
-    assert 'direction.setAttribute("aria-label", movement)' in source
+    assert "direction.textContent = formatParameter(predictedValue);" in source
+    assert '"aria-label",' in source
+    assert "`${slot.name} guess ${predictedValue.toFixed(2)}, ${movement}`" in source
     assert 'row.classList.add(`movement-${movement}`)' in source
     for noise in (
         "constraint-axis",

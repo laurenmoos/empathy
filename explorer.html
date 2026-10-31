@@ -77,7 +77,14 @@
     .comparison-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 1rem; padding: .85rem 0; border-top: 1px solid var(--line); }
     .constraint-label { display: block; }
     .constraint-name { font: 500 .72rem Georgia, serif; }
-    .constraint-direction { color: var(--muted); font-size: .58rem; letter-spacing: .01em; }
+    .constraint-direction {
+      min-width: 3.7rem;
+      color: var(--muted);
+      font: 500 .66rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: .01em;
+      text-align: right;
+    }
     .constraint-direction::before { display: inline-block; width: 1rem; text-align: left; }
     .movement-toward .constraint-direction { color: #667864; }
     .movement-toward .constraint-direction::before { content: "↘"; }
@@ -541,6 +548,11 @@
       return "steady";
     }
 
+    function formatParameter(value) {
+      const rounded = Math.abs(value) < .005 ? 0 : value;
+      return rounded.toFixed(2).replace("-", "−");
+    }
+
     function comparisonElements(actual, predictedParameters, previousParameters) {
       return worldSlots.map(slot => {
         const actualValue = worldSlotNumber(actual, slot);
@@ -558,8 +570,11 @@
         name.textContent = slot.name;
         const direction = document.createElement("span");
         direction.className = "constraint-direction constraint-direction-mark";
-        direction.textContent = "";
-        direction.setAttribute("aria-label", movement);
+        direction.textContent = formatParameter(predictedValue);
+        direction.setAttribute(
+          "aria-label",
+          `${slot.name} guess ${predictedValue.toFixed(2)}, ${movement}`
+        );
         label.append(name);
         row.append(label, direction);
         return row;

@@ -41,6 +41,9 @@ def test_explorer_uses_minimal_numeric_controls_and_plain_layer_names() -> None:
     source, parser = parsed_explorer()
 
     assert parser.input_types == ["number", "number", "number"]
+    assert "<title>Pinball</title>" in source
+    assert "<header><h1>Pinball</h1></header>" in source
+    assert "text-align: center" in source
     assert "<h2>Seeing</h2>" in source
     assert "<h2>Thinking</h2>" in source
     for unwanted in (
@@ -134,7 +137,8 @@ def test_stream_controls_start_sessions_and_queue_offset_episodes() -> None:
     assert "async function requestNextEpisode" in source
     assert "episodeQueue" in source
     assert "requestNextEpisode();" in source
-    assert "Play thinking stream" in source
+    assert "Throw the ball" in source
+    assert "Play thinking stream" not in source
 
 
 def test_world_guess_shows_all_three_current_numeric_parameters() -> None:

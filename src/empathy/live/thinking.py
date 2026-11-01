@@ -18,13 +18,19 @@ from ..model1.online_train import (
 )
 from ..model2.adapters import Model1BeliefPacket, adapt_model1_events
 from ..model2.coherence import ConstraintRecovery, evaluate_constraint_recovery
-from ..model2.contracts import BeliefInputs, ParameterPosterior, WorldPrediction
+from ..model2.contracts import (
+    BeliefInputs,
+    ParameterHypothesis,
+    ParameterPosterior,
+    WorldPrediction,
+)
 from ..model2.decode import decode_prediction
 from ..model2.losses import world_code_loss
 from ..model2.smc import (
     ContinualBeliefWorldSMC,
     SMCConfig,
     SMCResult,
+    weighted_hypothesis_clusters,
     weighted_parameter_summary,
 )
 from ..model2.train import predict as predict_model2
@@ -134,12 +140,19 @@ class SMCModel2Runtime:
         mean, intervals = weighted_parameter_summary(
             result.parameter_particles, result.weights
         )
+        hypotheses = tuple(
+            ParameterHypothesis(parameters, weight)
+            for parameters, weight in weighted_hypothesis_clusters(
+                result.parameter_particles, result.weights
+            )
+        )
         posterior = ParameterPosterior(
             result.parameter_particles,
             result.weights,
             mean,
             intervals,
             result.update_count,
+            hypotheses,
         )
         return WorldPrediction(logits, parameters, posterior)
 
@@ -191,6 +204,13 @@ class LiveThoughtStep:
                 "mean": self.parameter_posterior.mean.tolist(),
                 "intervals": self.parameter_posterior.intervals.tolist(),
                 "update_count": self.parameter_posterior.update_count,
+                "hypotheses": [
+                    {
+                        "parameters": hypothesis.parameters.tolist(),
+                        "weight": hypothesis.weight,
+                    }
+                    for hypothesis in self.parameter_posterior.hypotheses
+                ],
             },
         }
 

@@ -3,6 +3,7 @@ import pytest
 
 from empathy.model2.contracts import (
     BeliefInputs,
+    ParameterHypothesis,
     ParameterPosterior,
     SchemaLayout,
     WorldTargets,
@@ -89,12 +90,17 @@ def test_zero_valid_beliefs_and_target_validation():
 
 
 def test_parameter_posterior_is_validated_normalized_and_read_only():
+    hypotheses = (
+        ParameterHypothesis(np.array([-0.18, 0.08, 0.14]), 0.65),
+        ParameterHypothesis(np.array([0.12, -0.10, 0.42]), 0.35),
+    )
     posterior = ParameterPosterior(
         particles=np.array([[-0.2, 0.1, 0.2], [0.1, -0.1, 0.4]], dtype=np.float32),
         weights=np.array([2.0, 1.0], dtype=np.float32),
         mean=np.array([-0.1, 0.03, 0.27], dtype=np.float32),
         intervals=np.array([[-0.2, 0.1], [-0.1, 0.1], [0.2, 0.4]], dtype=np.float32),
         update_count=2,
+        hypotheses=hypotheses,
     )
 
     assert posterior.weights.sum() == pytest.approx(1.0)
@@ -102,3 +108,5 @@ def test_parameter_posterior_is_validated_normalized_and_read_only():
     assert not posterior.weights.flags.writeable
     assert not posterior.mean.flags.writeable
     assert not posterior.intervals.flags.writeable
+    assert posterior.hypotheses[0].weight == pytest.approx(0.65)
+    assert not posterior.hypotheses[0].parameters.flags.writeable

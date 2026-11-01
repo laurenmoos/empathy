@@ -15,6 +15,7 @@ from empathy.model2.smc import (
     BeliefWorldSMC,
     ContinualBeliefWorldSMC,
     SMCConfig,
+    weighted_hypothesis_clusters,
     weighted_parameter_summary,
 )
 from empathy.physics.world import WorldSchema
@@ -179,3 +180,24 @@ def test_weighted_parameter_summary_reports_physical_means_and_intervals() -> No
     assert intervals.shape == (3, 2)
     assert intervals[:, 0] == pytest.approx([-0.30, -0.10, 0.00])
     assert intervals[:, 1] == pytest.approx([0.20, 0.30, 0.60])
+
+
+def test_weighted_hypothesis_clusters_preserve_separate_joint_worlds() -> None:
+    particles = np.array(
+        [
+            [-0.22, 0.08, 0.10],
+            [-0.18, 0.12, 0.14],
+            [0.18, -0.12, 0.48],
+            [0.22, -0.08, 0.52],
+        ],
+        dtype=np.float64,
+    )
+    weights = np.array([0.35, 0.25, 0.20, 0.20], dtype=np.float64)
+
+    clusters = weighted_hypothesis_clusters(particles, weights)
+
+    assert len(clusters) == 2
+    assert clusters[0][1] == pytest.approx(0.60)
+    assert clusters[0][0] == pytest.approx([-0.203333, 0.096667, 0.116667], abs=1e-5)
+    assert clusters[1][1] == pytest.approx(0.40)
+    assert clusters[1][0] == pytest.approx([0.20, -0.10, 0.50])

@@ -173,6 +173,11 @@ def test_world_guess_shows_all_three_current_numeric_parameters() -> None:
     assert "posterior-band" in source
     assert "posterior-mean" in source
     assert "posterior-truth" in source
+    assert "function hypothesisElement" in source
+    assert "possible worlds" in source
+    assert "hypothesis-list" in source
+    assert "posterior.hypotheses" in source
+    assert "hypothesis.weight" in source
 
 
 def test_second_order_panel_shows_weighted_ranges_without_summary_block() -> None:
@@ -248,6 +253,7 @@ def test_live_episode_validation_checks_trajectory_beliefs_and_four_thoughts() -
     assert "parameter_posterior" in source
     assert "posterior particles and weights are invalid" in source
     assert "posterior intervals or mean are invalid" in source
+    assert "posterior hypotheses are invalid" in source
     assert "constraint recovery is invalid" in source
     assert "initial_state" in source
     assert "model1_checkpoint_version" in source

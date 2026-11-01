@@ -83,6 +83,13 @@
     .posterior-particle { position: absolute; top: .4rem; width: .2rem; height: .2rem; border-radius: 50%; background: #758073; transform: translateX(-.1rem); }
     .posterior-mean { position: absolute; top: .18rem; width: 2px; height: .68rem; background: var(--forest); transform: translateX(-1px); }
     .posterior-truth { position: absolute; top: .39rem; width: .28rem; height: .28rem; border: 1px solid var(--forest); border-radius: 50%; background: var(--paper); transform: translateX(-.14rem); }
+    .hypothesis-list { display: grid; gap: .35rem; margin-top: .45rem; }
+    .hypothesis-heading, .hypothesis-row { display: grid; grid-template-columns: minmax(5.5rem, 1fr) repeat(3, 3.15rem); align-items: baseline; gap: .3rem; }
+    .hypothesis-title { color: var(--muted); font: 400 .62rem Georgia, serif; }
+    .hypothesis-column { color: var(--muted); font: 400 .52rem ui-monospace, SFMono-Regular, Menlo, monospace; text-align: right; }
+    .hypothesis-key { display: flex; align-items: baseline; gap: .45rem; font: 500 .64rem Georgia, serif; }
+    .hypothesis-mass { color: var(--muted); font: 400 .56rem ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .hypothesis-value { font: 500 .62rem ui-monospace, SFMono-Regular, Menlo, monospace; text-align: right; font-variant-numeric: tabular-nums; }
     @media (max-width: 1080px) {
       .layers { grid-template-columns: 1fr; }
     }
@@ -285,6 +292,19 @@
               || !Number.isInteger(posterior.update_count)
               || posterior.update_count < 1) {
             throw new Error("posterior intervals or mean are invalid");
+          }
+          if (!Array.isArray(posterior.hypotheses)
+              || posterior.hypotheses.length < 1 || posterior.hypotheses.length > 3
+              || !posterior.hypotheses.every(hypothesis => hypothesis
+                && Array.isArray(hypothesis.parameters)
+                && hypothesis.parameters.length === 3
+                && hypothesis.parameters.every(Number.isFinite)
+                && Number.isFinite(hypothesis.weight)
+                && hypothesis.weight > 0 && hypothesis.weight <= 1)
+              || Math.abs(posterior.hypotheses.reduce(
+                (sum, hypothesis) => sum + hypothesis.weight, 0
+              ) - 1) > 1e-4) {
+            throw new Error("posterior hypotheses are invalid");
           }
         }
         if (!Array.isArray(step.paths) || step.paths.length < 1
@@ -732,13 +752,51 @@
       });
     }
 
+    function hypothesisElement(posterior) {
+      const section = document.createElement("div");
+      section.className = "hypothesis-list";
+      const heading = document.createElement("div");
+      heading.className = "hypothesis-heading";
+      const title = document.createElement("span");
+      title.className = "hypothesis-title";
+      title.textContent = "possible worlds";
+      heading.append(title);
+      worldSlots.forEach(slot => {
+        const label = document.createElement("span");
+        label.className = "hypothesis-column";
+        label.textContent = slot.name;
+        heading.append(label);
+      });
+      section.append(heading);
+      posterior.hypotheses.forEach((hypothesis, index) => {
+        const row = document.createElement("div");
+        row.className = "hypothesis-row";
+        const key = document.createElement("span");
+        key.className = "hypothesis-key";
+        key.textContent = String.fromCharCode(65 + index);
+        const mass = document.createElement("span");
+        mass.className = "hypothesis-mass";
+        mass.textContent = `${Math.round(100 * hypothesis.weight)}%`;
+        key.append(mass);
+        row.append(key);
+        hypothesis.parameters.forEach(value => {
+          const number = document.createElement("span");
+          number.className = "hypothesis-value";
+          number.textContent = formatParameter(value);
+          row.append(number);
+        });
+        section.append(row);
+      });
+      return section;
+    }
+
     function updateSecondOrder(step) {
       const posterior = step.parameter_posterior;
       if (!posterior) return clearSecondOrder();
-      $("comparisonRows").replaceChildren(...posteriorElements(
-        currentEpisode.ground_truth.operators,
-        posterior
-      ));
+      $("comparisonRows").replaceChildren(
+        ...posteriorElements(currentEpisode.ground_truth.operators, posterior),
+        hypothesisElement(posterior)
+      );
     }
 
     function draw() {

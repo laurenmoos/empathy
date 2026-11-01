@@ -244,6 +244,53 @@ def weighted_parameter_summary(
     return mean, intervals
 
 
+def weighted_hypothesis_clusters(
+    particles: np.ndarray,
+    weights: np.ndarray,
+    *,
+    max_clusters: int = 3,
+    radius: float = 0.22,
+) -> tuple[tuple[np.ndarray, float], ...]:
+    """Group the joint posterior into a few separated physical-world hypotheses."""
+    values = np.asarray(particles, dtype=np.float64)
+    probabilities = np.asarray(weights, dtype=np.float64)
+    if values.ndim != 2 or values.shape[1] != 3 or probabilities.shape != (len(values),):
+        raise ValueError("hypothesis particles must be [N,3] with matching weights")
+    if max_clusters < 1 or not np.isfinite(radius) or radius <= 0:
+        raise ValueError("hypothesis clustering requires positive limits")
+    total = float(probabilities.sum())
+    if total <= 0 or np.any(probabilities < 0):
+        raise ValueError("hypothesis weights must be nonnegative with positive mass")
+    probabilities = probabilities / total
+    normalized = (values - np.array([-0.30, -0.30, 0.0])) / 0.60
+    groups: list[list[int]] = []
+    for index in np.argsort(-probabilities, kind="stable"):
+        if not groups:
+            groups.append([int(index)])
+            continue
+        centers = np.stack(
+            [
+                np.average(normalized[group], axis=0, weights=probabilities[group])
+                for group in groups
+            ]
+        )
+        distances = np.linalg.norm(centers - normalized[index], axis=1)
+        nearest = int(np.argmin(distances))
+        if distances[nearest] > radius and len(groups) < max_clusters:
+            groups.append([int(index)])
+        else:
+            groups[nearest].append(int(index))
+    clusters = [
+        (
+            np.average(values[group], axis=0, weights=probabilities[group]),
+            float(probabilities[group].sum()),
+        )
+        for group in groups
+    ]
+    clusters.sort(key=lambda cluster: cluster[1], reverse=True)
+    return tuple(clusters)
+
+
 def _jitter_particles(
     particles: np.ndarray, config: SMCConfig, rng: np.random.Generator
 ) -> np.ndarray:

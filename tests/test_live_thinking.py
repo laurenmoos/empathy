@@ -14,7 +14,12 @@ from empathy.live.thinking import (
 )
 from empathy.model1.config import load_model1_config
 from empathy.model1.types import TrajectoryMixture
-from empathy.model2.contracts import BeliefInputs, ParameterPosterior, WorldPrediction
+from empathy.model2.contracts import (
+    BeliefInputs,
+    ParameterHypothesis,
+    ParameterPosterior,
+    WorldPrediction,
+)
 from empathy.model2.network import InverseWorldCNN
 from empathy.model2.smc import SMCConfig
 from empathy.physics.simulate import BallState
@@ -203,6 +208,10 @@ def test_next_rollout_uses_latest_completed_model2_checkpoint_guess() -> None:
         mean=np.array([-0.0875, 0.025, 0.225], np.float32),
         intervals=np.array([[-0.1, -0.05], [0.0, 0.1], [0.2, 0.3]], np.float32),
         update_count=1,
+        hypotheses=(
+            ParameterHypothesis(np.array([-0.09, 0.02, 0.22]), 0.7),
+            ParameterHypothesis(np.array([-0.05, 0.10, 0.30]), 0.3),
+        ),
     )
     observer.latest = Model2CheckpointGuess(
         1,
@@ -225,6 +234,10 @@ def test_next_rollout_uses_latest_completed_model2_checkpoint_guess() -> None:
     assert np.asarray(serialized["intervals"]) == pytest.approx(
         np.asarray([[-0.1, -0.05], [0.0, 0.1], [0.2, 0.3]])
     )
+    assert serialized["hypotheses"][0]["parameters"] == pytest.approx(
+        [-0.09, 0.02, 0.22]
+    )
+    assert serialized["hypotheses"][0]["weight"] == pytest.approx(0.7)
 
 
 def test_smc_runtime_accumulates_a_parameter_posterior_across_predictions() -> None:
@@ -251,6 +264,8 @@ def test_smc_runtime_accumulates_a_parameter_posterior_across_predictions() -> N
     assert second.posterior.update_count == 2
     assert second.posterior.particles.shape == (8, 3)
     assert second.posterior.weights.sum() == pytest.approx(1.0)
+    assert 1 <= len(second.posterior.hypotheses) <= 3
+    assert sum(item.weight for item in second.posterior.hypotheses) == pytest.approx(1.0)
 
 
 def test_live_smc_uses_a_dense_gently_rejuvenated_posterior() -> None:

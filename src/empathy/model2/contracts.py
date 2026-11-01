@@ -134,6 +134,23 @@ class Model2Batch:
 
 
 @dataclass(frozen=True, eq=False)
+class ParameterHypothesis:
+    """One weighted joint explanation of the observed belief history."""
+
+    parameters: np.ndarray
+    weight: float
+
+    def __post_init__(self) -> None:
+        parameters = np.asarray(self.parameters)
+        if parameters.shape != (3,) or not np.isfinite(parameters).all():
+            raise ValueError("hypothesis parameters must be three finite values")
+        if not np.isfinite(self.weight) or not 0 < self.weight <= 1:
+            raise ValueError("hypothesis weight must lie in (0,1]")
+        object.__setattr__(self, "parameters", _readonly(parameters, np.float32))
+        object.__setattr__(self, "weight", float(self.weight))
+
+
+@dataclass(frozen=True, eq=False)
 class ParameterPosterior:
     """Weighted joint hypotheses over physical gravity, wind, and damping."""
 
@@ -142,6 +159,7 @@ class ParameterPosterior:
     mean: np.ndarray
     intervals: np.ndarray
     update_count: int
+    hypotheses: tuple[ParameterHypothesis, ...] = ()
 
     def __post_init__(self) -> None:
         particles = np.asarray(self.particles)
@@ -160,6 +178,12 @@ class ParameterPosterior:
             raise ValueError("posterior weights must have positive nonnegative mass")
         if type(self.update_count) is not int or self.update_count < 1:
             raise ValueError("posterior update count must be a positive integer")
+        if any(type(hypothesis) is not ParameterHypothesis for hypothesis in self.hypotheses):
+            raise TypeError("posterior hypotheses must be ParameterHypothesis values")
+        if self.hypotheses and not np.isclose(
+            sum(hypothesis.weight for hypothesis in self.hypotheses), 1.0, atol=1e-5
+        ):
+            raise ValueError("posterior hypothesis weights must sum to one")
         normalized = weights.astype(np.float64) / float(weights.sum())
         object.__setattr__(self, "particles", _readonly(particles, np.float32))
         object.__setattr__(self, "weights", _readonly(normalized, np.float32))

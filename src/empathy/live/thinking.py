@@ -10,9 +10,8 @@ from typing import Protocol
 import numpy as np
 import torch
 
-from ..model1.data import collate_model1
-from ..model1.rasterize import rasterize_mixture
-from ..model1.types import TrajectoryMixture
+from ..model1.online import OnlineSeeingConfig, OnlineSeeingModel
+from ..model1.online_train import ObservedSeeingEpisode, OnlineSeeingRuntime
 from ..model2.adapters import Model1BeliefPacket, adapt_model1_events
 from ..model2.coherence import ConstraintRecovery, evaluate_constraint_recovery
 from ..model2.contracts import BeliefInputs, WorldPrediction
@@ -207,19 +206,6 @@ class LiveThinkingEpisode:
         }
 
 
-def _subset(prediction: TrajectoryMixture, count: int) -> TrajectoryMixture:
-    count = min(max(count, 1), prediction.positions.shape[1])
-    indices = torch.topk(prediction.logits, count, dim=1).indices
-    position_indices = indices[:, :, None, None].expand(
-        -1, -1, prediction.positions.shape[2], prediction.positions.shape[3]
-    )
-    return TrajectoryMixture(
-        positions=torch.gather(prediction.positions, 1, position_indices),
-        logits=torch.gather(prediction.logits, 1, indices),
-        entry_state=prediction.entry_state,
-    )
-
-
 DEFAULT_INITIAL_STATES = (
     BallState(0.1, 0.42, 0.18, 0.00),
     BallState(0.1, 0.50, 0.16, 0.02),
@@ -261,6 +247,19 @@ class LiveThinkingSession:
         self._episode_index = 0
         self._completed_events = 0
         self._latent_updates = 0
+        seeing_config = OnlineSeeingConfig(
+            channels=(4, 8, 12),
+            representation_size=24,
+            world_size=8,
+            sample_count=24,
+            path_steps=16,
+        )
+        occluder = model1_config.dataset.occluder
+        self.seeing_runtime = OnlineSeeingRuntime(
+            OnlineSeeingModel(seeing_config),
+            seed=7,
+            occluder=(float(occluder["x_min"]), float(occluder["x_max"])),
+        )
 
     @property
     def completed_event_count(self) -> int:
@@ -277,6 +276,45 @@ class LiveThinkingSession:
             return initial, record, frames, full_path
         raise LiveInferenceError("no valid offset produced an occluded reappearance")
 
+    def _observed_episode(self, record, frames, full_path) -> ObservedSeeingEpisode:
+        clip_steps = self.model1_config.dataset.clip_steps
+        pre_start = max(0, record.hidden_start - clip_steps)
+        post_end = min(len(frames), record.reappearance_step + 8)
+
+        def clip(start: int, end: int) -> tuple[torch.Tensor, torch.Tensor]:
+            values = torch.from_numpy(frames[start:end].astype(np.float32) / 255.0)
+            values = values[None, :, None]
+            return values, torch.ones((1, values.shape[1]), dtype=torch.bool)
+
+        pre_frames, pre_mask = clip(pre_start, record.hidden_start)
+        post_frames, post_mask = clip(record.reappearance_step, post_end)
+        exit_index = record.reappearance_step
+        exit_velocity = (full_path[exit_index] - full_path[exit_index - 1]) / 0.1
+        departure = full_path[exit_index + 1 : exit_index + 4]
+        return ObservedSeeingEpisode(
+            pre_frames,
+            pre_mask,
+            post_frames,
+            post_mask,
+            torch.from_numpy(record.target_states[0:1]),
+            torch.tensor(
+                [[*full_path[exit_index], *exit_velocity]], dtype=torch.float32
+            ),
+            torch.from_numpy(departure[None].astype(np.float32)),
+        )
+
+    @staticmethod
+    def _rasterize_paths(paths: np.ndarray, weights: np.ndarray, size: int) -> np.ndarray:
+        image = np.zeros((size, size), dtype=np.float32)
+        normalized = weights / max(float(weights.sum()), 1.0e-8)
+        for path, weight in zip(paths, normalized, strict=True):
+            columns = np.rint(np.clip(path[:, 0], 0, 1) * (size - 1)).astype(int)
+            rows = np.rint((1.0 - np.clip(path[:, 1], 0, 1)) * (size - 1)).astype(int)
+            for row, column in zip(rows, columns, strict=True):
+                image[max(0, row - 1) : row + 2, max(0, column - 1) : column + 2] += weight
+        maximum = float(image.max())
+        return image / maximum if maximum > 0 else image
+
     def next_episode(self) -> LiveThinkingEpisode:
         with self._session_lock, self._model_lock:
             engine = LiveInferenceEngine(
@@ -285,26 +323,22 @@ class LiveThinkingSession:
                 self.model2_runtime.predict,
             )
             initial, record, frames, full_path = self._next_record(engine)
-            batch = collate_model1([record], self.model1_config)
             size = self.model1_config.dataset.frame_size
-            with torch.inference_mode():
-                pre_prediction = self.model1(batch.pre_frames, batch.pre_times, batch.pre_mask)
-                post_prediction = self.model1(batch.post_frames, batch.post_times, batch.post_mask)
-                mode_count = pre_prediction.positions.shape[1]
-                counts = (1, min(2, mode_count), mode_count)
-                visual_predictions = [
-                    _subset(pre_prediction, count) for count in counts
-                ]
-                visual_predictions.append(post_prediction)
-                beliefs = [
-                    rasterize_mixture(
-                        prediction,
-                        height=size,
-                        width=size,
-                        step_mask=batch.target_mask,
-                    ).collapsed[0].cpu().numpy().astype(np.float32)
-                    for prediction in visual_predictions
-                ]
+            observed = self._observed_episode(record, frames, full_path)
+            frozen = self.seeing_runtime.begin(observed)
+            seeing_result = self.seeing_runtime.complete(frozen, observed, train=True)
+            all_paths = seeing_result.paths[0].cpu().numpy().astype(np.float32)
+            posterior_weights = seeing_result.posterior_weights[0].cpu().numpy().astype(np.float32)
+            counts = (4, 12, len(all_paths), len(all_paths))
+            visual_paths = [all_paths[:count] for count in counts]
+            visual_weights = [
+                np.full(count, 1.0 / count, dtype=np.float32) for count in counts[:-1]
+            ]
+            visual_weights.append(posterior_weights)
+            beliefs = [
+                self._rasterize_paths(paths, weights, size)
+                for paths, weights in zip(visual_paths, visual_weights, strict=True)
+            ]
 
             labels = (
                 "first possibility",
@@ -315,8 +349,8 @@ class LiveThinkingSession:
             previous = np.zeros_like(beliefs[0])
             steps: list[LiveThoughtStep] = []
             final_inputs: BeliefInputs | None = None
-            for index, (label, belief, visual_prediction) in enumerate(
-                zip(labels, beliefs, visual_predictions, strict=True)
+            for index, (label, belief, step_paths, step_weights) in enumerate(
+                zip(labels, beliefs, visual_paths, visual_weights, strict=True)
             ):
                 packet = Model1BeliefPacket(
                     episode_id="live-thinking",
@@ -336,18 +370,6 @@ class LiveThinkingSession:
                 guessed = decode_prediction(prediction, WorldSchema.v1()).flat[0].astype(
                     np.float32
                 )
-                visual_paths = (
-                    visual_prediction.positions[0]
-                    .detach()
-                    .cpu()
-                    .numpy()
-                    .astype(np.float32)
-                )
-                entry_position = full_path[record.hidden_start]
-                entries = np.broadcast_to(
-                    entry_position, (len(visual_paths), 1, 2)
-                ).copy()
-                visual_paths = np.concatenate((entries, visual_paths), axis=1)
                 steps.append(
                     LiveThoughtStep(
                         index,
@@ -356,18 +378,19 @@ class LiveThinkingSession:
                         belief.copy(),
                         guessed,
                         guessed_parameters,
-                        visual_paths,
-                        torch.softmax(visual_prediction.logits[0], dim=0)
-                        .detach()
-                        .cpu()
-                        .numpy()
-                        .astype(np.float32),
+                        step_paths,
+                        step_weights,
                         evaluate_constraint_recovery(record.world_flat, guessed),
                     )
                 )
                 previous = belief
             assert final_inputs is not None
             training = self.model2_runtime.complete_event(final_inputs)
+            training.update(
+                seeing_loss=seeing_result.metrics.loss,
+                seeing_exit_error=seeing_result.metrics.exit_error,
+                seeing_updates=seeing_result.metrics.updates,
+            )
             final_packet = Model1BeliefPacket(
                 episode_id="live-thinking",
                 event_ordinal=self._episode_index,
@@ -375,7 +398,7 @@ class LiveThinkingSession:
                 post_belief=beliefs[-1],
             )
             self._history = [*self._history, final_packet][-3:]
-            self._latent_updates += len(steps)
+            self._latent_updates += 1
             result = LiveThinkingEpisode(
                 episode_index=self._episode_index,
                 initial_state=initial,

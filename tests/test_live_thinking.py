@@ -85,8 +85,10 @@ def test_episode_thinks_in_four_belief_only_steps_before_training() -> None:
     assert all(isinstance(inputs, BeliefInputs) for inputs in runtime.inputs)
     assert all(set(inputs.__dict__) == {"beliefs", "history_mask"} for inputs in runtime.inputs)
     assert episode.thought_steps[-1].guessed_flat[0] == 1
-    assert episode.training == {"loss": 0.25, "weight_update_count": 0}
-    assert episode.latent_update_count == 4
+    assert episode.training["loss"] == 0.25
+    assert episode.training["weight_update_count"] == 0
+    assert episode.training["seeing_updates"] == 1
+    assert episode.latent_update_count == 1
     assert episode.weight_update_count == 0
     payload = episode.to_payload()
     ground_truth = payload["ground_truth"]
@@ -103,8 +105,8 @@ def test_episode_thinks_in_four_belief_only_steps_before_training() -> None:
     assert recovery["total"] == 3
     assert recovery["recovered"] == 3
     assert 0.99 < recovery["score"] < 1.0
-    assert len(payload["thought_steps"][0]["paths"]) == 1
-    assert len(payload["thought_steps"][2]["paths"]) == 4
+    assert len(payload["thought_steps"][0]["paths"]) == 4
+    assert len(payload["thought_steps"][2]["paths"]) == 24
     assert payload["thought_steps"][0]["paths"][0][0] == pytest.approx(
         path[ground_truth["hidden_start"]]
     )
@@ -137,6 +139,20 @@ def test_successive_episodes_vary_offsets_and_keep_completed_event_history() -> 
     assert runtime.inputs[7].history_mask.tolist() == [[False, False, True, True]]
     assert runtime.inputs[11].history_mask.tolist() == [[False, True, True, True]]
     assert session.completed_event_count == 3
+
+
+def test_live_session_persists_one_online_seeing_learner_across_throws() -> None:
+    session = _session()
+    learner = session.seeing_runtime
+
+    first = session.next_episode()
+    second = session.next_episode()
+
+    assert session.seeing_runtime is learner
+    assert learner.updates == 2
+    assert first.training["seeing_updates"] == 1
+    assert second.training["seeing_updates"] == 2
+    assert len(second.thought_steps[-1].paths) == learner.model.config.sample_count
 
 
 def test_invalid_offsets_are_skipped_with_a_fixed_attempt_bound() -> None:

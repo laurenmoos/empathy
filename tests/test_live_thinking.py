@@ -10,11 +10,13 @@ from empathy.live.thinking import (
     DEFAULT_INITIAL_STATES,
     LiveThinkingSession,
     OnlineModel2Runtime,
+    SMCModel2Runtime,
 )
 from empathy.model1.config import load_model1_config
 from empathy.model1.types import TrajectoryMixture
-from empathy.model2.contracts import BeliefInputs, WorldPrediction
+from empathy.model2.contracts import BeliefInputs, ParameterPosterior, WorldPrediction
 from empathy.model2.network import InverseWorldCNN
+from empathy.model2.smc import SMCConfig
 from empathy.physics.simulate import BallState
 from empathy.physics.world import WorldSchema
 
@@ -195,11 +197,19 @@ def test_next_rollout_uses_latest_completed_model2_checkpoint_guess() -> None:
     session = _session(observer=observer)
 
     first = session.next_episode()
+    posterior = ParameterPosterior(
+        particles=np.array([[-0.1, 0.0, 0.2], [-0.05, 0.1, 0.3]], np.float32),
+        weights=np.array([0.75, 0.25], np.float32),
+        mean=np.array([-0.0875, 0.025, 0.225], np.float32),
+        intervals=np.array([[-0.1, -0.05], [0.0, 0.1], [0.2, 0.3]], np.float32),
+        update_count=1,
+    )
     observer.latest = Model2CheckpointGuess(
         1,
         WorldPrediction(
             torch.tensor([[10.0, -10.0, -10.0, -10.0, -10.0]]),
             torch.full((1, 7), 0.5),
+            posterior,
         ),
     )
     second = session.next_episode()
@@ -209,6 +219,46 @@ def test_next_rollout_uses_latest_completed_model2_checkpoint_guess() -> None:
     assert second.model2_checkpoint_version == 1
     assert all(step.guessed_parameters.tolist() == [0.5] * 7 for step in second.thought_steps)
     assert len(observer.checkpoints) == 2
+    serialized = second.to_payload()["thought_steps"][0]["parameter_posterior"]
+    assert serialized["update_count"] == 1
+    assert serialized["mean"] == pytest.approx([-0.0875, 0.025, 0.225])
+    assert np.asarray(serialized["intervals"]) == pytest.approx(
+        np.asarray([[-0.1, -0.05], [0.0, 0.1], [0.2, 0.3]])
+    )
+
+
+def test_smc_runtime_accumulates_a_parameter_posterior_across_predictions() -> None:
+    beliefs = np.zeros((1, 4, 3, 16, 16), dtype=np.float32)
+    beliefs[0, -1, 1, 7, 5:12] = 1.0
+    beliefs[0, -1, 2] = beliefs[0, -1, 1]
+    inputs = BeliefInputs(beliefs, np.array([[False, False, False, True]]))
+    runtime = SMCModel2Runtime(
+        config=SMCConfig(
+            particle_count=8,
+            rounds=1,
+            seed=13,
+            grid_size=4,
+            sinkhorn_iterations=4,
+        )
+    )
+
+    first = runtime.predict(inputs)
+    second = runtime.predict(inputs)
+
+    assert first.posterior is not None
+    assert second.posterior is not None
+    assert first.posterior.update_count == 1
+    assert second.posterior.update_count == 2
+    assert second.posterior.particles.shape == (8, 3)
+    assert second.posterior.weights.sum() == pytest.approx(1.0)
+
+
+def test_live_smc_uses_a_dense_gently_rejuvenated_posterior() -> None:
+    runtime = SMCModel2Runtime()
+
+    assert runtime.config.particle_count == 24
+    assert runtime.config.score_temperature == pytest.approx(8.0)
+    assert runtime.config.jitter_scale == pytest.approx(0.015)
 
 
 def test_close_stops_the_model2_observer() -> None:

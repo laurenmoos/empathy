@@ -1,6 +1,7 @@
 import inspect
 
 import numpy as np
+import pytest
 import torch
 
 from empathy.model2.activation_adapter import (
@@ -10,7 +11,12 @@ from empathy.model2.activation_adapter import (
 )
 from empathy.model2.adapters import adapt_model1_activations
 from empathy.model2.contracts import BeliefInputs
-from empathy.model2.smc import BeliefWorldSMC, SMCConfig
+from empathy.model2.smc import (
+    BeliefWorldSMC,
+    ContinualBeliefWorldSMC,
+    SMCConfig,
+    weighted_parameter_summary,
+)
 from empathy.physics.world import WorldSchema
 
 
@@ -134,3 +140,42 @@ def test_activation_entry_point_reuses_the_belief_smc_search() -> None:
     assert np.array_equal(activation.ranked_worlds, explicit.ranked_worlds)
     assert np.array_equal(activation.weights, explicit.weights)
     assert np.array_equal(activation.event_discrepancies, explicit.event_discrepancies)
+
+
+def test_continual_smc_retains_one_particle_population_across_updates() -> None:
+    post = np.zeros((32, 32), dtype=np.float32)
+    post[12, 11:20] = 1.0
+    smc = ContinualBeliefWorldSMC(
+        SMCConfig(particle_count=18, rounds=1, seed=31)
+    )
+
+    first = smc.update(_inputs(post))
+    initializations = smc.initialization_count
+    second = smc.update(_inputs(post))
+
+    assert first.update_count == 1
+    assert second.update_count == 2
+    assert initializations == smc.initialization_count == 1
+    assert first.parameter_particles.shape == (18, 3)
+    assert second.parameter_particles.shape == (18, 3)
+    assert np.isfinite(second.weights).all()
+    assert second.weights.sum() == pytest.approx(1.0)
+
+
+def test_weighted_parameter_summary_reports_physical_means_and_intervals() -> None:
+    particles = np.array(
+        [
+            [-0.30, -0.10, 0.00],
+            [-0.10, 0.00, 0.20],
+            [0.20, 0.30, 0.60],
+        ],
+        dtype=np.float64,
+    )
+    weights = np.array([0.15, 0.70, 0.15], dtype=np.float64)
+
+    mean, intervals = weighted_parameter_summary(particles, weights)
+
+    assert mean == pytest.approx([-0.085, 0.03, 0.23])
+    assert intervals.shape == (3, 2)
+    assert intervals[:, 0] == pytest.approx([-0.30, -0.10, 0.00])
+    assert intervals[:, 1] == pytest.approx([0.20, 0.30, 0.60])

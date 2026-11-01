@@ -59,6 +59,8 @@ class SMCResult:
     best_world: np.ndarray
     event_discrepancies: np.ndarray
     progress: tuple[ActivationSearchProgress, ...] = ()
+    parameter_particles: np.ndarray | None = None
+    update_count: int = 0
 
 
 @dataclass(frozen=True, eq=False)
@@ -216,6 +218,32 @@ def _normalize_log_weights(log_weights: np.ndarray) -> np.ndarray:
     return weights / total
 
 
+def weighted_parameter_summary(
+    particles: np.ndarray, weights: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return the weighted mean and central 80% marginal intervals."""
+    values = np.asarray(particles, dtype=np.float64)
+    probabilities = np.asarray(weights, dtype=np.float64)
+    if values.ndim != 2 or values.shape[1] != 3 or probabilities.shape != (len(values),):
+        raise ValueError("posterior particles must be [N,3] with one weight per row")
+    if not np.isfinite(values).all() or not np.isfinite(probabilities).all():
+        raise ValueError("posterior particles and weights must be finite")
+    total = float(probabilities.sum())
+    if total <= 0 or np.any(probabilities < 0):
+        raise ValueError("posterior weights must be nonnegative with positive mass")
+    probabilities = probabilities / total
+    mean = np.average(values, axis=0, weights=probabilities)
+    intervals = np.empty((3, 2), dtype=np.float64)
+    for parameter in range(3):
+        order = np.argsort(values[:, parameter], kind="stable")
+        ordered = values[order, parameter]
+        cumulative = np.cumsum(probabilities[order])
+        for bound, quantile in enumerate((0.1, 0.9)):
+            index = min(int(np.searchsorted(cumulative, quantile, side="left")), len(ordered) - 1)
+            intervals[parameter, bound] = ordered[index]
+    return mean, intervals
+
+
 def _jitter_particles(
     particles: np.ndarray, config: SMCConfig, rng: np.random.Generator
 ) -> np.ndarray:
@@ -317,6 +345,64 @@ class BeliefWorldSMC:
         adapter: ActivationBeliefAdapter,
     ) -> SMCResult:
         return self.infer(adapt_model1_activations(events, adapter))
+
+
+class ContinualBeliefWorldSMC:
+    """Sequential belief-only posterior that persists across Model 1 versions."""
+
+    def __init__(self, config: SMCConfig | None = None) -> None:
+        self.config = config or SMCConfig()
+        self._rng = np.random.default_rng(self.config.seed)
+        self._particles: np.ndarray | None = None
+        self._log_weights: np.ndarray | None = None
+        self.update_count = 0
+        self.initialization_count = 0
+
+    def update(self, inputs: BeliefInputs) -> SMCResult:
+        if len(inputs.beliefs) != 1:
+            raise ValueError("live SMC inference expects one belief history")
+        if self._particles is None:
+            self._particles = _initial_particles(self.config, self._rng)
+            self._log_weights = np.zeros(len(self._particles), dtype=np.float64)
+            self.initialization_count += 1
+        assert self._log_weights is not None
+        valid = np.flatnonzero(inputs.history_mask[0])
+        latest = valid[-1:]
+        discrepancies = _score_particles(
+            self._particles, inputs, latest, self.config
+        )
+        self._log_weights += -self.config.score_temperature * discrepancies[:, 0]
+        weights = _normalize_log_weights(self._log_weights)
+        self.update_count += 1
+
+        worlds = np.stack(
+            [
+                _world_from_particle(particle).to_flat(WorldSchema.v1())
+                for particle in self._particles
+            ]
+        ).astype(np.float32)
+        order = np.argsort(-weights, kind="stable")
+        result = SMCResult(
+            ranked_worlds=worlds[order],
+            weights=weights[order],
+            best_world=worlds[order][0].copy(),
+            event_discrepancies=discrepancies[order],
+            parameter_particles=self._particles[order].copy(),
+            update_count=self.update_count,
+        )
+
+        effective_sample_size = 1.0 / float(np.square(weights).sum())
+        if effective_sample_size < 0.4 * len(self._particles):
+            selected = self._rng.choice(
+                len(self._particles), len(self._particles), replace=True, p=weights
+            )
+            elite = self._particles[int(np.argmax(weights))].copy()
+            self._particles = _jitter_particles(
+                self._particles[selected].copy(), self.config, self._rng
+            )
+            self._particles[0] = elite
+            self._log_weights = np.zeros(len(self._particles), dtype=np.float64)
+        return result
 
 
 class ActivationWorldSMC:

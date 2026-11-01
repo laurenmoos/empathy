@@ -164,27 +164,28 @@ def test_world_guess_shows_all_three_current_numeric_parameters() -> None:
         "reappearance revision",
     ):
         assert label in source
-    assert "movement-toward" in source
-    assert "movement-away" in source
     assert "function updateSecondOrder" in source
-    assert "function predictedParameterNumber" in source
     assert "function formatParameter" in source
-    assert "formatParameter(predictedValue)" in source
-    assert "step.predicted_parameters" in source
-    assert 'return "inactive"' not in source
+    assert "function posteriorElements" in source
+    assert "step.parameter_posterior" in source
+    assert "posterior-particle" in source
+    assert "border-radius: 50%; background: #758073" in source
+    assert "posterior-band" in source
+    assert "posterior-mean" in source
+    assert "posterior-truth" in source
 
 
-def test_second_order_panel_shows_constraint_direction_without_summary_block() -> None:
+def test_second_order_panel_shows_weighted_ranges_without_summary_block() -> None:
     source, parser = parsed_explorer()
 
     assert {"coherenceScore", "coherenceFill", "coherenceDetail"}.isdisjoint(parser.ids)
     assert parser.canvases == {"perceptionCanvas"}
-    assert "function movementDirection" in source
-    assert "constraint-direction-mark" in source
-    assert "direction.textContent = formatParameter(predictedValue);" in source
-    assert '"aria-label",' in source
-    assert "`${slot.name} guess ${predictedValue.toFixed(2)}, ${movement}`" in source
-    assert 'row.classList.add(`movement-${movement}`)' in source
+    assert "function scalePercent" in source
+    assert "posterior.intervals[slot.posteriorIndex]" in source
+    assert "posterior.mean[slot.posteriorIndex]" in source
+    assert "posterior.particles.forEach" in source
+    assert 'axis.setAttribute("role", "img")' in source
+    assert "hidden world" in source
     for noise in (
         "constraint-axis",
         "constraint-target",
@@ -244,6 +245,9 @@ def test_live_episode_validation_checks_trajectory_beliefs_and_four_thoughts() -
     assert "ground-truth occluder must contain four normalized values" in source
     assert "belief byte length" in source
     assert "predicted_world_flat" in source
+    assert "parameter_posterior" in source
+    assert "posterior particles and weights are invalid" in source
+    assert "posterior intervals or mean are invalid" in source
     assert "constraint recovery is invalid" in source
     assert "initial_state" in source
     assert "model1_checkpoint_version" in source

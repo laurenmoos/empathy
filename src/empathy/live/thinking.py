@@ -18,10 +18,15 @@ from ..model1.online_train import (
 )
 from ..model2.adapters import Model1BeliefPacket, adapt_model1_events
 from ..model2.coherence import ConstraintRecovery, evaluate_constraint_recovery
-from ..model2.contracts import BeliefInputs, WorldPrediction
+from ..model2.contracts import BeliefInputs, ParameterPosterior, WorldPrediction
 from ..model2.decode import decode_prediction
 from ..model2.losses import world_code_loss
-from ..model2.smc import BeliefWorldSMC, SMCConfig, SMCResult
+from ..model2.smc import (
+    ContinualBeliefWorldSMC,
+    SMCConfig,
+    SMCResult,
+    weighted_parameter_summary,
+)
 from ..model2.train import predict as predict_model2
 from ..physics.simulate import BallState
 from ..physics.world import WorldSchema
@@ -98,30 +103,45 @@ class SMCModel2Runtime:
 
     def __init__(self, *, seed: int = 7, config: SMCConfig | None = None) -> None:
         self.config = config or SMCConfig(
-            particle_count=12,
+            particle_count=24,
             rounds=1,
             seed=seed,
             grid_size=6,
             sinkhorn_iterations=10,
+            score_temperature=8.0,
+            jitter_scale=0.015,
         )
         self.weight_update_count = 0
         self._last_result: SMCResult | None = None
+        self._search = ContinualBeliefWorldSMC(self.config)
 
     def fork(self) -> SMCModel2Runtime:
         return SMCModel2Runtime(config=self.config)
 
     def infer(self, inputs: BeliefInputs) -> SMCResult:
-        self._last_result = BeliefWorldSMC(self.config).infer(inputs)
+        self._last_result = self._search.update(inputs)
         return self._last_result
 
     def predict(self, inputs: BeliefInputs) -> WorldPrediction:
-        flat = self.infer(inputs).best_world
+        result = self.infer(inputs)
+        flat = result.best_world
         activity_indices = (0, 2, 4, 6, 9)
         parameter_indices = (1, 3, 5, 7, 8, 10, 11)
         activity = torch.tensor(flat[list(activity_indices)], dtype=torch.float32)[None]
         parameters = torch.tensor(flat[list(parameter_indices)], dtype=torch.float32)[None]
         logits = torch.where(activity.bool(), torch.tensor(10.0), torch.tensor(-10.0))
-        return WorldPrediction(logits, parameters)
+        assert result.parameter_particles is not None
+        mean, intervals = weighted_parameter_summary(
+            result.parameter_particles, result.weights
+        )
+        posterior = ParameterPosterior(
+            result.parameter_particles,
+            result.weights,
+            mean,
+            intervals,
+            result.update_count,
+        )
+        return WorldPrediction(logits, parameters, posterior)
 
     def complete_event(self, inputs: BeliefInputs) -> dict[str, float | int]:
         if self._last_result is None:
@@ -144,6 +164,7 @@ class LiveThoughtStep:
     paths: np.ndarray
     path_weights: np.ndarray
     constraint_recovery: ConstraintRecovery
+    parameter_posterior: ParameterPosterior | None = None
 
     def to_payload(self) -> dict[str, object]:
         height, width = self.belief.shape
@@ -162,6 +183,15 @@ class LiveThoughtStep:
             "path_weights": self.path_weights.tolist(),
             "operators": _operator_payload(self.guessed_flat),
             "constraint_recovery": self.constraint_recovery.to_payload(),
+            "parameter_posterior": None
+            if self.parameter_posterior is None
+            else {
+                "particles": self.parameter_posterior.particles.tolist(),
+                "weights": self.parameter_posterior.weights.tolist(),
+                "mean": self.parameter_posterior.mean.tolist(),
+                "intervals": self.parameter_posterior.intervals.tolist(),
+                "update_count": self.parameter_posterior.update_count,
+            },
         }
 
 
@@ -392,6 +422,7 @@ class LiveThinkingSession:
                     np.float32
                 )
                 model2_checkpoint_version = None
+                parameter_posterior = None
             else:
                 guessed_parameters = (
                     latest_guess.prediction.normalized_parameters[0]
@@ -404,6 +435,7 @@ class LiveThinkingSession:
                     latest_guess.prediction, WorldSchema.v1()
                 ).flat[0].astype(np.float32)
                 model2_checkpoint_version = latest_guess.version
+                parameter_posterior = latest_guess.prediction.posterior
             for index, (label, belief, step_paths, step_weights) in enumerate(
                 zip(labels, beliefs, visual_paths, visual_weights, strict=True)
             ):
@@ -418,6 +450,7 @@ class LiveThinkingSession:
                         step_paths,
                         step_weights,
                         evaluate_constraint_recovery(record.world_flat, guessed),
+                        parameter_posterior,
                     )
                 )
                 previous = belief

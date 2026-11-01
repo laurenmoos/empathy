@@ -1,7 +1,12 @@
 import numpy as np
 import pytest
 
-from empathy.model2.contracts import BeliefInputs, SchemaLayout, WorldTargets
+from empathy.model2.contracts import (
+    BeliefInputs,
+    ParameterPosterior,
+    SchemaLayout,
+    WorldTargets,
+)
 from empathy.physics.world import WorldSchema
 
 
@@ -81,3 +86,19 @@ def test_zero_valid_beliefs_and_target_validation():
     for invalid in [np.ones((1, 11)), world + 0.1, np.full((1, 12), np.nan)]:
         with pytest.raises(ValueError):
             WorldTargets(invalid, np.zeros((1, 7), dtype=bool))
+
+
+def test_parameter_posterior_is_validated_normalized_and_read_only():
+    posterior = ParameterPosterior(
+        particles=np.array([[-0.2, 0.1, 0.2], [0.1, -0.1, 0.4]], dtype=np.float32),
+        weights=np.array([2.0, 1.0], dtype=np.float32),
+        mean=np.array([-0.1, 0.03, 0.27], dtype=np.float32),
+        intervals=np.array([[-0.2, 0.1], [-0.1, 0.1], [0.2, 0.4]], dtype=np.float32),
+        update_count=2,
+    )
+
+    assert posterior.weights.sum() == pytest.approx(1.0)
+    assert not posterior.particles.flags.writeable
+    assert not posterior.weights.flags.writeable
+    assert not posterior.mean.flags.writeable
+    assert not posterior.intervals.flags.writeable

@@ -70,25 +70,19 @@
     .panel-head { min-height: 2.5rem; margin-bottom: .65rem; }
     .panel-head span { display: block; margin-top: .25rem; color: var(--muted); font-size: .68rem; line-height: 1.35; }
     canvas { display: block; width: 100%; aspect-ratio: 1.2; background: var(--canvas); }
-    .comparison { display: grid; gap: .35rem; margin-top: .35rem; }
-    .comparison-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 1rem; padding: .55rem 0; }
-    .constraint-label { display: block; }
-    .constraint-name { font: 500 .72rem Georgia, serif; }
-    .constraint-direction {
-      min-width: 3.7rem;
-      color: var(--muted);
-      font: 500 .66rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-variant-numeric: tabular-nums;
-      letter-spacing: .01em;
-      text-align: right;
-    }
-    .constraint-direction::before { display: inline-block; width: 1rem; text-align: left; }
-    .movement-toward .constraint-direction { color: #667864; }
-    .movement-toward .constraint-direction::before { content: "↘"; }
-    .movement-away .constraint-direction { color: #967568; }
-    .movement-away .constraint-direction::before { content: "↗"; }
-    .movement-steady .constraint-direction::before { content: "—"; }
-    .movement-new .constraint-direction::before { content: "·"; }
+    .comparison { display: grid; gap: 1rem; margin-top: .35rem; }
+    .posterior-row { display: grid; gap: .42rem; padding: .25rem 0; }
+    .posterior-header { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+    .posterior-name { font: 500 .72rem Georgia, serif; }
+    .posterior-values { display: flex; align-items: baseline; gap: .55rem; font-variant-numeric: tabular-nums; }
+    .posterior-estimate { font: 500 .7rem ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .posterior-range { color: var(--muted); font: 400 .6rem ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .posterior-axis { position: relative; height: 1.05rem; }
+    .posterior-track { position: absolute; top: .5rem; right: 0; left: 0; height: 1px; background: rgb(61 67 61 / 14%); }
+    .posterior-band { position: absolute; top: .4rem; height: .2rem; border-radius: 1rem; background: rgb(111 126 109 / 34%); }
+    .posterior-particle { position: absolute; top: .4rem; width: .2rem; height: .2rem; border-radius: 50%; background: #758073; transform: translateX(-.1rem); }
+    .posterior-mean { position: absolute; top: .18rem; width: 2px; height: .68rem; background: var(--forest); transform: translateX(-1px); }
+    .posterior-truth { position: absolute; top: .39rem; width: .28rem; height: .28rem; border: 1px solid var(--forest); border-radius: 50%; background: var(--paper); transform: translateX(-.14rem); }
     @media (max-width: 1080px) {
       .layers { grid-template-columns: 1fr; }
     }
@@ -153,9 +147,9 @@
     const DEFAULT_OCCLUDER = [0.35, 0.55, 0.05, 0.95];
     const FRAME_INTERVAL_SECONDS = .004;
     const worldSlots = [
-      {name: "gravity", operator: "vertical_acceleration", parameter: "a_y", parameterIndex: 0, minimum: -1, maximum: 1},
-      {name: "wind", operator: "horizontal_acceleration", parameter: "a_x", parameterIndex: 1, minimum: -1, maximum: 1},
-      {name: "damping", operator: "damping", parameter: "lambda", parameterIndex: 2, minimum: 0, maximum: 1}
+      {name: "gravity", operator: "vertical_acceleration", parameter: "a_y", parameterIndex: 0, posteriorIndex: 0, minimum: -0.30, maximum: 0.30},
+      {name: "wind", operator: "horizontal_acceleration", parameter: "a_x", parameterIndex: 1, posteriorIndex: 1, minimum: -0.30, maximum: 0.30},
+      {name: "damping", operator: "damping", parameter: "lambda", parameterIndex: 2, posteriorIndex: 2, minimum: 0, maximum: 0.60}
     ];
 
     let sessionId = null;
@@ -269,6 +263,30 @@
             || !step.predicted_parameters.every(Number.isFinite)) {
           throw new Error("predicted parameters must contain seven finite values");
         }
+        const posterior = step.parameter_posterior;
+        if (posterior !== null) {
+          if (!posterior || !Array.isArray(posterior.particles)
+              || posterior.particles.length < 1
+              || !posterior.particles.every(particle => Array.isArray(particle)
+                && particle.length === 3 && particle.every(Number.isFinite))
+              || !Array.isArray(posterior.weights)
+              || posterior.weights.length !== posterior.particles.length
+              || !posterior.weights.every(weight => Number.isFinite(weight) && weight >= 0)
+              || posterior.weights.reduce((sum, weight) => sum + weight, 0) <= 0) {
+            throw new Error("posterior particles and weights are invalid");
+          }
+          if (!Array.isArray(posterior.mean) || posterior.mean.length !== 3
+              || !posterior.mean.every(Number.isFinite)
+              || !Array.isArray(posterior.intervals)
+              || posterior.intervals.length !== 3
+              || !posterior.intervals.every(interval => Array.isArray(interval)
+                && interval.length === 2 && interval.every(Number.isFinite)
+                && interval[0] <= interval[1])
+              || !Number.isInteger(posterior.update_count)
+              || posterior.update_count < 1) {
+            throw new Error("posterior intervals or mean are invalid");
+          }
+        }
         if (!Array.isArray(step.paths) || step.paths.length < 1
             || !step.paths.every(path => Array.isArray(path) && path.length > 1
               && path.every(point => Array.isArray(point) && point.length === 2
@@ -302,7 +320,7 @@
                 || Number.isFinite(item.parameter_error) && item.parameter_error >= 0))) {
           throw new Error("constraint recovery is invalid");
         }
-        return {...step, beliefBytes, constraint_recovery: recovery};
+        return {...step, beliefBytes, constraint_recovery: recovery, parameter_posterior: posterior};
       });
       if (!payload.training || !Number.isFinite(payload.training.loss)
           || !Number.isInteger(payload.latent_update_count)
@@ -644,18 +662,9 @@
       return Number(operator.parameters[slot.parameter]);
     }
 
-    function predictedParameterNumber(parameters, slot) {
-      const normalized = Math.max(0, Math.min(1, Number(parameters[slot.parameterIndex])));
-      return slot.minimum + normalized * (slot.maximum - slot.minimum);
-    }
-
-    function movementDirection(actual, current, previous) {
-      if (previous === null) return "new";
-      const before = Math.abs(previous - actual);
-      const after = Math.abs(current - actual);
-      if (after < before - 1e-6) return "toward";
-      if (after > before + 1e-6) return "away";
-      return "steady";
+    function scalePercent(value, slot) {
+      const fraction = (value - slot.minimum) / (slot.maximum - slot.minimum);
+      return 100 * Math.max(0, Math.min(1, fraction));
     }
 
     function formatParameter(value) {
@@ -663,44 +672,73 @@
       return rounded.toFixed(2).replace("-", "−");
     }
 
-    function comparisonElements(actual, predictedParameters, previousParameters) {
+    function posteriorElements(actual, posterior) {
+      const maximumWeight = Math.max(...posterior.weights, 1e-8);
       return worldSlots.map(slot => {
         const actualValue = worldSlotNumber(actual, slot);
-        const predictedValue = predictedParameterNumber(predictedParameters, slot);
-        const previousValue = previousParameters === null
-          ? null : predictedParameterNumber(previousParameters, slot);
-        const movement = movementDirection(actualValue, predictedValue, previousValue);
+        const [low, high] = posterior.intervals[slot.posteriorIndex];
+        const estimate = posterior.mean[slot.posteriorIndex];
         const row = document.createElement("div");
-        row.className = "comparison-row";
-        row.classList.add(`movement-${movement}`);
-        const label = document.createElement("span");
-        label.className = "constraint-label";
+        row.className = "posterior-row";
+        const header = document.createElement("div");
+        header.className = "posterior-header";
         const name = document.createElement("span");
-        name.className = "constraint-name";
+        name.className = "posterior-name";
         name.textContent = slot.name;
-        const direction = document.createElement("span");
-        direction.className = "constraint-direction constraint-direction-mark";
-        direction.textContent = formatParameter(predictedValue);
-        direction.setAttribute(
+        const values = document.createElement("span");
+        values.className = "posterior-values";
+        const estimateText = document.createElement("span");
+        estimateText.className = "posterior-estimate";
+        estimateText.textContent = formatParameter(estimate);
+        const rangeText = document.createElement("span");
+        rangeText.className = "posterior-range";
+        rangeText.textContent = `${formatParameter(low)}–${formatParameter(high)}`;
+        values.append(estimateText, rangeText);
+        header.append(name, values);
+
+        const axis = document.createElement("div");
+        axis.className = "posterior-axis";
+        axis.setAttribute("role", "img");
+        axis.setAttribute(
           "aria-label",
-          `${slot.name} guess ${predictedValue.toFixed(2)}, ${movement}`
+          `${slot.name} posterior ${low.toFixed(2)} to ${high.toFixed(2)}, `
+          + `mean ${estimate.toFixed(2)}, hidden world ${actualValue.toFixed(2)}`
         );
-        label.append(name);
-        row.append(label, direction);
+        const track = document.createElement("span");
+        track.className = "posterior-track";
+        const band = document.createElement("span");
+        band.className = "posterior-band";
+        band.style.left = `${scalePercent(low, slot)}%`;
+        band.style.width = `${Math.max(.6, scalePercent(high, slot) - scalePercent(low, slot))}%`;
+        axis.append(track, band);
+        posterior.particles.forEach((particle, index) => {
+          const mark = document.createElement("span");
+          mark.className = "posterior-particle";
+          mark.style.left = `${scalePercent(particle[slot.posteriorIndex], slot)}%`;
+          mark.style.opacity = (.10 + .72 * Math.sqrt(
+            posterior.weights[index] / maximumWeight
+          )).toFixed(3);
+          axis.append(mark);
+        });
+        const mean = document.createElement("span");
+        mean.className = "posterior-mean";
+        mean.style.left = `${scalePercent(estimate, slot)}%`;
+        const truth = document.createElement("span");
+        truth.className = "posterior-truth";
+        truth.style.left = `${scalePercent(actualValue, slot)}%`;
+        axis.append(mean, truth);
+        row.append(header, axis);
         return row;
       });
     }
 
     function updateSecondOrder(step) {
-      const previousParameters = step.index > 0
-        ? currentEpisode.thought_steps[step.index - 1].predicted_parameters : null;
-      $("comparisonRows").replaceChildren(
-        ...comparisonElements(
-          currentEpisode.ground_truth.operators,
-          step.predicted_parameters,
-          previousParameters
-        )
-      );
+      const posterior = step.parameter_posterior;
+      if (!posterior) return clearSecondOrder();
+      $("comparisonRows").replaceChildren(...posteriorElements(
+        currentEpisode.ground_truth.operators,
+        posterior
+      ));
     }
 
     function draw() {

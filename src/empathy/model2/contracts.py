@@ -133,7 +133,42 @@ class Model2Batch:
     parameter_identifiable: torch.Tensor
 
 
+@dataclass(frozen=True, eq=False)
+class ParameterPosterior:
+    """Weighted joint hypotheses over physical gravity, wind, and damping."""
+
+    particles: np.ndarray
+    weights: np.ndarray
+    mean: np.ndarray
+    intervals: np.ndarray
+    update_count: int
+
+    def __post_init__(self) -> None:
+        particles = np.asarray(self.particles)
+        weights = np.asarray(self.weights)
+        mean = np.asarray(self.mean)
+        intervals = np.asarray(self.intervals)
+        if particles.ndim != 2 or particles.shape[1] != 3 or len(particles) < 1:
+            raise ValueError("posterior particles must have shape [N,3]")
+        if weights.shape != (len(particles),) or mean.shape != (3,):
+            raise ValueError("posterior weights and mean do not match particles")
+        if intervals.shape != (3, 2) or np.any(intervals[:, 0] > intervals[:, 1]):
+            raise ValueError("posterior intervals must be ordered [3,2] bounds")
+        if not all(np.isfinite(values).all() for values in (particles, weights, mean, intervals)):
+            raise ValueError("posterior values must be finite")
+        if np.any(weights < 0) or float(weights.sum()) <= 0:
+            raise ValueError("posterior weights must have positive nonnegative mass")
+        if type(self.update_count) is not int or self.update_count < 1:
+            raise ValueError("posterior update count must be a positive integer")
+        normalized = weights.astype(np.float64) / float(weights.sum())
+        object.__setattr__(self, "particles", _readonly(particles, np.float32))
+        object.__setattr__(self, "weights", _readonly(normalized, np.float32))
+        object.__setattr__(self, "mean", _readonly(mean, np.float32))
+        object.__setattr__(self, "intervals", _readonly(intervals, np.float32))
+
+
 @dataclass(frozen=True)
 class WorldPrediction:
     activity_logits: torch.Tensor
     normalized_parameters: torch.Tensor
+    posterior: ParameterPosterior | None = None

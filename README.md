@@ -18,6 +18,14 @@ uv run empathy train-seeing --episodes 50 --log-dir runs/seeing
 
 This prints one compact JSON line per throw and writes a checkpoint, `metrics.jsonl`, and TensorBoard-compatible events. `prediction_loss` scores the frozen pre-exit belief against the later visible exit and departure. One episode is one online update and one TensorBoard step. Optionally inspect the run with `uv run tensorboard --logdir runs/seeing`.
 
+To train in the source world and then reset the fast world state while carrying the slow network into an unseen environment:
+
+```bash
+uv run empathy train-seeing --episodes 100 --heldout-episodes 100 --log-dir runs/heldout
+```
+
+The held-out phase keeps the same single loss and continues updating both fast and slow parameters. Its log includes their distance from the start of the new environment.
+
 ## Environment
 
 A ball moves behind a fixed occluder. Each environment is defined by gravity, wind, and damping. These parameters compose at every time step to transform one ball state into the next, so the hidden trajectory carries their joint constraints without directly revealing their values.

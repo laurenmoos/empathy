@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from empathy.model1 import online_cli
 from empathy.model1.online_cli import run_online_training
 
 
@@ -27,3 +28,28 @@ def test_headless_training_is_seeded(tmp_path, capsys) -> None:
     second = run_online_training(episodes=2, log_dir=tmp_path / "two", seed=5)
     capsys.readouterr()
     assert first == second
+
+
+def test_heldout_training_carries_slow_model_and_resets_fast_world_state(
+    tmp_path, capsys
+) -> None:
+    output = tmp_path / "heldout"
+    metrics = online_cli.run_heldout_training(
+        source_episodes=2,
+        heldout_episodes=2,
+        log_dir=output,
+        seed=13,
+    )
+    capsys.readouterr()
+
+    assert [row["phase"] for row in metrics] == [
+        "source",
+        "source",
+        "heldout",
+        "heldout",
+    ]
+    assert [row["episode"] for row in metrics] == [1, 2, 1, 2]
+    assert metrics[2]["fast_distance"] > 0
+    assert metrics[2]["slow_distance"] > 0
+    assert (output / "source-boundary.pt").is_file()
+    assert (output / "heldout-final.pt").is_file()

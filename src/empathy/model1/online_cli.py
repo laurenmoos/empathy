@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
@@ -22,6 +23,9 @@ from .online_train import (
     observed_states_from_path,
 )
 
+SOURCE_WORLD = LiveParameters(gravity=-0.06, wind=0.06, damping=0.04)
+HELDOUT_WORLD = LiveParameters(gravity=0.10, wind=-0.06, damping=0.16)
+
 
 def _clip(frames: np.ndarray, start: int, end: int) -> tuple[torch.Tensor, torch.Tensor]:
     values = torch.from_numpy(frames[start:end].astype(np.float32) / 255.0)
@@ -29,8 +33,12 @@ def _clip(frames: np.ndarray, start: int, end: int) -> tuple[torch.Tensor, torch
     return values, torch.ones((1, values.shape[1]), dtype=torch.bool)
 
 
-def _observed_episode(index: int, rng: np.random.Generator) -> ObservedSeeingEpisode:
-    world = world_from_parameters(LiveParameters(gravity=-0.06, wind=0.06, damping=0.04))
+def _observed_episode(
+    index: int,
+    rng: np.random.Generator,
+    parameters: LiveParameters = SOURCE_WORLD,
+) -> ObservedSeeingEpisode:
+    world = world_from_parameters(parameters)
     initial = BallState(
         0.1,
         float(rng.uniform(0.58, 0.72)),
@@ -119,4 +127,97 @@ def run_online_training(
         },
         log_dir / "online-seeing.pt",
     )
+    return rows
+
+
+def _parameter_distance(model: StepwiseWorldModel, baseline: tuple[torch.Tensor, ...]) -> float:
+    squared = sum(
+        (parameter.detach() - initial).square().sum()
+        for parameter, initial in zip(model.parameters(), baseline, strict=True)
+    )
+    return float(squared.sqrt())
+
+
+def _save_phase(
+    path: Path,
+    runtime: OnlineSeeingRuntime,
+    config: OnlineSeeingConfig,
+    parameters: LiveParameters,
+) -> None:
+    torch.save(
+        {
+            "model": runtime.model.state_dict(),
+            "world_latent": runtime.world_latent.detach(),
+            "config": config.__dict__,
+            "world": asdict(parameters),
+            "updates": runtime.updates,
+        },
+        path,
+    )
+
+
+def run_heldout_training(
+    *,
+    source_episodes: int,
+    heldout_episodes: int,
+    log_dir: Path,
+    seed: int = 7,
+    source_world: LiveParameters = SOURCE_WORLD,
+    heldout_world: LiveParameters = HELDOUT_WORLD,
+) -> list[dict[str, str | int | float]]:
+    """Train on one world, then adapt fast and slow state in an unseen world."""
+    if source_episodes < 1 or heldout_episodes < 1:
+        raise ValueError("source and heldout episodes must be positive")
+    log_dir = Path(log_dir)
+    log_dir.mkdir(parents=True, exist_ok=False)
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    rng = np.random.default_rng(seed)
+    config = OnlineSeeingConfig()
+    model = StepwiseWorldModel(config)
+    writer = SummaryWriter(log_dir=str(log_dir), flush_secs=1)
+    rows: list[dict[str, str | int | float]] = []
+    metrics_path = log_dir / "metrics.jsonl"
+    global_step = 0
+
+    with metrics_path.open("w") as metrics_file:
+        for phase, count, parameters in (
+            ("source", source_episodes, source_world),
+            ("heldout", heldout_episodes, heldout_world),
+        ):
+            runtime = OnlineSeeingRuntime(
+                model,
+                seed=seed + (phase == "heldout"),
+                occluder=(0.35, 0.55),
+            )
+            slow_baseline = tuple(parameter.detach().clone() for parameter in model.parameters())
+            for episode_index in range(count):
+                episode = _observed_episode(global_step, rng, parameters)
+                result = runtime.complete(runtime.begin(episode), episode, train=True)
+                global_step += 1
+                row: dict[str, str | int | float] = {
+                    "phase": phase,
+                    "episode": episode_index + 1,
+                    "global_step": global_step,
+                    "prediction_loss": round(result.metrics.prediction_loss, 6),
+                    "belief_spread": round(result.metrics.belief_spread, 6),
+                    "fast_distance": round(float(runtime.world_latent.detach().norm()), 6),
+                    "slow_distance": round(_parameter_distance(model, slow_baseline), 6),
+                }
+                rows.append(row)
+                encoded = json.dumps(row, sort_keys=True)
+                print(encoded, flush=True)
+                metrics_file.write(encoded + "\n")
+                metrics_file.flush()
+                for name in (
+                    "prediction_loss",
+                    "belief_spread",
+                    "fast_distance",
+                    "slow_distance",
+                ):
+                    writer.add_scalar(f"{phase}/{name}", row[name], episode_index + 1)
+                writer.flush()
+            checkpoint = "source-boundary.pt" if phase == "source" else "heldout-final.pt"
+            _save_phase(log_dir / checkpoint, runtime, config, parameters)
+    writer.close()
     return rows

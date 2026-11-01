@@ -53,6 +53,15 @@ def test_live_demo_uses_one_tracked_checkpoint_by_default() -> None:
     assert not hasattr(args, "model2_checkpoint")
 
 
+def test_train_seeing_accepts_a_heldout_phase() -> None:
+    args = _parser().parse_args(
+        ["train-seeing", "--episodes", "12", "--heldout-episodes", "7"]
+    )
+
+    assert args.episodes == 12
+    assert args.heldout_episodes == 7
+
+
 def test_live_demo_delegates_only_the_model1_checkpoint(monkeypatch, tmp_path) -> None:
     from empathy.live import server as live_server
 

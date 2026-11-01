@@ -6,7 +6,11 @@ import torch
 
 from empathy.live.inference import LiveParameters
 from empathy.live.observer import Model2CheckpointGuess
-from empathy.live.thinking import LiveThinkingSession, OnlineModel2Runtime
+from empathy.live.thinking import (
+    DEFAULT_INITIAL_STATES,
+    LiveThinkingSession,
+    OnlineModel2Runtime,
+)
 from empathy.model1.config import load_model1_config
 from empathy.model1.types import TrajectoryMixture
 from empathy.model2.contracts import BeliefInputs, WorldPrediction
@@ -83,6 +87,19 @@ def _session(runtime=None, observer=None, **kwargs) -> LiveThinkingSession:
     )
 
 
+def test_default_throws_form_a_controlled_vertical_sweep() -> None:
+    heights = [state.y for state in DEFAULT_INITIAL_STATES]
+
+    assert len(heights) >= 12
+    assert heights[:5] == pytest.approx([0.50, 0.08, 0.92, 0.15, 0.85])
+    assert min(heights) <= 0.10
+    assert max(heights) >= 0.90
+    assert max(heights) - min(heights) >= 0.80
+    assert {(state.x, state.vx, state.vy) for state in DEFAULT_INITIAL_STATES} == {
+        (0.1, 0.18, 0.0)
+    }
+
+
 def test_episode_publishes_one_checkpoint_without_running_model2_synchronously() -> None:
     runtime = RecordingWorldRuntime()
     observer = RecordingObserver()
@@ -90,7 +107,9 @@ def test_episode_publishes_one_checkpoint_without_running_model2_synchronously()
 
     episode = session.next_episode()
 
-    assert episode.initial_state != BallState(0.1, 0.5, 0.18, 0.0)
+    assert episode.initial_state.y in {state.y for state in DEFAULT_INITIAL_STATES}
+    assert episode.initial_state.x == pytest.approx(0.1)
+    assert episode.initial_state.vx == pytest.approx(0.18)
     assert [step.label for step in episode.thought_steps] == [
         "first possibility",
         "more possibilities",
@@ -158,6 +177,17 @@ def test_successive_episodes_vary_offsets_and_keep_completed_event_history() -> 
     assert observer.checkpoints[1].inputs.history_mask.tolist() == [[False, False, True, True]]
     assert observer.checkpoints[2].inputs.history_mask.tolist() == [[False, True, True, True]]
     assert session.completed_event_count == 3
+
+
+def test_default_stream_realizes_probes_across_most_of_the_vertical_range() -> None:
+    session = _session()
+
+    episodes = [session.next_episode() for _ in DEFAULT_INITIAL_STATES]
+    heights = [episode.initial_state.y for episode in episodes]
+
+    assert min(heights) <= 0.10
+    assert max(heights) >= 0.90
+    assert max(heights) - min(heights) >= 0.80
 
 
 def test_next_rollout_uses_latest_completed_model2_checkpoint_guess() -> None:

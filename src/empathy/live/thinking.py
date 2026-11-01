@@ -216,14 +216,19 @@ class LiveThinkingEpisode:
 
 
 DEFAULT_INITIAL_STATES = (
-    BallState(0.1, 0.42, 0.18, 0.00),
-    BallState(0.1, 0.50, 0.16, 0.02),
-    BallState(0.1, 0.58, 0.20, -0.02),
-    BallState(0.1, 0.46, 0.20, 0.03),
-    BallState(0.1, 0.54, 0.17, -0.03),
-    BallState(0.1, 0.38, 0.19, 0.01),
-    BallState(0.1, 0.62, 0.18, -0.01),
-    BallState(0.1, 0.48, 0.21, 0.00),
+    BallState(0.1, 0.50, 0.18, 0.0),
+    BallState(0.1, 0.08, 0.18, 0.0),
+    BallState(0.1, 0.92, 0.18, 0.0),
+    BallState(0.1, 0.15, 0.18, 0.0),
+    BallState(0.1, 0.85, 0.18, 0.0),
+    BallState(0.1, 0.22, 0.18, 0.0),
+    BallState(0.1, 0.78, 0.18, 0.0),
+    BallState(0.1, 0.29, 0.18, 0.0),
+    BallState(0.1, 0.71, 0.18, 0.0),
+    BallState(0.1, 0.36, 0.18, 0.0),
+    BallState(0.1, 0.64, 0.18, 0.0),
+    BallState(0.1, 0.43, 0.18, 0.0),
+    BallState(0.1, 0.57, 0.18, 0.0),
 )
 
 
@@ -238,7 +243,7 @@ class LiveThinkingSession:
         parameters: LiveParameters,
         *,
         initial_states: tuple[BallState, ...] = DEFAULT_INITIAL_STATES,
-        max_offset_attempts: int = 8,
+        max_offset_attempts: int = len(DEFAULT_INITIAL_STATES),
         model_lock: threading.RLock | None = None,
         model2_observer: AsyncModel2Observer | None = None,
     ) -> None:
@@ -249,6 +254,7 @@ class LiveThinkingSession:
         self.model2_runtime = model2_runtime
         self.parameters = parameters
         self.initial_states = initial_states
+        self._adaptive_vertical_sweep = initial_states is DEFAULT_INITIAL_STATES
         self.max_offset_attempts = max_offset_attempts
         self._model_lock = model_lock or threading.RLock()
         self._session_lock = threading.Lock()
@@ -281,6 +287,18 @@ class LiveThinkingSession:
         for _ in range(self.max_offset_attempts):
             initial = self.initial_states[self._offset_cursor % len(self.initial_states)]
             self._offset_cursor += 1
+            if self._adaptive_vertical_sweep:
+                horizon = 3.9
+                vertical_velocity = (
+                    (0.5 - initial.y) / horizon
+                    - 0.5 * self.parameters.gravity * horizon
+                )
+                initial = BallState(
+                    initial.x,
+                    initial.y,
+                    initial.vx,
+                    vertical_velocity,
+                )
             try:
                 record, frames, full_path = engine._record(self.parameters, initial)
             except LiveInferenceError:

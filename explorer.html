@@ -489,45 +489,71 @@
       perceptionCtx.stroke();
     }
 
-    function drawInitialCondition([x, y, vx, vy]) {
-      const startX = x * perceptionCanvas.width;
-      const startY = (1 - y) * perceptionCanvas.height;
-      const endX = startX + vx * perceptionCanvas.width * .42;
-      const endY = startY - vy * perceptionCanvas.height * .42;
-      const angle = Math.atan2(endY - startY, endX - startX);
-      const arrowSize = 5;
+    function drawInitialPoint([x, y]) {
       perceptionCtx.save();
       perceptionCtx.fillStyle = "#4f554f";
       perceptionCtx.strokeStyle = "#4f554f";
-      perceptionCtx.globalAlpha = .82;
-      perceptionCtx.lineWidth = 1.3;
+      perceptionCtx.globalAlpha = .9;
       perceptionCtx.beginPath();
-      perceptionCtx.moveTo(startX, startY);
-      perceptionCtx.lineTo(endX, endY);
-      perceptionCtx.lineTo(
-        endX - arrowSize * Math.cos(angle - Math.PI / 6),
-        endY - arrowSize * Math.sin(angle - Math.PI / 6)
+      perceptionCtx.arc(
+        x * perceptionCanvas.width,
+        (1 - y) * perceptionCanvas.height,
+        4,
+        0,
+        Math.PI * 2
       );
-      perceptionCtx.moveTo(endX, endY);
-      perceptionCtx.lineTo(
-        endX - arrowSize * Math.cos(angle + Math.PI / 6),
-        endY - arrowSize * Math.sin(angle + Math.PI / 6)
-      );
-      perceptionCtx.stroke();
-      perceptionCtx.beginPath();
-      perceptionCtx.arc(startX, startY, 3.5, 0, Math.PI * 2);
       perceptionCtx.fill();
       perceptionCtx.restore();
     }
 
-    function drawExitPoint(truth) {
+    function drawEntryExitPoints(truth) {
+      const entry = boundaryPoint(truth.path, truth.occluder[0]);
       const exit = boundaryPoint(truth.path, truth.occluder[1]);
       perceptionCtx.save();
       perceptionCtx.fillStyle = "#dbd8d0";
       perceptionCtx.strokeStyle = "#4f554f";
       perceptionCtx.lineWidth = 1.2;
+      if (currentFrame >= truth.hidden_start) drawPoint(entry);
       if (currentFrame >= truth.reappearance_step) drawPoint(exit);
       perceptionCtx.restore();
+    }
+
+    function drawObservedPath(path) {
+      if (path.length < 2) return;
+      perceptionCtx.save();
+      perceptionCtx.beginPath();
+      path.forEach(([x, y], index) => {
+        const px = x * perceptionCanvas.width;
+        const py = (1 - y) * perceptionCanvas.height;
+        if (index === 0) perceptionCtx.moveTo(px, py);
+        else perceptionCtx.lineTo(px, py);
+      });
+      perceptionCtx.strokeStyle = "#4f554f";
+      perceptionCtx.lineWidth = 1.5;
+      perceptionCtx.globalAlpha = .78;
+      perceptionCtx.lineCap = "round";
+      perceptionCtx.lineJoin = "round";
+      perceptionCtx.stroke();
+      perceptionCtx.restore();
+    }
+
+    function drawVisibleTrajectory(truth) {
+      const entry = boundaryPoint(truth.path, truth.occluder[0]);
+      const exit = boundaryPoint(truth.path, truth.occluder[1]);
+      const approachEnd = Math.min(
+        currentFrame,
+        Math.max(0, truth.hidden_start - 1)
+      );
+      const approach = truth.path.slice(0, approachEnd + 1);
+      if (currentFrame >= truth.hidden_start && entry) approach.push(entry);
+      drawObservedPath(approach);
+
+      if (currentFrame >= truth.reappearance_step) {
+        const exitEnd = Math.min(currentFrame, truth.path.length - 1);
+        const departure = truth.path.slice(truth.reappearance_step, exitEnd + 1);
+        if (exit) departure.unshift(exit);
+        drawObservedPath(departure);
+      }
     }
 
     function strokePath(path, width, alpha) {
@@ -588,8 +614,9 @@
       if (currentFrame >= truth.reappearance_step) {
         clipToOccluder(truth.occluder, () => drawGroundTruthPath(truth.path));
       }
-      drawInitialCondition(currentEpisode.initial_state);
-      drawExitPoint(truth);
+      drawVisibleTrajectory(truth);
+      drawInitialPoint(currentEpisode.initial_state);
+      drawEntryExitPoints(truth);
     }
 
     function thoughtIndex() {

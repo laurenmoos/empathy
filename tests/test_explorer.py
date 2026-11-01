@@ -104,15 +104,20 @@ def test_explorer_uses_vector_trajectories_without_ball_pixels() -> None:
 
     assert "function drawOccluder" in source
     assert "function clipToOccluder" in source
-    assert "function drawInitialCondition" in source
-    assert "drawInitialCondition(currentEpisode.initial_state);" in source
-    assert "function drawExitPoint" in source
-    assert "drawExitPoint(truth);" in source
-    assert "drawEntryExitPoints" not in source
+    assert "function drawInitialPoint" in source
+    assert "drawInitialPoint(currentEpisode.initial_state);" in source
+    assert "function drawVisibleTrajectory" in source
+    assert "drawVisibleTrajectory(truth);" in source
+    assert "function drawEntryExitPoints" in source
+    assert "drawEntryExitPoints(truth);" in source
+    assert "boundaryPoint(truth.path, truth.occluder[0])" in source
+    assert "boundaryPoint(truth.path, truth.occluder[1])" in source
     assert "clipToOccluder(truth.occluder, () =>" in source
     assert "drawGroundTruthPath(truth.path)" in source
     assert "progressiveGroundTruthPath" not in source
     for unwanted in (
+        "function drawInitialCondition",
+        "function drawExitPoint",
         "function drawBallMarker",
         "function imageBuffer",
         "frames_base64",

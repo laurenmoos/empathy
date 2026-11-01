@@ -2,9 +2,9 @@
 
 Empathy asks whether one system can partially recover another **as a perceiver**, through the intentional structure preserved in its experience. **Model 1 sees; Model 2 thinks by imagining the world that could have made Model 1 see as it did.**
 
-![Thinking infers a distribution over the hidden world's gravity, wind, and damping.](assets/thinking.png)
+![A ball approaches an occluder, becomes a superposition of possible hidden trajectories, exits, and continues visibly.](assets/experiment.svg)
 
-_Thinking during an early search step: the hidden setting is marked while the posterior is still forming._
+_One fixed world, many throws: Model 1 predicts through the occlusion; Model 2 searches for the world that would produce those beliefs._
 
 ## The thought experiment
 

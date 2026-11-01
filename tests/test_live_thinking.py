@@ -190,6 +190,28 @@ def test_close_stops_the_model2_observer() -> None:
     assert observer.closed
 
 
+def test_default_observer_is_not_started_before_seeing_runtime_initializes(
+    monkeypatch,
+) -> None:
+    created = []
+
+    class TrackingObserver:
+        def __init__(self, predict):
+            created.append(predict)
+
+    def fail_seeing_runtime(*args, **kwargs):
+        del args, kwargs
+        raise RuntimeError("seeing initialization failed")
+
+    monkeypatch.setattr("empathy.live.thinking.AsyncModel2Observer", TrackingObserver)
+    monkeypatch.setattr("empathy.live.thinking.OnlineSeeingRuntime", fail_seeing_runtime)
+
+    with pytest.raises(RuntimeError, match="seeing initialization failed"):
+        _session()
+
+    assert created == []
+
+
 def test_live_session_persists_one_online_seeing_learner_across_throws() -> None:
     session = _session()
     learner = session.seeing_runtime

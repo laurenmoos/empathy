@@ -254,6 +254,25 @@ def test_registry_evicts_oldest_idle_session_at_capacity() -> None:
     assert registry.next_episode(third).index == 0
 
 
+def test_failed_replacement_closes_the_session_evicted_for_capacity() -> None:
+    class FailingReplacementEngine(FakeThinkingEngine):
+        def thinking_session(self, parameters):
+            if self.sessions:
+                raise RuntimeError("replacement failed")
+            return super().thinking_session(parameters)
+
+    engine = FailingReplacementEngine()
+    registry = LiveSessionRegistry(engine, max_sessions=1)
+    first = registry.start(LiveParameters())
+
+    with pytest.raises(RuntimeError, match="replacement failed"):
+        registry.start(LiveParameters(gravity=-0.1))
+
+    assert engine.sessions[0].closed
+    with pytest.raises(KeyError, match="unknown session"):
+        registry.next_episode(first)
+
+
 def test_session_close_releases_the_registered_model_copy() -> None:
     engine = FakeThinkingEngine()
     registry = LiveSessionRegistry(engine)

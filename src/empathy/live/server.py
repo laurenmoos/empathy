@@ -43,24 +43,28 @@ class LiveSessionRegistry:
 
     def start(self, parameters: LiveParameters) -> str:
         evicted: list[_SessionEntry] = []
-        with self._lock:
-            while len(self._sessions) >= self.max_sessions:
-                idle_id = next(
-                    (
-                        session_id
-                        for session_id, entry in self._sessions.items()
-                        if entry.active_requests == 0
-                    ),
-                    None,
-                )
-                if idle_id is None:
-                    raise LiveInferenceError("all live session slots are busy; retry shortly")
-                evicted.append(self._sessions.pop(idle_id))
-            session = self.engine.thinking_session(parameters)
-            session_id = uuid.uuid4().hex
-            self._sessions[session_id] = _SessionEntry(session, threading.Lock())
-        for entry in evicted:
-            self._close_session(entry)
+        try:
+            with self._lock:
+                while len(self._sessions) >= self.max_sessions:
+                    idle_id = next(
+                        (
+                            session_id
+                            for session_id, entry in self._sessions.items()
+                            if entry.active_requests == 0
+                        ),
+                        None,
+                    )
+                    if idle_id is None:
+                        raise LiveInferenceError(
+                            "all live session slots are busy; retry shortly"
+                        )
+                    evicted.append(self._sessions.pop(idle_id))
+                session = self.engine.thinking_session(parameters)
+                session_id = uuid.uuid4().hex
+                self._sessions[session_id] = _SessionEntry(session, threading.Lock())
+        finally:
+            for entry in evicted:
+                self._close_session(entry)
         return session_id
 
     def next_episode(self, session_id: str):

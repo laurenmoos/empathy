@@ -257,9 +257,6 @@ class LiveThinkingSession:
         self._episode_index = 0
         self._completed_events = 0
         self._latent_updates = 0
-        self.model2_observer = model2_observer or AsyncModel2Observer(
-            model2_runtime.predict
-        )
         seeing_config = OnlineSeeingConfig(
             channels=(4, 8, 12),
             representation_size=24,
@@ -271,6 +268,9 @@ class LiveThinkingSession:
             StepwiseWorldModel(seeing_config, hidden_size=32),
             seed=7,
             occluder=(float(occluder["x_min"]), float(occluder["x_max"])),
+        )
+        self.model2_observer = model2_observer or AsyncModel2Observer(
+            model2_runtime.predict
         )
 
     @property

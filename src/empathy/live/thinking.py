@@ -11,7 +11,11 @@ import numpy as np
 import torch
 
 from ..model1.online import OnlineSeeingConfig, OnlineSeeingModel
-from ..model1.online_train import ObservedSeeingEpisode, OnlineSeeingRuntime
+from ..model1.online_train import (
+    ObservedSeeingEpisode,
+    OnlineSeeingRuntime,
+    observed_states_from_path,
+)
 from ..model2.adapters import Model1BeliefPacket, adapt_model1_events
 from ..model2.coherence import ConstraintRecovery, evaluate_constraint_recovery
 from ..model2.contracts import BeliefInputs, WorldPrediction
@@ -288,19 +292,21 @@ class LiveThinkingSession:
 
         pre_frames, pre_mask = clip(pre_start, record.hidden_start)
         post_frames, post_mask = clip(record.reappearance_step, post_end)
-        exit_index = record.reappearance_step
-        exit_velocity = (full_path[exit_index] - full_path[exit_index - 1]) / 0.1
-        departure = full_path[exit_index + 1 : exit_index + 4]
+        entry_state, exit_state, departure = observed_states_from_path(
+            torch.from_numpy(full_path),
+            hidden_start=record.hidden_start,
+            reappearance_step=record.reappearance_step,
+            dt=0.1,
+            left_edge=float(self.model1_config.dataset.occluder["x_min"]),
+        )
         return ObservedSeeingEpisode(
             pre_frames,
             pre_mask,
             post_frames,
             post_mask,
-            torch.from_numpy(record.target_states[0:1]),
-            torch.tensor(
-                [[*full_path[exit_index], *exit_velocity]], dtype=torch.float32
-            ),
-            torch.from_numpy(departure[None].astype(np.float32)),
+            entry_state,
+            exit_state,
+            departure,
         )
 
     @staticmethod

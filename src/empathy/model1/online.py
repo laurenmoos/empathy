@@ -81,6 +81,23 @@ class HiddenPathBelief:
     ) -> torch.Tensor:
         if samples.ndim != 3 or samples.shape[-1] != 6:
             raise ValueError("samples must have shape [batch, samples, 6]")
+        p0, p1, p2, p3, _ = self._geometry(samples, entry_state, occluder)
+        t = torch.linspace(0.0, 1.0, steps, device=samples.device, dtype=samples.dtype)
+        t = t.view(1, 1, steps, 1)
+        omt = 1.0 - t
+        return (
+            omt**3 * p0[:, :, None]
+            + 3.0 * omt**2 * t * p1[:, :, None]
+            + 3.0 * omt * t**2 * p2[:, :, None]
+            + t**3 * p3[:, :, None]
+        )
+
+    @staticmethod
+    def _geometry(
+        samples: torch.Tensor,
+        entry_state: torch.Tensor,
+        occluder: tuple[float, float],
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         values = samples.sigmoid()
         left, right = occluder
         width = right - left
@@ -92,15 +109,20 @@ class HiddenPathBelief:
             (left + width * (0.55 + 0.35 * values[..., 2]), values[..., 3]), dim=-1
         )
         p3 = torch.stack((torch.full_like(values[..., 4], right), values[..., 4]), dim=-1)
-        t = torch.linspace(0.0, 1.0, steps, device=samples.device, dtype=samples.dtype)
-        t = t.view(1, 1, steps, 1)
-        omt = 1.0 - t
-        return (
-            omt**3 * p0[:, :, None]
-            + 3.0 * omt**2 * t * p1[:, :, None]
-            + 3.0 * omt * t**2 * p2[:, :, None]
-            + t**3 * p3[:, :, None]
-        )
+        duration = 0.2 + 1.8 * values[..., 5]
+        return p0, p1, p2, p3, duration
+
+    def implied_exit_state(
+        self,
+        samples: torch.Tensor,
+        entry_state: torch.Tensor,
+        *,
+        occluder: tuple[float, float],
+    ) -> torch.Tensor:
+        """Return exit position and physical velocity, independent of draw resolution."""
+        _, _, p2, p3, duration = self._geometry(samples, entry_state, occluder)
+        velocity = 3.0 * (p3 - p2) / duration[..., None]
+        return torch.cat((p3, velocity), dim=-1)
 
 
 class OnlineSeeingModel(nn.Module):

@@ -16,7 +16,11 @@ from empathy.physics.simulate import BallState, rollout
 
 from ..live.inference import LiveParameters, world_from_parameters
 from .online import OnlineSeeingConfig, OnlineSeeingModel
-from .online_train import ObservedSeeingEpisode, OnlineSeeingRuntime
+from .online_train import (
+    ObservedSeeingEpisode,
+    OnlineSeeingRuntime,
+    observed_states_from_path,
+)
 
 
 def _clip(frames: np.ndarray, start: int, end: int) -> tuple[torch.Tensor, torch.Tensor]:
@@ -47,21 +51,23 @@ def _observed_episode(index: int, rng: np.random.Generator) -> ObservedSeeingEpi
     post_end = min(len(sequence.frames), event.step + 8)
     pre_frames, pre_mask = _clip(sequence.frames, pre_start, event.hidden_start)
     post_frames, post_mask = _clip(sequence.frames, event.step, post_end)
-    entry = trajectory.states[event.hidden_start]
-    exit_state = trajectory.states[event.step]
-    departure = trajectory.states[event.step + 1 : event.step + 4]
+    path = torch.tensor([(state.x, state.y) for state in trajectory.states])
+    entry_state, exit_state, departure = observed_states_from_path(
+        path,
+        hidden_start=event.hidden_start,
+        reappearance_step=event.step,
+        dt=simulation.dt,
+        left_edge=0.35,
+    )
     return ObservedSeeingEpisode(
         pre_frames=pre_frames,
         pre_mask=pre_mask,
         post_frames=post_frames,
         post_mask=post_mask,
-        entry_state=torch.tensor([[entry.x, entry.y, entry.vx, entry.vy]], dtype=torch.float32),
-        exit_state=torch.tensor(
-            [[exit_state.x, exit_state.y, exit_state.vx, exit_state.vy]], dtype=torch.float32
-        ),
-        departure_positions=torch.tensor(
-            [[(state.x, state.y) for state in departure]], dtype=torch.float32
-        ),
+        entry_state=entry_state,
+        exit_state=exit_state,
+        departure_positions=departure,
+        dt=simulation.dt,
     )
 
 

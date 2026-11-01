@@ -53,3 +53,21 @@ def test_pre_belief_is_differentiable() -> None:
     assert belief.mean.shape == (2, 6)
     assert world.grad is not None
     assert any(parameter.grad is not None for parameter in model.parameters())
+
+
+def test_duration_controls_exit_velocity_without_changing_draw_resolution() -> None:
+    belief = HiddenPathBelief(torch.zeros(1, 6), torch.zeros(1, 6))
+    samples = torch.zeros(1, 1, 6, requires_grad=True)
+    entry = torch.tensor([[0.38, 0.55, 0.25, 0.0]])
+    exit_state = belief.implied_exit_state(samples, entry, occluder=(0.38, 0.58))
+    exit_state[..., 2:].sum().backward()
+    assert samples.grad is not None
+    assert samples.grad[..., 5].abs().item() > 0
+
+    short = belief.decode(samples.detach(), entry, occluder=(0.38, 0.58), steps=8)
+    long = belief.decode(samples.detach(), entry, occluder=(0.38, 0.58), steps=64)
+    assert torch.allclose(short[:, :, -1], long[:, :, -1])
+    assert torch.allclose(
+        belief.implied_exit_state(samples.detach(), entry, occluder=(0.38, 0.58)),
+        exit_state.detach(),
+    )

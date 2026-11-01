@@ -107,11 +107,10 @@ def test_episode_thinks_in_four_belief_only_steps_before_training() -> None:
     assert 0.99 < recovery["score"] < 1.0
     assert len(payload["thought_steps"][0]["paths"]) == 4
     assert len(payload["thought_steps"][2]["paths"]) == 24
-    assert payload["thought_steps"][0]["paths"][0][0] == pytest.approx(
-        path[ground_truth["hidden_start"]]
-    )
+    entry = payload["thought_steps"][0]["paths"][0][0]
+    assert entry[0] == pytest.approx(ground_truth["occluder"][0])
     assert all(
-        path_points[0] == pytest.approx(path[ground_truth["hidden_start"]])
+        path_points[0] == pytest.approx(entry)
         for step in payload["thought_steps"]
         for path_points in step["paths"]
     )

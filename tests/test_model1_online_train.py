@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-from dataclasses import fields
+from dataclasses import fields, replace
 
 import torch
 
 from empathy.model1.online import OnlineSeeingConfig, OnlineSeeingModel
-from empathy.model1.online_train import ObservedSeeingEpisode, OnlineSeeingRuntime
+from empathy.model1.online_train import (
+    ObservedSeeingEpisode,
+    OnlineSeeingRuntime,
+    observed_states_from_path,
+)
 
 
 def _episode(y: float = 0.55) -> ObservedSeeingEpisode:
@@ -67,3 +71,33 @@ def test_matched_clip_score_exceeds_swapped_after_online_updates() -> None:
     matched = runtime.pair_score(first, first)
     swapped = runtime.pair_score(first, second)
     assert matched > swapped
+
+
+def test_observed_state_extraction_ignores_every_hidden_point() -> None:
+    path = torch.tensor(
+        [[0.10, 0.50], [0.20, 0.51], [0.30, 0.52], [0.40, 0.20], [0.50, 0.80],
+         [0.60, 0.54], [0.70, 0.55], [0.80, 0.56]]
+    )
+    changed = path.clone()
+    changed[3:5] = torch.tensor([[0.40, -50.0], [0.50, 50.0]])
+    first = observed_states_from_path(path, hidden_start=3, reappearance_step=5, dt=0.1)
+    second = observed_states_from_path(changed, hidden_start=3, reappearance_step=5, dt=0.1)
+    assert all(torch.equal(a, b) for a, b in zip(first, second, strict=True))
+
+
+def test_replayed_geometric_constraints_change_the_next_update() -> None:
+    first = _runtime(12)
+    second = _runtime(12)
+    second.model.load_state_dict(first.model.state_dict())
+    current = _episode(0.55)
+    old = _episode(0.48)
+    shifted = replace(
+        old,
+        exit_state=old.exit_state + torch.tensor([[0.0, 0.3, 0.0, 0.0]]),
+        departure_positions=old.departure_positions + torch.tensor([[[0.0, 0.3]]]),
+    )
+    first.replay.append(old)
+    second.replay.append(shifted)
+    first.complete(first.begin(current), current, train=True)
+    second.complete(second.begin(current), current, train=True)
+    assert not torch.allclose(first.world_latent, second.world_latent)

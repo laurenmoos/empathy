@@ -24,7 +24,7 @@ A ball moves behind a fixed occluder. Each environment is defined by gravity, wi
 
 ## Model 1: Seeing
 
-Model 1 is a shared 3D video CNN. Before reappearance it emits a continuous Gaussian belief over smooth hidden paths. The visible exit position, velocity, and first departure frames then reweight those paths: they do not disclose a unique hidden trajectory.
+Model 1 uses a small 3D video CNN to encode the visible approach. That encoding initializes a distribution over recurrent states. A GRU then predicts acceleration and integrates position and velocity one physical time step at a time, producing a superposition of possible hidden rollouts. The visible exit position, velocity, and first departure frames reweight those rollouts; they do not disclose a unique hidden trajectory.
 
 Within one environment, repeated throws vary the initial conditions while gravity, wind, and damping remain fixed. A fast per-world latent updates after each throw, shared weights move more slowly, and recent observations are replayed. The hidden simulator path is available only for evaluation and the ground-truth line in the visualization; it is not a training target.
 

@@ -15,7 +15,7 @@ from empathy.physics.render import Occluder, render_sequence
 from empathy.physics.simulate import BallState, rollout
 
 from ..live.inference import LiveParameters, world_from_parameters
-from .online import OnlineSeeingConfig, OnlineSeeingModel
+from .online import OnlineSeeingConfig, StepwiseWorldModel
 from .online_train import (
     ObservedSeeingEpisode,
     OnlineSeeingRuntime,
@@ -67,6 +67,7 @@ def _observed_episode(index: int, rng: np.random.Generator) -> ObservedSeeingEpi
         entry_state=entry_state,
         exit_state=exit_state,
         departure_positions=departure,
+        hidden_steps=event.step - event.hidden_start + 1,
         dt=simulation.dt,
     )
 
@@ -83,7 +84,7 @@ def run_online_training(
     rng = np.random.default_rng(seed)
     config = OnlineSeeingConfig()
     runtime = OnlineSeeingRuntime(
-        OnlineSeeingModel(config), seed=seed, occluder=(0.35, 0.55)
+        StepwiseWorldModel(config), seed=seed, occluder=(0.35, 0.55)
     )
     writer = SummaryWriter(log_dir=str(log_dir), flush_secs=1)
     rows: list[dict[str, int | float]] = []

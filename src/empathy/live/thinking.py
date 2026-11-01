@@ -10,7 +10,7 @@ from typing import Protocol
 import numpy as np
 import torch
 
-from ..model1.online import OnlineSeeingConfig, OnlineSeeingModel
+from ..model1.online import OnlineSeeingConfig, StepwiseWorldModel
 from ..model1.online_train import (
     ObservedSeeingEpisode,
     OnlineSeeingRuntime,
@@ -256,11 +256,10 @@ class LiveThinkingSession:
             representation_size=24,
             world_size=8,
             sample_count=24,
-            path_steps=16,
         )
         occluder = model1_config.dataset.occluder
         self.seeing_runtime = OnlineSeeingRuntime(
-            OnlineSeeingModel(seeing_config),
+            StepwiseWorldModel(seeing_config, hidden_size=32),
             seed=7,
             occluder=(float(occluder["x_min"]), float(occluder["x_max"])),
         )
@@ -307,6 +306,7 @@ class LiveThinkingSession:
             entry_state,
             exit_state,
             departure,
+            hidden_steps=record.reappearance_step - record.hidden_start + 1,
         )
 
     @staticmethod
@@ -334,6 +334,10 @@ class LiveThinkingSession:
             frozen = self.seeing_runtime.begin(observed)
             seeing_result = self.seeing_runtime.complete(frozen, observed, train=True)
             all_paths = seeing_result.paths[0].cpu().numpy().astype(np.float32)
+            entries = np.broadcast_to(
+                observed.entry_state[0, :2].numpy(), (len(all_paths), 1, 2)
+            ).copy()
+            all_paths = np.concatenate((entries, all_paths), axis=1)
             posterior_weights = seeing_result.posterior_weights[0].cpu().numpy().astype(np.float32)
             counts = (4, 12, len(all_paths), len(all_paths))
             visual_paths = [all_paths[:count] for count in counts]

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import torch
 from torch import nn
 
-from .online import HiddenPathBelief, OnlineSeeingModel
+from .online import LatentStateBelief, StepwiseWorldModel
 
 
 @dataclass(frozen=True)
@@ -20,6 +20,7 @@ class ObservedSeeingEpisode:
     entry_state: torch.Tensor
     exit_state: torch.Tensor
     departure_positions: torch.Tensor
+    hidden_steps: int = 4
     dt: float = 0.1
 
 
@@ -47,7 +48,7 @@ def observed_states_from_path(
 
 @dataclass(frozen=True)
 class FrozenPreBelief:
-    belief: HiddenPathBelief
+    belief: LatentStateBelief
     samples: torch.Tensor
     paths: torch.Tensor
 
@@ -72,7 +73,7 @@ class OnlineSeeingRuntime:
 
     def __init__(
         self,
-        model: OnlineSeeingModel,
+        model: StepwiseWorldModel,
         *,
         seed: int = 0,
         fast_lr: float = 0.02,
@@ -92,8 +93,8 @@ class OnlineSeeingRuntime:
     def _world(self, batch: int) -> torch.Tensor:
         return self.world_latent.expand(batch, -1)
 
-    def _belief(self, episode: ObservedSeeingEpisode) -> HiddenPathBelief:
-        return self.model.pre_belief(
+    def _belief(self, episode: ObservedSeeingEpisode) -> LatentStateBelief:
+        return self.model.initial_belief(
             episode.pre_frames,
             episode.pre_mask,
             episode.entry_state,
@@ -104,36 +105,38 @@ class OnlineSeeingRuntime:
         with torch.no_grad():
             belief = self._belief(episode)
             samples = belief.sample(self.model.config.sample_count, generator=self.generator)
-            paths = belief.decode(
+            path_steps = episode.hidden_steps + episode.departure_positions.shape[1]
+            paths = self.model.rollout(
                 samples,
                 episode.entry_state,
-                occluder=self.occluder,
-                steps=self.model.config.path_steps,
+                self._world(episode.pre_frames.shape[0]),
+                steps=path_steps,
+                dt=episode.dt,
             )
-            frozen = HiddenPathBelief(
+            frozen = LatentStateBelief(
                 belief.mean.detach().clone(), belief.log_scale.detach().clone()
             )
             return FrozenPreBelief(frozen, samples.detach().clone(), paths.detach().clone())
 
     def _sample_error(
         self,
-        belief: HiddenPathBelief,
-        samples: torch.Tensor,
+        paths: torch.Tensor,
         episode: ObservedSeeingEpisode,
     ) -> torch.Tensor:
-        implied_state = belief.implied_exit_state(
-            samples, episode.entry_state, occluder=self.occluder
+        exit_index = episode.hidden_steps - 1
+        endpoint = paths[:, :, exit_index]
+        previous = (
+            episode.entry_state[:, None, :2]
+            if exit_index == 0
+            else paths[:, :, exit_index - 1]
         )
-        endpoint = implied_state[..., :2]
-        velocity = implied_state[..., 2:]
+        velocity = (endpoint - previous) / episode.dt
         exit_error = (endpoint - episode.exit_state[:, None, :2]).square().sum(dim=-1)
         velocity_error = (
             velocity - episode.exit_state[:, None, 2:4]
         ).square().sum(dim=-1)
         count = episode.departure_positions.shape[1]
-        times = torch.arange(1, count + 1, device=samples.device, dtype=samples.dtype)
-        times = times * episode.dt
-        implied = endpoint[:, :, None] + velocity[:, :, None] * times[None, None, :, None]
+        implied = paths[:, :, exit_index + 1 : exit_index + 1 + count]
         departure_error = (
             implied - episode.departure_positions[:, None]
         ).square().sum(dim=-1).mean(dim=-1)
@@ -151,7 +154,14 @@ class OnlineSeeingRuntime:
     def _fresh_evidence_loss(self, episode: ObservedSeeingEpisode) -> torch.Tensor:
         belief = self._belief(episode)
         samples = belief.sample(self.model.config.sample_count, generator=self.generator)
-        return self._evidence_loss(self._sample_error(belief, samples, episode))
+        paths = self.model.rollout(
+            samples,
+            episode.entry_state,
+            self._world(episode.pre_frames.shape[0]),
+            steps=episode.hidden_steps + episode.departure_positions.shape[1],
+            dt=episode.dt,
+        )
+        return self._evidence_loss(self._sample_error(paths, episode))
 
     def complete(
         self,
@@ -160,7 +170,7 @@ class OnlineSeeingRuntime:
         *,
         train: bool = True,
     ) -> OnlineSeeingResult:
-        frozen_error = self._sample_error(frozen.belief, frozen.samples, episode)
+        frozen_error = self._sample_error(frozen.paths, episode)
         weights = torch.softmax(-frozen_error / 0.01, dim=1)
         prediction_loss = float(self._evidence_loss(frozen_error).detach())
         if train:
@@ -173,7 +183,14 @@ class OnlineSeeingRuntime:
                 frozen.belief.log_scale.exp()[:, None] + 1e-8
             )
             samples = belief.mean[:, None] + noise * scale
-            error = self._sample_error(belief, samples, episode)
+            paths = self.model.rollout(
+                samples,
+                episode.entry_state,
+                self._world(episode.pre_frames.shape[0]),
+                steps=episode.hidden_steps + episode.departure_positions.shape[1],
+                dt=episode.dt,
+            )
+            error = self._sample_error(paths, episode)
             losses = [self._evidence_loss(error)]
             losses.extend(
                 self._fresh_evidence_loss(previous) for previous in list(self.replay)[-3:]

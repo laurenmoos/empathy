@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import fields, replace
 
+import pytest
 import torch
 
 from empathy.model1.online import OnlineSeeingConfig, OnlineSeeingModel
@@ -54,23 +55,23 @@ def test_repeated_observations_update_world_state_and_preserve_replay() -> None:
     errors = []
     for _ in range(8):
         result = runtime.complete(runtime.begin(episode), episode, train=True)
-        errors.append(result.metrics.exit_error)
+        errors.append(result.metrics.prediction_loss)
     assert runtime.updates == 8
     assert len(runtime.replay) == 8
     assert not torch.equal(runtime.world_latent.detach(), initial)
     assert min(errors[4:]) <= errors[0]
 
 
-def test_matched_clip_score_exceeds_swapped_after_online_updates() -> None:
+def test_only_one_loss_is_reported_and_it_scores_the_frozen_prediction() -> None:
     runtime = _runtime(8)
-    first = _episode(0.48)
-    second = _episode(0.67)
-    for _ in range(5):
-        runtime.complete(runtime.begin(first), first, train=True)
-        runtime.complete(runtime.begin(second), second, train=True)
-    matched = runtime.pair_score(first, first)
-    swapped = runtime.pair_score(first, second)
-    assert matched > swapped
+    episode = _episode(0.48)
+    frozen = runtime.begin(episode)
+    expected = runtime._evidence_loss(
+        runtime._sample_error(frozen.belief, frozen.samples, episode)
+    )
+    result = runtime.complete(frozen, episode, train=True)
+    assert result.metrics.prediction_loss == pytest.approx(float(expected))
+    assert set(result.metrics.__dict__) == {"prediction_loss", "belief_spread", "updates"}
 
 
 def test_observed_state_extraction_ignores_every_hidden_point() -> None:

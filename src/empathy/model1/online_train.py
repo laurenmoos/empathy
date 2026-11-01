@@ -6,7 +6,6 @@ from collections import deque
 from dataclasses import dataclass
 
 import torch
-import torch.nn.functional as F
 from torch import nn
 
 from .online import HiddenPathBelief, OnlineSeeingModel
@@ -55,12 +54,8 @@ class FrozenPreBelief:
 
 @dataclass(frozen=True)
 class OnlineSeeingMetrics:
-    loss: float
-    geometric_loss: float
-    contrastive_loss: float
-    exit_error: float
+    prediction_loss: float
     belief_spread: float
-    effective_samples: float
     updates: int
 
 
@@ -158,27 +153,6 @@ class OnlineSeeingRuntime:
         samples = belief.sample(self.model.config.sample_count, generator=self.generator)
         return self._evidence_loss(self._sample_error(belief, samples, episode))
 
-    def pair_score(
-        self, pre_episode: ObservedSeeingEpisode, post_episode: ObservedSeeingEpisode
-    ) -> float:
-        with torch.no_grad():
-            pre = self.model.video_encoder(pre_episode.pre_frames, pre_episode.pre_mask)
-            post = self.model.encode_post(post_episode.post_frames, post_episode.post_mask)
-            return float(F.cosine_similarity(pre, post).mean())
-
-    def _contrastive_loss(self, episode: ObservedSeeingEpisode) -> torch.Tensor:
-        pre = self.model.video_encoder(episode.pre_frames, episode.pre_mask)
-        post = self.model.encode_post(episode.post_frames, episode.post_mask)
-        matched = F.cosine_similarity(pre, post).mean()
-        if not self.replay:
-            return 1.0 - matched
-        swapped_episode = self.replay[-1]
-        swapped = self.model.encode_post(
-            swapped_episode.post_frames, swapped_episode.post_mask
-        )
-        mismatched = F.cosine_similarity(pre, swapped).mean()
-        return 1.0 - matched + F.relu(mismatched - matched + 0.1)
-
     def complete(
         self,
         frozen: FrozenPreBelief,
@@ -188,11 +162,7 @@ class OnlineSeeingRuntime:
     ) -> OnlineSeeingResult:
         frozen_error = self._sample_error(frozen.belief, frozen.samples, episode)
         weights = torch.softmax(-frozen_error / 0.01, dim=1)
-        geometric_value = float(
-            (weights * frozen_error).sum(dim=1).mean().detach()
-        )
-        contrastive_value = 0.0
-        total_value = geometric_value
+        prediction_loss = float(self._evidence_loss(frozen_error).detach())
         if train:
             self.fast_optimizer.zero_grad()
             self.slow_optimizer.zero_grad()
@@ -208,30 +178,16 @@ class OnlineSeeingRuntime:
             losses.extend(
                 self._fresh_evidence_loss(previous) for previous in list(self.replay)[-3:]
             )
-            geometric = torch.stack(losses).mean()
-            contrastive = self._contrastive_loss(episode)
-            loss = geometric + 0.05 * contrastive
+            loss = torch.stack(losses).mean()
             loss.backward()
             self.fast_optimizer.step()
             self.slow_optimizer.step()
             self.updates += 1
-            geometric_value = float(geometric.detach())
-            contrastive_value = float(contrastive.detach())
-            total_value = float(loss.detach())
             self.replay.append(episode)
-        weighted_endpoint = (weights[..., None] * frozen.paths[:, :, -1]).sum(dim=1)
-        exit_error = torch.linalg.vector_norm(
-            weighted_endpoint - episode.exit_state[:, :2], dim=-1
-        ).mean()
         spread = frozen.paths[:, :, -1, 1].std(dim=1).mean()
-        effective = (1.0 / weights.square().sum(dim=1)).mean()
         metrics = OnlineSeeingMetrics(
-            loss=total_value,
-            geometric_loss=geometric_value,
-            contrastive_loss=contrastive_value,
-            exit_error=float(exit_error),
+            prediction_loss=prediction_loss,
             belief_spread=float(spread),
-            effective_samples=float(effective),
             updates=self.updates,
         )
         return OnlineSeeingResult(frozen, frozen.paths, weights.detach(), metrics)

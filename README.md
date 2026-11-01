@@ -16,7 +16,7 @@ To watch Seeing learn without the browser:
 uv run empathy train-seeing --episodes 50 --log-dir runs/seeing
 ```
 
-This prints one compact JSON line per throw and writes a checkpoint, `metrics.jsonl`, and TensorBoard-compatible events. Optionally inspect the latter with `uv run tensorboard --logdir runs/seeing`.
+This prints one compact JSON line per throw and writes a checkpoint, `metrics.jsonl`, and TensorBoard-compatible events. `prediction_loss` scores the frozen pre-exit belief against the later visible exit and departure. One episode is one online update and one TensorBoard step. Optionally inspect the run with `uv run tensorboard --logdir runs/seeing`.
 
 ## Environment
 

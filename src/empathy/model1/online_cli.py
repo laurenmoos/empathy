@@ -95,12 +95,8 @@ def run_online_training(
             metrics = result.metrics
             row: dict[str, int | float] = {
                 "episode": episode_index + 1,
-                "loss": round(metrics.loss, 6),
-                "geometric_loss": round(metrics.geometric_loss, 6),
-                "contrastive_loss": round(metrics.contrastive_loss, 6),
-                "exit_error": round(metrics.exit_error, 6),
+                "prediction_loss": round(metrics.prediction_loss, 6),
                 "belief_spread": round(metrics.belief_spread, 6),
-                "effective_samples": round(metrics.effective_samples, 3),
                 "updates": metrics.updates,
             }
             rows.append(row)

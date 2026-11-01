@@ -393,8 +393,7 @@ class LiveThinkingSession:
             assert final_inputs is not None
             training = self.model2_runtime.complete_event(final_inputs)
             training.update(
-                seeing_loss=seeing_result.metrics.loss,
-                seeing_exit_error=seeing_result.metrics.exit_error,
+                seeing_loss=seeing_result.metrics.prediction_loss,
                 seeing_updates=seeing_result.metrics.updates,
             )
             final_packet = Model1BeliefPacket(

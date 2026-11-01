@@ -13,7 +13,7 @@ def test_headless_training_writes_json_events_and_checkpoint(tmp_path, capsys) -
     assert len(lines) == 2
     assert lines == metrics
     assert all(
-        {"episode", "loss", "exit_error", "belief_spread", "updates"} <= row.keys()
+        set(row) == {"episode", "prediction_loss", "belief_spread", "updates"}
         for row in lines
     )
     assert len((output / "metrics.jsonl").read_text().splitlines()) == 2

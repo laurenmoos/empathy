@@ -2,6 +2,18 @@
 
 Empathy asks whether one system can partially recover another **as a perceiver**, through the intentional structure preserved in its experience. **Model 1 sees; Model 2 thinks by imagining the world that could have made Model 1 see as it did.**
 
+![Thinking infers a distribution over the hidden world's gravity, wind, and damping.](assets/thinking.png)
+
+_Thinking during an early search step: the hidden setting is marked while the posterior is still forming._
+
+## The thought experiment
+
+Imagine that one system learns to anticipate a moving object without ever being told the laws of its world. A second system cannot inspect that world, the object's true hidden path, or the first system's training targets. It can only observe the *form of the first system's experience*: detached activations before and after the object disappears.
+
+The second system is allowed to think. It proposes a world, runs a private counterfactual simulation, lets a frozen copy of the first system perceive it, and asks whether the resulting internal response resembles the response that actually occurred. Repeating this turns gravity, wind, and damping into competing hypotheses rather than supervised labels.
+
+The toy asks: **can a system recover the constraints organizing another system's perception by searching for worlds under which that perception would make sense?** If it can, coherence is not merely agreement with an observed trajectory. It is agreement between a hypothesized world and the structure of another perceiver's possible experience. “Empathy” is the deliberately ambitious name for that second-order inference.
+
 ## Run
 
 ```bash

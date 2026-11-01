@@ -229,7 +229,7 @@ def test_normal_playback_is_visual_without_narration_feeds() -> None:
 def test_playback_runs_at_fast_visual_cadence() -> None:
     source, _ = parsed_explorer()
 
-    assert "const FRAME_INTERVAL_SECONDS = .01;" in source
+    assert "const FRAME_INTERVAL_SECONDS = .004;" in source
     assert "while (accumulator >= FRAME_INTERVAL_SECONDS" in source
     assert "accumulator -= FRAME_INTERVAL_SECONDS;" in source
 

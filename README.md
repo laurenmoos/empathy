@@ -44,6 +44,8 @@ The pre-belief, post-belief, and difference panels are readable projections reco
 
 Sequential Monte Carlo maintains candidate settings of gravity, wind, and damping. A modular imagination loop simulates each candidate environment and privately calls the frozen Model 1 on its counterfactual clip. Only the resulting detached activations cross into Model 2, which gives greater weight to worlds whose activations resemble Model 1's actual activation history. Raw frames never enter Model 2's inference boundary.
 
+Model 1 is unaware of both the candidate world parameters and Model 2: it receives only a clip. Model 2 owns the search, tells the separate imagination runner which counterfactual world to generate, and receives only Model 1's detached response. Every search round reports the best and mean activation mismatch, effective particle count, accepted revisions, and current best and posterior-mean values for gravity, wind, and damping.
+
 This is a practical approximation to second-order perception: Model 1 sees an event, and Model 2 tries to understand the conditions under which that seeing took the form it did. The simulator search remains reflective thinking rather than immediate perception.
 
 Model 2 recovers the **intentional structure** of Model 1's experience only as an intermediate representation in its task of reconstructing the environment reflected in those activations.

@@ -42,6 +42,14 @@ class ParameterActivationSource:
         )
 
 
+class PartiallyUnavailableSource(ParameterActivationSource):
+    def activations_for(self, world: WorldCode) -> tuple[Model1ActivationPacket, ...]:
+        gravity = world.slot("vertical_acceleration")
+        if not gravity.active or gravity.parameters[0] >= 0:
+            raise CounterfactualUnavailable("candidate has no comparable event")
+        return super().activations_for(world)
+
+
 def test_activation_smc_boundary_accepts_only_the_imagination_loop() -> None:
     assert importlib.util.find_spec("empathy.model2.imagination") is not None
     assert hasattr(smc, "ActivationWorldSMC")
@@ -132,7 +140,7 @@ def test_all_unavailable_counterfactuals_do_not_return_a_posterior() -> None:
         ).infer(imagination)
 
 
-def test_rejuvenation_rounds_do_not_reapply_the_same_activation_evidence() -> None:
+def test_search_rounds_report_activation_progress_and_parameter_estimates() -> None:
     observed = (
         Model1ActivationPacket(
             "episode-0",
@@ -142,13 +150,37 @@ def test_rejuvenation_rounds_do_not_reapply_the_same_activation_evidence() -> No
             np.asarray([-0.60, 0.0, 0.0], dtype=np.float32),
         ),
     )
-    one = smc.ActivationWorldSMC(
-        SMCConfig(particle_count=6, rounds=1, seed=3)
-    ).infer(ActivationImaginationLoop(observed, ParameterActivationSource()))
+    source = ParameterActivationSource()
     four = smc.ActivationWorldSMC(
         SMCConfig(particle_count=6, rounds=4, seed=3)
-    ).infer(ActivationImaginationLoop(observed, ParameterActivationSource()))
+    ).infer(ActivationImaginationLoop(observed, source))
 
-    assert np.array_equal(one.ranked_worlds, four.ranked_worlds)
-    assert np.array_equal(one.weights, four.weights)
+    assert [step.round_index for step in four.progress] == [0, 1, 2, 3]
+    assert all(step.best_parameters.shape == (3,) for step in four.progress)
+    assert all(step.posterior_mean.shape == (3,) for step in four.progress)
+    assert all(np.isfinite(step.best_discrepancy) for step in four.progress)
+    assert all(np.isfinite(step.effective_sample_size) for step in four.progress)
+    assert all(step.accepted_revisions >= 0 for step in four.progress)
+    best = [step.best_discrepancy for step in four.progress]
+    assert all(
+        later <= earlier for earlier, later in zip(best, best[1:], strict=False)
+    )
+    assert source.calls == 6 * 4
+
+
+def test_search_handles_mixed_valid_and_invalid_counterfactuals_without_nan() -> None:
+    observed = (
+        Model1ActivationPacket(
+            "episode-0",
+            0,
+            "frozen-model-1",
+            np.asarray([-0.30, 0.0, 0.0], dtype=np.float32),
+            np.asarray([-0.60, 0.0, 0.0], dtype=np.float32),
+        ),
+    )
+    with np.errstate(invalid="raise"):
+        result = smc.ActivationWorldSMC(
+            SMCConfig(particle_count=6, rounds=2, seed=3)
+        ).infer(ActivationImaginationLoop(observed, PartiallyUnavailableSource()))
+    assert np.isfinite(result.weights).all()
 

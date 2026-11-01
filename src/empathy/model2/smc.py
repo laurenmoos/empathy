@@ -58,6 +58,18 @@ class SMCResult:
     weights: np.ndarray
     best_world: np.ndarray
     event_discrepancies: np.ndarray
+    progress: tuple[ActivationSearchProgress, ...] = ()
+
+
+@dataclass(frozen=True, eq=False)
+class ActivationSearchProgress:
+    round_index: int
+    best_discrepancy: float
+    mean_discrepancy: float
+    effective_sample_size: float
+    accepted_revisions: int
+    best_parameters: np.ndarray
+    posterior_mean: np.ndarray
 
 
 def _world_from_particle(values: np.ndarray) -> WorldCode:
@@ -326,6 +338,46 @@ class ActivationWorldSMC:
         weights = _normalize_log_weights(
             -self.config.score_temperature * total_discrepancy
         )
+        progress = [
+            self._progress(0, particles, total_discrepancy, weights, accepted=0)
+        ]
+        for round_index in range(1, self.config.rounds):
+            proposals = _jitter_particles(particles, self.config, rng)
+            proposal_worlds = tuple(
+                _world_from_particle(particle) for particle in proposals
+            )
+            proposal_discrepancies = imagination.discrepancies(proposal_worlds)
+            proposal_total = proposal_discrepancies.sum(axis=1)
+            current_finite = np.isfinite(total_discrepancy)
+            proposal_finite = np.isfinite(proposal_total)
+            log_acceptance = np.full(len(particles), -np.inf, dtype=np.float64)
+            newly_valid = proposal_finite & ~current_finite
+            both_valid = proposal_finite & current_finite
+            log_acceptance[newly_valid] = np.inf
+            log_acceptance[both_valid] = -self.config.score_temperature * (
+                proposal_total[both_valid] - total_discrepancy[both_valid]
+            )
+            accepted = proposal_finite & (
+                np.log(rng.random(len(particles)))
+                < np.minimum(0.0, log_acceptance)
+            )
+            elite = int(np.nanargmin(total_discrepancy))
+            accepted[elite] = proposal_total[elite] < total_discrepancy[elite]
+            particles[accepted] = proposals[accepted]
+            discrepancies[accepted] = proposal_discrepancies[accepted]
+            total_discrepancy[accepted] = proposal_total[accepted]
+            weights = _normalize_log_weights(
+                -self.config.score_temperature * total_discrepancy
+            )
+            progress.append(
+                self._progress(
+                    round_index,
+                    particles,
+                    total_discrepancy,
+                    weights,
+                    accepted=int(accepted.sum()),
+                )
+            )
         worlds = np.stack(
             [
                 _world_from_particle(particle).to_flat(WorldSchema.v1())
@@ -339,4 +391,26 @@ class ActivationWorldSMC:
             weights=weights[order],
             best_world=ranked_worlds[0].copy(),
             event_discrepancies=discrepancies[order],
+            progress=tuple(progress),
+        )
+
+    @staticmethod
+    def _progress(
+        round_index: int,
+        particles: np.ndarray,
+        discrepancies: np.ndarray,
+        weights: np.ndarray,
+        *,
+        accepted: int,
+    ) -> ActivationSearchProgress:
+        finite = discrepancies[np.isfinite(discrepancies)]
+        best_index = int(np.nanargmin(discrepancies))
+        return ActivationSearchProgress(
+            round_index=round_index,
+            best_discrepancy=float(discrepancies[best_index]),
+            mean_discrepancy=float(finite.mean()),
+            effective_sample_size=float(1.0 / np.square(weights).sum()),
+            accepted_revisions=accepted,
+            best_parameters=particles[best_index].copy(),
+            posterior_mean=np.average(particles, axis=0, weights=weights),
         )

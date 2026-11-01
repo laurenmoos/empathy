@@ -42,7 +42,7 @@ Model 2 receives the detached pre-belief, post-belief, and belief-change activat
 
 The pre-belief, post-belief, and difference panels are readable projections reconstructed from the underlying activation traces `z_pre`, `z_post`, and `z_post - z_pre`.
 
-A small evidence adapter maps these traces into a space that can be compared with simulated candidates. Sequential Monte Carlo then maintains candidate settings of gravity, wind, and damping. The simulator rolls out each candidate across possible initial states, and Model 2 gives greater weight to worlds whose consequences best explain Model 1's activation history.
+Sequential Monte Carlo maintains candidate settings of gravity, wind, and damping. A modular imagination loop simulates each candidate environment and privately calls the frozen Model 1 on its counterfactual clip. Only the resulting detached activations cross into Model 2, which gives greater weight to worlds whose activations resemble Model 1's actual activation history. Raw frames never enter Model 2's inference boundary.
 
 This is a practical approximation to second-order perception: Model 1 sees an event, and Model 2 tries to understand the conditions under which that seeing took the form it did. The simulator search remains reflective thinking rather than immediate perception.
 

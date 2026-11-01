@@ -14,6 +14,7 @@ from empathy.physics.world import WorldCode, WorldSchema
 from .activation_adapter import ActivationBeliefAdapter, Model1ActivationPacket
 from .adapters import adapt_model1_activations
 from .contracts import BeliefInputs
+from .imagination import ActivationImaginationLoop
 
 
 @dataclass(frozen=True)
@@ -304,3 +305,43 @@ class BeliefWorldSMC:
         adapter: ActivationBeliefAdapter,
     ) -> SMCResult:
         return self.infer(adapt_model1_activations(events, adapter))
+
+
+class ActivationWorldSMC:
+    """Particle search scored only through counterfactual Model 1 activations."""
+
+    def __init__(self, config: SMCConfig | None = None) -> None:
+        self.config = config or SMCConfig()
+
+    def infer(self, imagination: ActivationImaginationLoop) -> SMCResult:
+        rng = np.random.default_rng(self.config.seed)
+        particles = _initial_particles(self.config, rng)
+        weights = np.full(len(particles), 1.0 / len(particles), dtype=np.float64)
+        discrepancies = np.empty((len(particles), len(imagination.observed)))
+        for round_index in range(self.config.rounds):
+            worlds = tuple(_world_from_particle(particle) for particle in particles)
+            discrepancies = imagination.discrepancies(worlds)
+            weights = _normalize_log_weights(
+                -self.config.score_temperature * discrepancies.sum(axis=1)
+            )
+            if round_index + 1 < self.config.rounds:
+                selected = rng.choice(
+                    len(particles), len(particles), replace=True, p=weights
+                )
+                particles = _jitter_particles(
+                    particles[selected].copy(), self.config, rng
+                )
+        worlds = np.stack(
+            [
+                _world_from_particle(particle).to_flat(WorldSchema.v1())
+                for particle in particles
+            ]
+        ).astype(np.float32)
+        order = np.argsort(-weights, kind="stable")
+        ranked_worlds = worlds[order]
+        return SMCResult(
+            ranked_worlds=ranked_worlds,
+            weights=weights[order],
+            best_world=ranked_worlds[0].copy(),
+            event_discrepancies=discrepancies[order],
+        )

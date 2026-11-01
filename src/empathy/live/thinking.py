@@ -10,13 +10,16 @@ from typing import Protocol
 import numpy as np
 import torch
 
+from ..model1.counterfactual import (
+    CounterfactualEpisode,
+    FrozenOnlineSeeingCounterfactualRunner,
+)
 from ..model1.online import OnlineSeeingConfig, StepwiseWorldModel
 from ..model1.online_train import (
     ObservedSeeingEpisode,
     OnlineSeeingRuntime,
     observed_states_from_path,
 )
-from ..model2.adapters import Model1BeliefPacket, adapt_model1_events
 from ..model2.coherence import ConstraintRecovery, evaluate_constraint_recovery
 from ..model2.contracts import (
     BeliefInputs,
@@ -25,8 +28,10 @@ from ..model2.contracts import (
     WorldPrediction,
 )
 from ..model2.decode import decode_prediction
+from ..model2.imagination import ActivationImaginationLoop
 from ..model2.losses import world_code_loss
 from ..model2.smc import (
+    ContinualActivationWorldSMC,
     ContinualBeliefWorldSMC,
     SMCConfig,
     SMCResult,
@@ -43,13 +48,17 @@ from .inference import (
     _encoded_u8,
     _operator_payload,
 )
-from .observer import AsyncModel2Observer, Model1BeliefCheckpoint
+from .observer import AsyncActivationModel2Observer, Model1ActivationCheckpoint
 
 
 class Model2Runtime(Protocol):
     weight_update_count: int
 
     def predict(self, inputs: BeliefInputs) -> WorldPrediction: ...
+
+    def predict_imagination(
+        self, imagination: ActivationImaginationLoop
+    ) -> WorldPrediction: ...
 
     def complete_event(self, inputs: BeliefInputs) -> dict[str, float | int]: ...
 
@@ -120,6 +129,7 @@ class SMCModel2Runtime:
         self.weight_update_count = 0
         self._last_result: SMCResult | None = None
         self._search = ContinualBeliefWorldSMC(self.config)
+        self._activation_search = ContinualActivationWorldSMC(self.config)
 
     def fork(self) -> SMCModel2Runtime:
         return SMCModel2Runtime(config=self.config)
@@ -130,6 +140,16 @@ class SMCModel2Runtime:
 
     def predict(self, inputs: BeliefInputs) -> WorldPrediction:
         result = self.infer(inputs)
+        return self._prediction_from_result(result)
+
+    def predict_imagination(
+        self, imagination: ActivationImaginationLoop
+    ) -> WorldPrediction:
+        self._last_result = self._activation_search.update(imagination)
+        return self._prediction_from_result(self._last_result)
+
+    @staticmethod
+    def _prediction_from_result(result: SMCResult) -> WorldPrediction:
         flat = result.best_world
         activity_indices = (0, 2, 4, 6, 9)
         parameter_indices = (1, 3, 5, 7, 8, 10, 11)
@@ -295,7 +315,7 @@ class LiveThinkingSession:
         initial_states: tuple[BallState, ...] = DEFAULT_INITIAL_STATES,
         max_offset_attempts: int = len(DEFAULT_INITIAL_STATES),
         model_lock: threading.RLock | None = None,
-        model2_observer: AsyncModel2Observer | None = None,
+        model2_observer: AsyncActivationModel2Observer | None = None,
     ) -> None:
         if not initial_states or max_offset_attempts < 1:
             raise ValueError("thinking session requires offsets and a positive attempt bound")
@@ -308,7 +328,6 @@ class LiveThinkingSession:
         self.max_offset_attempts = max_offset_attempts
         self._model_lock = model_lock or threading.RLock()
         self._session_lock = threading.Lock()
-        self._history: list[Model1BeliefPacket] = []
         self._offset_cursor = 0
         self._episode_index = 0
         self._completed_events = 0
@@ -325,8 +344,8 @@ class LiveThinkingSession:
             seed=7,
             occluder=(float(occluder["x_min"]), float(occluder["x_max"])),
         )
-        self.model2_observer = model2_observer or AsyncModel2Observer(
-            model2_runtime.predict
+        self.model2_observer = model2_observer or AsyncActivationModel2Observer(
+            model2_runtime.predict_imagination
         )
 
     @property
@@ -474,16 +493,24 @@ class LiveThinkingSession:
                     )
                 )
                 previous = belief
-            final_packet = Model1BeliefPacket(
-                episode_id="live-thinking",
-                event_ordinal=self._episode_index,
-                pre_belief=beliefs[-2],
-                post_belief=beliefs[-1],
-            )
-            final_inputs = adapt_model1_events([*self._history, final_packet])
             model1_checkpoint_version = seeing_result.metrics.updates
+            event = CounterfactualEpisode(
+                "live-thinking", self._episode_index, initial
+            )
+            runner, observed_activations = (
+                FrozenOnlineSeeingCounterfactualRunner.from_observed(
+                    self.seeing_runtime.model,
+                    self.seeing_runtime.world_latent,
+                    self.model1_config,
+                    ((event, observed),),
+                    checkpoint_id=f"online-seeing-{model1_checkpoint_version}",
+                )
+            )
             self.model2_observer.submit(
-                Model1BeliefCheckpoint(model1_checkpoint_version, final_inputs)
+                Model1ActivationCheckpoint(
+                    model1_checkpoint_version,
+                    ActivationImaginationLoop(observed_activations, runner),
+                )
             )
             training = dict(
                 loss=0.0,
@@ -491,7 +518,6 @@ class LiveThinkingSession:
                 seeing_loss=seeing_result.metrics.prediction_loss,
                 seeing_updates=seeing_result.metrics.updates,
             )
-            self._history = [*self._history, final_packet][-3:]
             self._latent_updates += 1
             result = LiveThinkingEpisode(
                 episode_index=self._episode_index,

@@ -5,7 +5,7 @@ import pytest
 import torch
 
 from empathy.live.inference import LiveParameters
-from empathy.live.observer import Model2CheckpointGuess
+from empathy.live.observer import Model1ActivationCheckpoint, Model2CheckpointGuess
 from empathy.live.thinking import (
     DEFAULT_INITIAL_STATES,
     LiveThinkingSession,
@@ -14,12 +14,14 @@ from empathy.live.thinking import (
 )
 from empathy.model1.config import load_model1_config
 from empathy.model1.types import TrajectoryMixture
+from empathy.model2.activation_adapter import Model1ActivationPacket
 from empathy.model2.contracts import (
     BeliefInputs,
     ParameterHypothesis,
     ParameterPosterior,
     WorldPrediction,
 )
+from empathy.model2.imagination import ActivationImaginationLoop
 from empathy.model2.network import InverseWorldCNN
 from empathy.model2.smc import SMCConfig
 from empathy.physics.simulate import BallState
@@ -47,6 +49,7 @@ class FourPathModel1:
 class RecordingWorldRuntime:
     def __init__(self) -> None:
         self.inputs: list[BeliefInputs] = []
+        self.imaginations: list[ActivationImaginationLoop] = []
         self.order: list[str] = []
         self.weight_update_count = 0
 
@@ -56,6 +59,16 @@ class RecordingWorldRuntime:
         call = len(self.inputs)
         logits = torch.tensor([[float(call), -10.0, -10.0, -10.0, -10.0]])
         return WorldPrediction(logits, torch.full((1, 7), 0.5))
+
+    def predict_imagination(
+        self, imagination: ActivationImaginationLoop
+    ) -> WorldPrediction:
+        self.order.append("imagine")
+        self.imaginations.append(imagination)
+        return WorldPrediction(
+            torch.tensor([[10.0, -10.0, -10.0, -10.0, -10.0]]),
+            torch.full((1, 7), 0.5),
+        )
 
     def train_step(self, inputs: BeliefInputs, target_world_flat: np.ndarray) -> dict[str, float]:
         self.order.append("train")
@@ -125,7 +138,10 @@ def test_episode_publishes_one_checkpoint_without_running_model2_synchronously()
     ]
     assert runtime.order == []
     assert len(observer.checkpoints) == 1
-    assert isinstance(observer.checkpoints[0].inputs, BeliefInputs)
+    checkpoint = observer.checkpoints[0]
+    assert isinstance(checkpoint, Model1ActivationCheckpoint)
+    assert checkpoint.imagination.observed[0].checkpoint_id == "online-seeing-1"
+    assert checkpoint.imagination.observed[0].event_ordinal == 0
     assert observer.checkpoints[0].version == 1
     assert episode.thought_steps[-1].guessed_flat[0] == 0
     assert episode.training["loss"] == 0.0
@@ -167,7 +183,7 @@ def test_episode_publishes_one_checkpoint_without_running_model2_synchronously()
     )
 
 
-def test_successive_episodes_vary_offsets_and_keep_completed_event_history() -> None:
+def test_successive_episodes_vary_offsets_and_publish_new_imagination_checkpoints() -> None:
     runtime = RecordingWorldRuntime()
     observer = RecordingObserver()
     session = _session(runtime, observer)
@@ -180,9 +196,15 @@ def test_successive_episodes_vary_offsets_and_keep_completed_event_history() -> 
     assert first.episode_index == 0
     assert second.episode_index == 1
     assert third.episode_index == 2
-    assert observer.checkpoints[0].inputs.history_mask.tolist() == [[False, False, False, True]]
-    assert observer.checkpoints[1].inputs.history_mask.tolist() == [[False, False, True, True]]
-    assert observer.checkpoints[2].inputs.history_mask.tolist() == [[False, True, True, True]]
+    assert [checkpoint.version for checkpoint in observer.checkpoints] == [1, 2, 3]
+    assert [
+        checkpoint.imagination.observed[0].event_ordinal
+        for checkpoint in observer.checkpoints
+    ] == [0, 1, 2]
+    assert [
+        checkpoint.imagination.observed[0].checkpoint_id
+        for checkpoint in observer.checkpoints
+    ] == ["online-seeing-1", "online-seeing-2", "online-seeing-3"]
     assert session.completed_event_count == 3
 
 
@@ -268,6 +290,39 @@ def test_smc_runtime_accumulates_a_parameter_posterior_across_predictions() -> N
     assert sum(item.weight for item in second.posterior.hypotheses) == pytest.approx(1.0)
 
 
+def test_smc_runtime_scores_whole_counterfactual_model1_imaginations() -> None:
+    observed = Model1ActivationPacket(
+        "episode-0",
+        0,
+        "online-1",
+        np.array([-0.2, 0.1, 0.2], np.float32),
+        np.array([-0.4, 0.2, 0.4], np.float32),
+    )
+
+    class Source:
+        def activations_for(self, world):
+            gravity = world.slot("vertical_acceleration")
+            value = gravity.parameters[0] if gravity.active else 0.0
+            activation = np.array([value, 0.1, 0.2], np.float32)
+            return (
+                Model1ActivationPacket(
+                    "episode-0", 0, "online-1", activation, activation * 2
+                ),
+            )
+
+    runtime = SMCModel2Runtime(
+        config=SMCConfig(particle_count=8, rounds=1, seed=3)
+    )
+    imagination = ActivationImaginationLoop((observed,), Source())
+
+    first = runtime.predict_imagination(imagination)
+    second = runtime.predict_imagination(imagination)
+
+    assert first.posterior is not None and second.posterior is not None
+    assert first.posterior.update_count == 1
+    assert second.posterior.update_count == 2
+
+
 def test_live_smc_uses_a_dense_gently_rejuvenated_posterior() -> None:
     runtime = SMCModel2Runtime()
 
@@ -298,7 +353,9 @@ def test_default_observer_is_not_started_before_seeing_runtime_initializes(
         del args, kwargs
         raise RuntimeError("seeing initialization failed")
 
-    monkeypatch.setattr("empathy.live.thinking.AsyncModel2Observer", TrackingObserver)
+    monkeypatch.setattr(
+        "empathy.live.thinking.AsyncActivationModel2Observer", TrackingObserver
+    )
     monkeypatch.setattr("empathy.live.thinking.OnlineSeeingRuntime", fail_seeing_runtime)
 
     with pytest.raises(RuntimeError, match="seeing initialization failed"):

@@ -113,6 +113,9 @@ def test_engine_exposes_thinking_sessions_only_with_an_online_runtime() -> None:
         def predict(self, inputs):
             return WorldPrediction(torch.zeros((1, 5)), torch.zeros((1, 7)))
 
+        def predict_imagination(self, imagination):
+            return WorldPrediction(torch.zeros((1, 5)), torch.zeros((1, 7)))
+
         def train_step(self, inputs, target):
             self.weight_update_count += 1
             return {"loss": 1.0, "weight_update_count": self.weight_update_count}
@@ -144,6 +147,9 @@ def test_each_thinking_session_forks_fresh_online_model_state() -> None:
             self.forks = 0
 
         def predict(self, inputs):
+            return WorldPrediction(torch.zeros((1, 5)), torch.zeros((1, 7)))
+
+        def predict_imagination(self, imagination):
             return WorldPrediction(torch.zeros((1, 5)), torch.zeros((1, 7)))
 
         def fork(self):

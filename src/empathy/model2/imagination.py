@@ -54,9 +54,27 @@ class ActivationImaginationLoop:
 
     def discrepancies(self, worlds: Sequence[WorldCode]) -> np.ndarray:
         result = np.empty((len(worlds), len(self.observed)), dtype=np.float64)
-        for world_index, world in enumerate(worlds):
+        activations_for_many = getattr(self.source, "activations_for_many", None)
+        if callable(activations_for_many):
+            imagined_worlds = activations_for_many(tuple(worlds))
+            if len(imagined_worlds) != len(worlds):
+                raise CounterfactualUnavailable(
+                    "batched counterfactual world count differs"
+                )
+        else:
+            imagined_worlds = []
+            for world in worlds:
+                try:
+                    imagined_worlds.append(self.source.activations_for(world))
+                except CounterfactualUnavailable:
+                    imagined_worlds.append(None)
+
+        for world_index, imagined in enumerate(imagined_worlds):
             try:
-                imagined = self.source.activations_for(world)
+                if imagined is None:
+                    raise CounterfactualUnavailable(
+                        "candidate produced no comparable activations"
+                    )
                 if not all(
                     type(event) is Model1ActivationPacket for event in imagined
                 ):

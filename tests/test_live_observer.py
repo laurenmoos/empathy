@@ -7,8 +7,16 @@ import numpy as np
 import pytest
 import torch
 
-from empathy.live.observer import AsyncModel2Observer, Model1BeliefCheckpoint
+from empathy.live.observer import (
+    AsyncActivationModel2Observer,
+    AsyncModel2Observer,
+    Model1ActivationCheckpoint,
+    Model1BeliefCheckpoint,
+)
+from empathy.model2.activation_adapter import Model1ActivationPacket
 from empathy.model2.contracts import BeliefInputs, WorldPrediction
+from empathy.model2.imagination import ActivationImaginationLoop
+from empathy.physics.world import WorldSchema
 
 
 def _inputs(value: float) -> BeliefInputs:
@@ -125,4 +133,36 @@ def test_close_rejects_new_work_without_waiting_for_active_prediction() -> None:
     with pytest.raises(RuntimeError, match="closed"):
         observer.submit(Model1BeliefCheckpoint(2, _inputs(0.2)))
     release.set()
+
+
+def test_activation_observer_processes_imagination_without_raw_perceptions() -> None:
+    packet = Model1ActivationPacket(
+        "episode-0",
+        0,
+        "online-1",
+        np.zeros(4, dtype=np.float32),
+        np.ones(4, dtype=np.float32),
+    )
+
+    class Source:
+        def activations_for(self, world):
+            del world
+            return (packet,)
+
+    imagination = ActivationImaginationLoop((packet,), Source())
+    seen = []
+
+    def predict(loop: ActivationImaginationLoop) -> WorldPrediction:
+        seen.append(loop)
+        assert not hasattr(loop.observed[0], "frames")
+        loop.discrepancies((WorldSchema.v1().world(),))
+        return _prediction(0.4)
+
+    observer = AsyncActivationModel2Observer(predict)
+    observer.submit(Model1ActivationCheckpoint(1, imagination))
+    result = observer.wait_for_version(1, timeout=1.0)
+    observer.close()
+
+    assert result is not None and result.version == 1
+    assert seen == [imagination]
 

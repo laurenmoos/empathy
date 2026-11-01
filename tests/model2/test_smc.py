@@ -201,3 +201,17 @@ def test_weighted_hypothesis_clusters_preserve_separate_joint_worlds() -> None:
     assert clusters[0][0] == pytest.approx([-0.203333, 0.096667, 0.116667], abs=1e-5)
     assert clusters[1][1] == pytest.approx(0.40)
     assert clusters[1][0] == pytest.approx([0.20, -0.10, 0.50])
+
+
+def test_weighted_hypothesis_clusters_ignore_zero_mass_particles() -> None:
+    particles = np.array(
+        [[-0.2, 0.0, 0.1], [0.2, 0.0, 0.1], [0.0, 0.3, 0.5]],
+        dtype=np.float64,
+    )
+    weights = np.array([1.0, 0.0, 0.0], dtype=np.float64)
+
+    clusters = weighted_hypothesis_clusters(particles, weights)
+
+    assert len(clusters) == 1
+    assert clusters[0][0] == pytest.approx(particles[0])
+    assert clusters[0][1] == pytest.approx(1.0)

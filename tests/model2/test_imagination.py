@@ -84,6 +84,61 @@ def test_particles_are_weighted_by_counterfactual_model1_activations() -> None:
     assert source.calls == 6
 
 
+def test_imagination_uses_batched_counterfactual_model_calls_when_available() -> None:
+    observed = (
+        Model1ActivationPacket(
+            "episode-0",
+            0,
+            "frozen-model-1",
+            np.zeros(3, dtype=np.float32),
+            np.zeros(3, dtype=np.float32),
+        ),
+    )
+
+    class BatchSource(ParameterActivationSource):
+        def activations_for(self, world):
+            raise AssertionError("single-world path should not run")
+
+        def activations_for_many(self, worlds):
+            return tuple(
+                ParameterActivationSource.activations_for(self, world)
+                for world in worlds
+            )
+
+    source = BatchSource()
+    worlds = (WorldSchema.v1().world(), WorldSchema.v1().world())
+
+    discrepancies = ActivationImaginationLoop(observed, source).discrepancies(worlds)
+
+    assert discrepancies.shape == (2, 1)
+    assert source.calls == 2
+
+
+def test_continual_activation_search_retains_its_posterior_across_checkpoints() -> None:
+    observed = (
+        Model1ActivationPacket(
+            "episode-0",
+            0,
+            "frozen-model-1",
+            np.asarray([-0.20, 0.10, 0.20], dtype=np.float32),
+            np.asarray([-0.40, 0.20, 0.40], dtype=np.float32),
+        ),
+    )
+    search = smc.ContinualActivationWorldSMC(
+        SMCConfig(particle_count=8, rounds=1, seed=19)
+    )
+
+    first = search.update(ActivationImaginationLoop(observed, ParameterActivationSource()))
+    second = search.update(ActivationImaginationLoop(observed, ParameterActivationSource()))
+
+    assert first.update_count == 1
+    assert second.update_count == 2
+    assert search.initialization_count == 1
+    assert second.parameter_particles.shape == (8, 3)
+    assert np.isfinite(second.weights).all()
+    assert second.weights.sum() == pytest.approx(1.0)
+
+
 def test_imagination_rejects_activation_shaped_objects_with_raw_frames() -> None:
     class RawActivationCarrier:
         checkpoint_id = "frozen-model-1"

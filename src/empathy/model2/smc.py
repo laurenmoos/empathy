@@ -262,6 +262,10 @@ def weighted_hypothesis_clusters(
     if total <= 0 or np.any(probabilities < 0):
         raise ValueError("hypothesis weights must be nonnegative with positive mass")
     probabilities = probabilities / total
+    positive = probabilities > 0
+    values = values[positive]
+    probabilities = probabilities[positive]
+    probabilities = probabilities / probabilities.sum()
     normalized = (values - np.array([-0.30, -0.30, 0.0])) / 0.60
     groups: list[list[int]] = []
     for index in np.argsort(-probabilities, kind="stable"):
@@ -438,6 +442,61 @@ class ContinualBeliefWorldSMC:
             update_count=self.update_count,
         )
 
+        effective_sample_size = 1.0 / float(np.square(weights).sum())
+        if effective_sample_size < 0.4 * len(self._particles):
+            selected = self._rng.choice(
+                len(self._particles), len(self._particles), replace=True, p=weights
+            )
+            elite = self._particles[int(np.argmax(weights))].copy()
+            self._particles = _jitter_particles(
+                self._particles[selected].copy(), self.config, self._rng
+            )
+            self._particles[0] = elite
+            self._log_weights = np.zeros(len(self._particles), dtype=np.float64)
+        return result
+
+
+class ContinualActivationWorldSMC:
+    """Persistent particle posterior scored only by imagined Model 1 activations."""
+
+    def __init__(self, config: SMCConfig | None = None) -> None:
+        self.config = config or SMCConfig()
+        self._rng = np.random.default_rng(self.config.seed)
+        self._particles: np.ndarray | None = None
+        self._log_weights: np.ndarray | None = None
+        self.update_count = 0
+        self.initialization_count = 0
+
+    def update(self, imagination: ActivationImaginationLoop) -> SMCResult:
+        if type(imagination) is not ActivationImaginationLoop:
+            raise TypeError("activation search requires an ActivationImaginationLoop")
+        if self._particles is None:
+            self._particles = _initial_particles(self.config, self._rng)
+            self._log_weights = np.zeros(len(self._particles), dtype=np.float64)
+            self.initialization_count += 1
+        assert self._log_weights is not None
+        worlds = tuple(_world_from_particle(particle) for particle in self._particles)
+        discrepancies = imagination.discrepancies(worlds)
+        totals = discrepancies.sum(axis=1)
+        if not np.isfinite(totals).any():
+            raise CounterfactualUnavailable(
+                "no candidate world produced comparable Model 1 activations"
+            )
+        self._log_weights += -self.config.score_temperature * totals
+        weights = _normalize_log_weights(self._log_weights)
+        self.update_count += 1
+        flat_worlds = np.stack(
+            [world.to_flat(WorldSchema.v1()) for world in worlds]
+        ).astype(np.float32)
+        order = np.argsort(-weights, kind="stable")
+        result = SMCResult(
+            ranked_worlds=flat_worlds[order],
+            weights=weights[order],
+            best_world=flat_worlds[order][0].copy(),
+            event_discrepancies=discrepancies[order],
+            parameter_particles=self._particles[order].copy(),
+            update_count=self.update_count,
+        )
         effective_sample_size = 1.0 / float(np.square(weights).sum())
         if effective_sample_size < 0.4 * len(self._particles):
             selected = self._rng.choice(

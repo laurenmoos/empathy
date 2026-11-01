@@ -35,7 +35,14 @@ class LiveSessionRegistry:
         self._sessions: OrderedDict[str, _SessionEntry] = OrderedDict()
         self._lock = threading.Lock()
 
+    @staticmethod
+    def _close_session(entry: _SessionEntry) -> None:
+        close = getattr(entry.session, "close", None)
+        if close is not None:
+            close()
+
     def start(self, parameters: LiveParameters) -> str:
+        evicted: list[_SessionEntry] = []
         with self._lock:
             while len(self._sessions) >= self.max_sessions:
                 idle_id = next(
@@ -48,10 +55,12 @@ class LiveSessionRegistry:
                 )
                 if idle_id is None:
                     raise LiveInferenceError("all live session slots are busy; retry shortly")
-                del self._sessions[idle_id]
+                evicted.append(self._sessions.pop(idle_id))
             session = self.engine.thinking_session(parameters)
             session_id = uuid.uuid4().hex
             self._sessions[session_id] = _SessionEntry(session, threading.Lock())
+        for entry in evicted:
+            self._close_session(entry)
         return session_id
 
     def next_episode(self, session_id: str):
@@ -65,20 +74,26 @@ class LiveSessionRegistry:
             with entry.request_lock:
                 return entry.session.next_episode()
         finally:
+            closed_entry = None
             with self._lock:
                 entry.active_requests -= 1
                 if entry.closing and entry.active_requests == 0:
-                    self._sessions.pop(session_id, None)
+                    closed_entry = self._sessions.pop(session_id, None)
+            if closed_entry is not None:
+                self._close_session(closed_entry)
 
     def close(self, session_id: str) -> bool:
+        closed_entry = None
         with self._lock:
             entry = self._sessions.get(session_id)
             if entry is None:
                 return False
             entry.closing = True
             if entry.active_requests == 0:
-                del self._sessions[session_id]
-            return True
+                closed_entry = self._sessions.pop(session_id)
+        if closed_entry is not None:
+            self._close_session(closed_entry)
+        return True
 
 
 def process_inference_request(

@@ -229,8 +229,9 @@ def test_normal_playback_is_visual_without_narration_feeds() -> None:
 def test_playback_runs_at_fast_visual_cadence() -> None:
     source, _ = parsed_explorer()
 
-    assert "const FRAME_INTERVAL_SECONDS = .03;" in source
-    assert "accumulator >= FRAME_INTERVAL_SECONDS" in source
+    assert "const FRAME_INTERVAL_SECONDS = .01;" in source
+    assert "while (accumulator >= FRAME_INTERVAL_SECONDS" in source
+    assert "accumulator -= FRAME_INTERVAL_SECONDS;" in source
 
 
 def test_live_episode_validation_checks_trajectory_beliefs_and_four_thoughts() -> None:
@@ -245,4 +246,7 @@ def test_live_episode_validation_checks_trajectory_beliefs_and_four_thoughts() -
     assert "predicted_world_flat" in source
     assert "constraint recovery is invalid" in source
     assert "initial_state" in source
+    assert "model1_checkpoint_version" in source
+    assert "model2_checkpoint_version" in source
+    assert "checkpoint versions are invalid" in source
     assert "requestAnimationFrame" in source

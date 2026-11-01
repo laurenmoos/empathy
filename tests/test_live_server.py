@@ -125,6 +125,7 @@ class FakeThinkingSession:
         self.parameters = parameters
         self.fail = fail
         self.index = 0
+        self.closed = False
 
     def next_episode(self):
         if self.fail:
@@ -133,14 +134,20 @@ class FakeThinkingSession:
         self.index += 1
         return episode
 
+    def close(self):
+        self.closed = True
+
 
 class FakeThinkingEngine:
     def __init__(self) -> None:
         self.parameters = []
+        self.sessions = []
 
     def thinking_session(self, parameters):
         self.parameters.append(parameters)
-        return FakeThinkingSession(parameters, fail=parameters.wind == -1.0)
+        session = FakeThinkingSession(parameters, fail=parameters.wind == -1.0)
+        self.sessions.append(session)
+        return session
 
 
 def test_session_endpoints_lock_parameters_and_advance_distinct_episodes() -> None:
@@ -234,19 +241,22 @@ def test_registry_serializes_concurrent_requests_for_one_session() -> None:
 
 
 def test_registry_evicts_oldest_idle_session_at_capacity() -> None:
-    registry = LiveSessionRegistry(FakeThinkingEngine(), max_sessions=2)
+    engine = FakeThinkingEngine()
+    registry = LiveSessionRegistry(engine, max_sessions=2)
     first = registry.start(LiveParameters())
     second = registry.start(LiveParameters(gravity=-0.1))
     third = registry.start(LiveParameters(wind=0.1))
 
     with pytest.raises(KeyError, match="unknown session"):
         registry.next_episode(first)
+    assert engine.sessions[0].closed
     assert registry.next_episode(second).index == 0
     assert registry.next_episode(third).index == 0
 
 
 def test_session_close_releases_the_registered_model_copy() -> None:
-    registry = LiveSessionRegistry(FakeThinkingEngine())
+    engine = FakeThinkingEngine()
+    registry = LiveSessionRegistry(engine)
     session_id = registry.start(LiveParameters())
 
     status, payload = process_session_close(
@@ -255,5 +265,37 @@ def test_session_close_releases_the_registered_model_copy() -> None:
 
     assert status is HTTPStatus.OK
     assert payload == {"closed": True}
+    assert engine.sessions[0].closed
     with pytest.raises(KeyError, match="unknown session"):
         registry.next_episode(session_id)
+
+
+def test_close_during_active_request_releases_session_after_request_finishes() -> None:
+    from threading import Event
+
+    entered = Event()
+    release = Event()
+
+    class BlockingSession(FakeThinkingSession):
+        def next_episode(self):
+            entered.set()
+            assert release.wait(1.0)
+            return super().next_episode()
+
+    class BlockingEngine(FakeThinkingEngine):
+        def thinking_session(self, parameters):
+            session = BlockingSession(parameters)
+            self.sessions.append(session)
+            return session
+
+    engine = BlockingEngine()
+    registry = LiveSessionRegistry(engine)
+    session_id = registry.start(LiveParameters())
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        pending = pool.submit(registry.next_episode, session_id)
+        assert entered.wait(1.0)
+        assert registry.close(session_id)
+        assert not engine.sessions[0].closed
+        release.set()
+        pending.result()
+    assert engine.sessions[0].closed

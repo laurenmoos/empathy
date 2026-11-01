@@ -32,6 +32,7 @@ from .inference import (
     _encoded_u8,
     _operator_payload,
 )
+from .observer import AsyncModel2Observer, Model1BeliefCheckpoint
 
 
 class Model2Runtime(Protocol):
@@ -179,6 +180,8 @@ class LiveThinkingEpisode:
     training: dict[str, float | int]
     latent_update_count: int
     weight_update_count: int
+    model1_checkpoint_version: int
+    model2_checkpoint_version: int | None
 
     def to_payload(self) -> dict[str, object]:
         height, width = self.frames.shape[1:]
@@ -207,6 +210,8 @@ class LiveThinkingEpisode:
             "training": dict(self.training),
             "latent_update_count": self.latent_update_count,
             "weight_update_count": self.weight_update_count,
+            "model1_checkpoint_version": self.model1_checkpoint_version,
+            "model2_checkpoint_version": self.model2_checkpoint_version,
         }
 
 
@@ -235,6 +240,7 @@ class LiveThinkingSession:
         initial_states: tuple[BallState, ...] = DEFAULT_INITIAL_STATES,
         max_offset_attempts: int = 8,
         model_lock: threading.RLock | None = None,
+        model2_observer: AsyncModel2Observer | None = None,
     ) -> None:
         if not initial_states or max_offset_attempts < 1:
             raise ValueError("thinking session requires offsets and a positive attempt bound")
@@ -251,6 +257,9 @@ class LiveThinkingSession:
         self._episode_index = 0
         self._completed_events = 0
         self._latent_updates = 0
+        self.model2_observer = model2_observer or AsyncModel2Observer(
+            model2_runtime.predict
+        )
         seeing_config = OnlineSeeingConfig(
             channels=(4, 8, 12),
             representation_size=24,
@@ -323,6 +332,7 @@ class LiveThinkingSession:
 
     def next_episode(self) -> LiveThinkingEpisode:
         with self._session_lock, self._model_lock:
+            latest_guess = self.model2_observer.latest
             engine = LiveInferenceEngine(
                 self.model1,
                 self.model1_config,
@@ -358,28 +368,27 @@ class LiveThinkingSession:
             )
             previous = np.zeros_like(beliefs[0])
             steps: list[LiveThoughtStep] = []
-            final_inputs: BeliefInputs | None = None
-            for index, (label, belief, step_paths, step_weights) in enumerate(
-                zip(labels, beliefs, visual_paths, visual_weights, strict=True)
-            ):
-                packet = Model1BeliefPacket(
-                    episode_id="live-thinking",
-                    event_ordinal=self._episode_index,
-                    pre_belief=previous,
-                    post_belief=belief,
+            if latest_guess is None:
+                guessed_parameters = np.zeros(7, dtype=np.float32)
+                guessed = WorldSchema.v1().world().to_flat(WorldSchema.v1()).astype(
+                    np.float32
                 )
-                final_inputs = adapt_model1_events([*self._history, packet])
-                prediction = self.model2_runtime.predict(final_inputs)
+                model2_checkpoint_version = None
+            else:
                 guessed_parameters = (
-                    prediction.normalized_parameters[0]
+                    latest_guess.prediction.normalized_parameters[0]
                     .detach()
                     .cpu()
                     .numpy()
                     .astype(np.float32)
                 )
-                guessed = decode_prediction(prediction, WorldSchema.v1()).flat[0].astype(
-                    np.float32
-                )
+                guessed = decode_prediction(
+                    latest_guess.prediction, WorldSchema.v1()
+                ).flat[0].astype(np.float32)
+                model2_checkpoint_version = latest_guess.version
+            for index, (label, belief, step_paths, step_weights) in enumerate(
+                zip(labels, beliefs, visual_paths, visual_weights, strict=True)
+            ):
                 steps.append(
                     LiveThoughtStep(
                         index,
@@ -394,17 +403,22 @@ class LiveThinkingSession:
                     )
                 )
                 previous = belief
-            assert final_inputs is not None
-            training = self.model2_runtime.complete_event(final_inputs)
-            training.update(
-                seeing_loss=seeing_result.metrics.prediction_loss,
-                seeing_updates=seeing_result.metrics.updates,
-            )
             final_packet = Model1BeliefPacket(
                 episode_id="live-thinking",
                 event_ordinal=self._episode_index,
                 pre_belief=beliefs[-2],
                 post_belief=beliefs[-1],
+            )
+            final_inputs = adapt_model1_events([*self._history, final_packet])
+            model1_checkpoint_version = seeing_result.metrics.updates
+            self.model2_observer.submit(
+                Model1BeliefCheckpoint(model1_checkpoint_version, final_inputs)
+            )
+            training = dict(
+                loss=0.0,
+                weight_update_count=self.model2_runtime.weight_update_count,
+                seeing_loss=seeing_result.metrics.prediction_loss,
+                seeing_updates=seeing_result.metrics.updates,
             )
             self._history = [*self._history, final_packet][-3:]
             self._latent_updates += 1
@@ -425,7 +439,12 @@ class LiveThinkingSession:
                 training=training,
                 latent_update_count=self._latent_updates,
                 weight_update_count=self.model2_runtime.weight_update_count,
+                model1_checkpoint_version=model1_checkpoint_version,
+                model2_checkpoint_version=model2_checkpoint_version,
             )
             self._episode_index += 1
             self._completed_events += 1
             return result
+
+    def close(self) -> None:
+        self.model2_observer.close()

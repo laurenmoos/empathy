@@ -5,6 +5,7 @@ import pytest
 import torch
 
 from empathy.live.inference import LiveParameters
+from empathy.live.observer import Model2CheckpointGuess
 from empathy.live.thinking import LiveThinkingSession, OnlineModel2Runtime
 from empathy.model1.config import load_model1_config
 from empathy.model1.types import TrajectoryMixture
@@ -52,25 +53,40 @@ class RecordingWorldRuntime:
         self.weight_update_count += 1
         return {"loss": 0.25, "weight_update_count": self.weight_update_count}
 
+
+class RecordingObserver:
+    def __init__(self) -> None:
+        self.checkpoints = []
+        self.latest = None
+        self.closed = False
+
+    def submit(self, checkpoint) -> None:
+        self.checkpoints.append(checkpoint)
+
+    def close(self) -> None:
+        self.closed = True
+
     def complete_event(self, inputs: BeliefInputs) -> dict[str, float]:
         self.order.append("complete")
         assert inputs is self.inputs[-1]
         return {"loss": 0.25, "weight_update_count": self.weight_update_count}
 
 
-def _session(runtime=None, **kwargs) -> LiveThinkingSession:
+def _session(runtime=None, observer=None, **kwargs) -> LiveThinkingSession:
     return LiveThinkingSession(
         FourPathModel1(),
         load_model1_config(ROOT / "configs" / "model1" / "v1.yaml"),
         runtime or RecordingWorldRuntime(),
         LiveParameters(gravity=-0.06, wind=0.0, damping=0.0),
+        model2_observer=observer,
         **kwargs,
     )
 
 
-def test_episode_thinks_in_four_belief_only_steps_before_training() -> None:
+def test_episode_publishes_one_checkpoint_without_running_model2_synchronously() -> None:
     runtime = RecordingWorldRuntime()
-    session = _session(runtime)
+    observer = RecordingObserver()
+    session = _session(runtime, observer)
 
     episode = session.next_episode()
 
@@ -81,16 +97,19 @@ def test_episode_thinks_in_four_belief_only_steps_before_training() -> None:
         "full belief",
         "reappearance revision",
     ]
-    assert runtime.order == ["predict", "predict", "predict", "predict", "complete"]
-    assert all(isinstance(inputs, BeliefInputs) for inputs in runtime.inputs)
-    assert all(set(inputs.__dict__) == {"beliefs", "history_mask"} for inputs in runtime.inputs)
-    assert episode.thought_steps[-1].guessed_flat[0] == 1
-    assert episode.training["loss"] == 0.25
+    assert runtime.order == []
+    assert len(observer.checkpoints) == 1
+    assert isinstance(observer.checkpoints[0].inputs, BeliefInputs)
+    assert observer.checkpoints[0].version == 1
+    assert episode.thought_steps[-1].guessed_flat[0] == 0
+    assert episode.training["loss"] == 0.0
     assert episode.training["weight_update_count"] == 0
     assert episode.training["seeing_updates"] == 1
     assert episode.latent_update_count == 1
     assert episode.weight_update_count == 0
     payload = episode.to_payload()
+    assert payload["model1_checkpoint_version"] == 1
+    assert payload["model2_checkpoint_version"] is None
     ground_truth = payload["ground_truth"]
     path = ground_truth["path"]
     assert "frames_base64" not in ground_truth
@@ -100,11 +119,11 @@ def test_episode_thinks_in_four_belief_only_steps_before_training() -> None:
     assert path[0] == pytest.approx(payload["initial_state"][:2])
     assert all(len(point) == 2 for point in path)
     assert all(0.0 <= coordinate <= 1.0 for point in path for coordinate in point)
-    assert payload["thought_steps"][0]["predicted_parameters"] == [0.5] * 7
+    assert payload["thought_steps"][0]["predicted_parameters"] == [0.0] * 7
     recovery = payload["thought_steps"][0]["constraint_recovery"]
     assert recovery["total"] == 3
-    assert recovery["recovered"] == 3
-    assert 0.99 < recovery["score"] < 1.0
+    assert recovery["recovered"] == 2
+    assert 0.8 < recovery["score"] < 1.0
     assert len(payload["thought_steps"][0]["paths"]) == 4
     assert len(payload["thought_steps"][2]["paths"]) == 24
     entry = payload["thought_steps"][0]["paths"][0][0]
@@ -124,7 +143,8 @@ def test_episode_thinks_in_four_belief_only_steps_before_training() -> None:
 
 def test_successive_episodes_vary_offsets_and_keep_completed_event_history() -> None:
     runtime = RecordingWorldRuntime()
-    session = _session(runtime)
+    observer = RecordingObserver()
+    session = _session(runtime, observer)
 
     first = session.next_episode()
     second = session.next_episode()
@@ -134,10 +154,40 @@ def test_successive_episodes_vary_offsets_and_keep_completed_event_history() -> 
     assert first.episode_index == 0
     assert second.episode_index == 1
     assert third.episode_index == 2
-    assert runtime.inputs[3].history_mask.tolist() == [[False, False, False, True]]
-    assert runtime.inputs[7].history_mask.tolist() == [[False, False, True, True]]
-    assert runtime.inputs[11].history_mask.tolist() == [[False, True, True, True]]
+    assert observer.checkpoints[0].inputs.history_mask.tolist() == [[False, False, False, True]]
+    assert observer.checkpoints[1].inputs.history_mask.tolist() == [[False, False, True, True]]
+    assert observer.checkpoints[2].inputs.history_mask.tolist() == [[False, True, True, True]]
     assert session.completed_event_count == 3
+
+
+def test_next_rollout_uses_latest_completed_model2_checkpoint_guess() -> None:
+    observer = RecordingObserver()
+    session = _session(observer=observer)
+
+    first = session.next_episode()
+    observer.latest = Model2CheckpointGuess(
+        1,
+        WorldPrediction(
+            torch.tensor([[10.0, -10.0, -10.0, -10.0, -10.0]]),
+            torch.full((1, 7), 0.5),
+        ),
+    )
+    second = session.next_episode()
+
+    assert first.model2_checkpoint_version is None
+    assert second.model1_checkpoint_version == 2
+    assert second.model2_checkpoint_version == 1
+    assert all(step.guessed_parameters.tolist() == [0.5] * 7 for step in second.thought_steps)
+    assert len(observer.checkpoints) == 2
+
+
+def test_close_stops_the_model2_observer() -> None:
+    observer = RecordingObserver()
+    session = _session(observer=observer)
+
+    session.close()
+
+    assert observer.closed
 
 
 def test_live_session_persists_one_online_seeing_learner_across_throws() -> None:

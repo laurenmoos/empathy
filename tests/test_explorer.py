@@ -226,6 +226,13 @@ def test_normal_playback_is_visual_without_narration_feeds() -> None:
     assert 'statusOverride = `Stream stopped: ${error.message}`' not in source
 
 
+def test_playback_runs_at_fast_visual_cadence() -> None:
+    source, _ = parsed_explorer()
+
+    assert "const FRAME_INTERVAL_SECONDS = .03;" in source
+    assert "accumulator >= FRAME_INTERVAL_SECONDS" in source
+
+
 def test_live_episode_validation_checks_trajectory_beliefs_and_four_thoughts() -> None:
     source, _ = parsed_explorer()
 

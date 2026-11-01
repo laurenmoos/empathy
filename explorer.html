@@ -151,6 +151,7 @@
       "reappearance revision"
     ];
     const DEFAULT_OCCLUDER = [0.35, 0.55, 0.05, 0.95];
+    const FRAME_INTERVAL_SECONDS = .03;
     const worldSlots = [
       {name: "gravity", operator: "vertical_acceleration", parameter: "a_y", parameterIndex: 0, minimum: -1, maximum: 1},
       {name: "wind", operator: "horizontal_acceleration", parameter: "a_x", parameterIndex: 1, minimum: -1, maximum: 1},
@@ -704,7 +705,7 @@
       previousTimestamp = timestamp;
       if (playing && currentEpisode) {
         accumulator += elapsed;
-        if (accumulator >= .14) {
+        if (accumulator >= FRAME_INTERVAL_SECONDS) {
           accumulator = 0;
           if (currentFrame < currentEpisode.ground_truth.frame_count - 1) {
             currentFrame += 1;

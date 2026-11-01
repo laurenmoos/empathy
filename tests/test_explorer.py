@@ -75,7 +75,7 @@ def test_explorer_uses_minimal_numeric_controls_and_plain_layer_names() -> None:
         ">Ready.</p>",
     ):
         assert unwanted not in source
-def test_explorer_combines_ground_truth_path_and_belief_fuzz() -> None:
+def test_explorer_compares_one_guess_with_truth_only_during_occlusion() -> None:
     source, parser = parsed_explorer()
 
     assert {
@@ -92,8 +92,15 @@ def test_explorer_combines_ground_truth_path_and_belief_fuzz() -> None:
     assert "<h2>Seeing</h2>" in source
     assert "<h2>Thinking</h2>" in source
     assert "function drawGroundTruthPath" in source
-    assert "function drawBeliefSuperposition" in source
-    assert "drawBeliefFuzz" not in source
+    assert "function weightedPredictionPath" in source
+    assert "function drawPredictedPath" in source
+    assert "const hidden = currentFrame >= truth.hidden_start" in source
+    assert "currentFrame < truth.reappearance_step;" in source
+    assert "const guess = currentEpisode.thought_steps[2];" in source
+    assert "drawPredictedPath(guess);" in source
+    assert "drawGroundTruthPath(truth.path);" in source
+    assert "function drawBeliefSuperposition" not in source
+    assert "function beliefConfidence" not in source
     assert "step.path_weights" in source
     assert "lineWidth" in source
     assert "globalAlpha" in source
@@ -113,7 +120,7 @@ def test_explorer_uses_vector_trajectories_without_ball_pixels() -> None:
     assert "boundaryPoint(truth.path, truth.occluder[0])" in source
     assert "boundaryPoint(truth.path, truth.occluder[1])" in source
     assert "clipToOccluder(truth.occluder, () =>" in source
-    assert "drawGroundTruthPath(truth.path)" in source
+    assert "drawGroundTruthPath(truth.path);" in source
     assert "progressiveGroundTruthPath" not in source
     for unwanted in (
         "function drawInitialCondition",
@@ -236,8 +243,11 @@ def test_playback_runs_at_fast_visual_cadence() -> None:
     source, _ = parsed_explorer()
 
     assert "const FRAME_INTERVAL_SECONDS = .004;" in source
-    assert "while (accumulator >= FRAME_INTERVAL_SECONDS" in source
-    assert "accumulator -= FRAME_INTERVAL_SECONDS;" in source
+    assert "const HIDDEN_FRAME_INTERVAL_SECONDS = .025;" in source
+    assert "function playbackInterval" in source
+    assert "return HIDDEN_FRAME_INTERVAL_SECONDS;" in source
+    assert "const interval = playbackInterval();" in source
+    assert "accumulator -= interval;" in source
 
 
 def test_live_episode_validation_checks_trajectory_beliefs_and_four_thoughts() -> None:

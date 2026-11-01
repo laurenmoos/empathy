@@ -153,6 +153,7 @@
     ];
     const DEFAULT_OCCLUDER = [0.35, 0.55, 0.05, 0.95];
     const FRAME_INTERVAL_SECONDS = .004;
+    const HIDDEN_FRAME_INTERVAL_SECONDS = .025;
     const worldSlots = [
       {name: "gravity", operator: "vertical_acceleration", parameter: "a_y", parameterIndex: 0, posteriorIndex: 0, minimum: -0.30, maximum: 0.30},
       {name: "wind", operator: "horizontal_acceleration", parameter: "a_x", parameterIndex: 1, posteriorIndex: 1, minimum: -0.30, maximum: 0.30},
@@ -468,8 +469,8 @@
         else perceptionCtx.lineTo(px, py);
       });
       perceptionCtx.strokeStyle = "#4f554f";
-      perceptionCtx.lineWidth = 1.35;
-      perceptionCtx.globalAlpha = .58;
+      perceptionCtx.lineWidth = 1.25;
+      perceptionCtx.globalAlpha = .92;
       perceptionCtx.lineCap = "round";
       perceptionCtx.lineJoin = "round";
       perceptionCtx.stroke();
@@ -603,7 +604,26 @@
       }
     }
 
-    function strokePath(path, width, alpha) {
+    function weightedPredictionPath(step) {
+      const length = Math.min(...step.paths.map(path => path.length));
+      const total = step.path_weights.reduce((sum, weight) => sum + weight, 0);
+      const weights = total > 0
+        ? step.path_weights.map(weight => weight / total)
+        : step.path_weights.map(() => 1 / step.path_weights.length);
+      return Array.from({length}, (_, pointIndex) => {
+        let x = 0;
+        let y = 0;
+        step.paths.forEach((path, pathIndex) => {
+          x += path[pointIndex][0] * weights[pathIndex];
+          y += path[pointIndex][1] * weights[pathIndex];
+        });
+        return [x, y];
+      });
+    }
+
+    function drawPredictedPath(step) {
+      const path = weightedPredictionPath(step);
+      if (path.length < 2) return;
       perceptionCtx.save();
       perceptionCtx.beginPath();
       path.forEach(([x, y], index) => {
@@ -613,34 +633,12 @@
         else perceptionCtx.lineTo(px, py);
       });
       perceptionCtx.strokeStyle = "#788076";
-      perceptionCtx.lineWidth = width;
-      perceptionCtx.globalAlpha = alpha;
+      perceptionCtx.lineWidth = 2.4;
+      perceptionCtx.globalAlpha = .82;
       perceptionCtx.lineCap = "round";
       perceptionCtx.lineJoin = "round";
       perceptionCtx.stroke();
       perceptionCtx.restore();
-    }
-
-    function beliefConfidence(weights) {
-      if (weights.length === 1) return 1;
-      const entropy = -weights.reduce(
-        (total, weight) => total + (weight > 0 ? weight * Math.log(weight) : 0),
-        0
-      );
-      return Math.max(0, Math.min(1, 1 - entropy / Math.log(weights.length)));
-    }
-
-    function drawBeliefSuperposition(step, occluder) {
-      const confidence = beliefConfidence(step.path_weights);
-      clipToOccluder(occluder, () => {
-        step.paths.forEach((path, index) => {
-          const weight = step.path_weights[index];
-          const broadWidth = 5 + (1 - confidence) * 11 + (1 - weight) * 3;
-          const broadAlpha = .07 + confidence * .12 + weight * .12;
-          strokePath(path, broadWidth, broadAlpha);
-          strokePath(path, 1.2 + weight * 2.2, .12 + confidence * .28 + weight * .38);
-        });
-      });
     }
 
     function drawPerception() {
@@ -652,14 +650,19 @@
       const index = thoughtIndex();
       if (index >= 0) {
         const step = currentEpisode.thought_steps[index];
-        drawBeliefSuperposition(step, truth.occluder);
         if (index !== currentThought) {
           currentThought = index;
           updateSecondOrder(step);
         }
       }
-      if (currentFrame >= truth.reappearance_step) {
-        clipToOccluder(truth.occluder, () => drawGroundTruthPath(truth.path));
+      const hidden = currentFrame >= truth.hidden_start
+        && currentFrame < truth.reappearance_step;
+      if (hidden) {
+        const guess = currentEpisode.thought_steps[2];
+        clipToOccluder(truth.occluder, () => {
+          drawPredictedPath(guess);
+          drawGroundTruthPath(truth.path);
+        });
       }
       drawVisibleTrajectory(truth);
       drawInitialPoint(currentEpisode.initial_state);
@@ -803,14 +806,26 @@
       drawPerception();
     }
 
+    function playbackInterval() {
+      if (!currentEpisode) return FRAME_INTERVAL_SECONDS;
+      const truth = currentEpisode.ground_truth;
+      if (currentFrame >= truth.hidden_start
+          && currentFrame < truth.reappearance_step) {
+        return HIDDEN_FRAME_INTERVAL_SECONDS;
+      }
+      return FRAME_INTERVAL_SECONDS;
+    }
+
     function animate(timestamp) {
       if (!previousTimestamp) previousTimestamp = timestamp;
       const elapsed = Math.min((timestamp - previousTimestamp) / 1000, .1);
       previousTimestamp = timestamp;
       if (playing && currentEpisode) {
         accumulator += elapsed;
-        while (accumulator >= FRAME_INTERVAL_SECONDS) {
-          accumulator -= FRAME_INTERVAL_SECONDS;
+        while (true) {
+          const interval = playbackInterval();
+          if (accumulator < interval) break;
+          accumulator -= interval;
           if (currentFrame < currentEpisode.ground_truth.frame_count - 1) {
             currentFrame += 1;
             draw();

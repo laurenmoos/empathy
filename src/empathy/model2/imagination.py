@@ -44,6 +44,8 @@ class ActivationImaginationLoop:
     ) -> None:
         if not observed:
             raise ValueError("imagination requires observed Model 1 activations")
+        if not all(type(event) is Model1ActivationPacket for event in observed):
+            raise TypeError("observed events must be Model1ActivationPacket instances")
         checkpoint_ids = {event.checkpoint_id for event in observed}
         if len(checkpoint_ids) != 1:
             raise ValueError("observed activations must use one Model 1 checkpoint")
@@ -55,11 +57,24 @@ class ActivationImaginationLoop:
         for world_index, world in enumerate(worlds):
             try:
                 imagined = self.source.activations_for(world)
+                if not all(
+                    type(event) is Model1ActivationPacket for event in imagined
+                ):
+                    raise CounterfactualUnavailable(
+                        "counterfactual source returned a non-activation packet"
+                    )
                 if len(imagined) != len(self.observed):
                     raise CounterfactualUnavailable("counterfactual event count differs")
                 for event_index, (actual, candidate) in enumerate(
                     zip(self.observed, imagined, strict=True)
                 ):
+                    if (
+                        candidate.episode_id != actual.episode_id
+                        or candidate.event_ordinal != actual.event_ordinal
+                    ):
+                        raise CounterfactualUnavailable(
+                            "counterfactual event identity differs"
+                        )
                     if candidate.checkpoint_id != actual.checkpoint_id:
                         raise CounterfactualUnavailable(
                             "counterfactual used a different Model 1 checkpoint"
@@ -75,6 +90,6 @@ class ActivationImaginationLoop:
                         np.mean((actual_vector - candidate_vector) ** 2) / scale
                     )
             except CounterfactualUnavailable:
-                result[world_index] = 1.0e6
+                result[world_index] = np.inf
         return result
 

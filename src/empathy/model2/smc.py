@@ -14,7 +14,7 @@ from empathy.physics.world import WorldCode, WorldSchema
 from .activation_adapter import ActivationBeliefAdapter, Model1ActivationPacket
 from .adapters import adapt_model1_activations
 from .contracts import BeliefInputs
-from .imagination import ActivationImaginationLoop
+from .imagination import ActivationImaginationLoop, CounterfactualUnavailable
 
 
 @dataclass(frozen=True)
@@ -316,21 +316,16 @@ class ActivationWorldSMC:
     def infer(self, imagination: ActivationImaginationLoop) -> SMCResult:
         rng = np.random.default_rng(self.config.seed)
         particles = _initial_particles(self.config, rng)
-        weights = np.full(len(particles), 1.0 / len(particles), dtype=np.float64)
-        discrepancies = np.empty((len(particles), len(imagination.observed)))
-        for round_index in range(self.config.rounds):
-            worlds = tuple(_world_from_particle(particle) for particle in particles)
-            discrepancies = imagination.discrepancies(worlds)
-            weights = _normalize_log_weights(
-                -self.config.score_temperature * discrepancies.sum(axis=1)
+        worlds = tuple(_world_from_particle(particle) for particle in particles)
+        discrepancies = imagination.discrepancies(worlds)
+        total_discrepancy = discrepancies.sum(axis=1)
+        if not np.isfinite(total_discrepancy).any():
+            raise CounterfactualUnavailable(
+                "no candidate world produced comparable Model 1 activations"
             )
-            if round_index + 1 < self.config.rounds:
-                selected = rng.choice(
-                    len(particles), len(particles), replace=True, p=weights
-                )
-                particles = _jitter_particles(
-                    particles[selected].copy(), self.config, rng
-                )
+        weights = _normalize_log_weights(
+            -self.config.score_temperature * total_discrepancy
+        )
         worlds = np.stack(
             [
                 _world_from_particle(particle).to_flat(WorldSchema.v1())

@@ -526,6 +526,13 @@ def _parser() -> argparse.ArgumentParser:
     subparsers.add_parser("model1", help="train and inspect the trajectory-belief model")
     subparsers.add_parser("model2", help="train and inspect the inverse-world model")
 
+    online = subparsers.add_parser(
+        "train-seeing", help="watch the Seeing model learn online from repeated throws"
+    )
+    online.add_argument("--episodes", type=int, default=50)
+    online.add_argument("--log-dir", default="runs/seeing")
+    online.add_argument("--seed", type=int, default=7)
+
     live = subparsers.add_parser("live-demo", help="serve the interactive learned-inference demo")
     live.add_argument("--host", default="127.0.0.1")
     live.add_argument("--port", type=int, default=8765)
@@ -581,6 +588,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                 port=args.port,
                 root=Path(args.root),
                 model1_checkpoint=Path(args.model1_checkpoint),
+            )
+        elif args.command == "train-seeing":
+            from .model1.online_cli import run_online_training
+
+            run_online_training(
+                episodes=args.episodes,
+                log_dir=Path(args.log_dir),
+                seed=args.seed,
             )
     except (OSError, ValueError, KeyError) as error:
         print(f"empathy: {error}", file=sys.stderr)

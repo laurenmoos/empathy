@@ -10,23 +10,23 @@ uv run empathy
 
 Open <http://127.0.0.1:8765/explorer.html>.
 
+To watch Seeing learn without the browser:
+
+```bash
+uv run empathy train-seeing --episodes 50 --log-dir runs/seeing
+```
+
+This prints one compact JSON line per throw and writes a checkpoint, `metrics.jsonl`, and TensorBoard-compatible events. Optionally inspect the latter with `uv run tensorboard --logdir runs/seeing`.
+
 ## Environment
 
 A ball moves behind a fixed occluder. Each environment is defined by gravity, wind, and damping. These parameters compose at every time step to transform one ball state into the next, so the hidden trajectory carries their joint constraints without directly revealing their values.
 
 ## Model 1: Seeing
 
-Model 1 is a video CNN with temporal memory. From the visible frames before and after occlusion, it predicts a weighted set of possible hidden trajectories.
+Model 1 is a shared 3D video CNN. Before reappearance it emits a continuous Gaussian belief over smooth hidden paths. The visible exit position, velocity, and first departure frames then reweight those paths: they do not disclose a unique hidden trajectory.
 
-It learns through a streaming loop. Within one environment, it predicts across episodes with varied initial conditions; completed trajectories are then revealed and used for a few updates, together with replay from earlier environments. Its weights and replay continue into the next environment.
-
-For every episode, the interface preserves three perceptual traces from Model 1's late temporal activations:
-
-- **pre-belief**: `z_pre`, recorded while the ball is hidden;
-- **post-belief**: `z_post`, recorded after it reappears;
-- **belief change**: `z_post - z_pre`.
-
-The trajectory maps remain useful outputs for training and visualization, but the activation traces become the channel into Model 2.
+Within one environment, repeated throws vary the initial conditions while gravity, wind, and damping remain fixed. A fast per-world latent updates after each throw, shared weights move more slowly, and recent observations are replayed. The hidden simulator path is available only for evaluation and the ground-truth line in the visualization; it is not a training target.
 
 ## Model 2: Thinking
 

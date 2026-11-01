@@ -215,3 +215,13 @@ def test_weighted_hypothesis_clusters_ignore_zero_mass_particles() -> None:
     assert len(clusters) == 1
     assert clusters[0][0] == pytest.approx(particles[0])
     assert clusters[0][1] == pytest.approx(1.0)
+
+
+def test_hypothesis_cluster_weight_never_exceeds_probability_bounds() -> None:
+    particles = np.zeros((10, 3), dtype=np.float64)
+    weights = np.exp(np.linspace(-20.0, 0.0, 10))
+    weights /= weights.sum()
+
+    clusters = weighted_hypothesis_clusters(particles, weights)
+
+    assert all(0.0 < weight <= 1.0 for _, weight in clusters)

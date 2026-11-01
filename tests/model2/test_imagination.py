@@ -50,6 +50,24 @@ class PartiallyUnavailableSource(ParameterActivationSource):
         return super().activations_for(world)
 
 
+class NarrowGravitySource(ParameterActivationSource):
+    def activations_for(self, world: WorldCode) -> tuple[Model1ActivationPacket, ...]:
+        gravity = world.slot("vertical_acceleration")
+        value = gravity.parameters[0] if gravity.active else 0.0
+        if value < -0.10 or value > 0.0:
+            raise CounterfactualUnavailable("candidate has no comparable event")
+        activation = np.asarray([value], dtype=np.float32)
+        return (
+            Model1ActivationPacket(
+                "episode-0",
+                0,
+                "frozen-model-1",
+                activation,
+                activation,
+            ),
+        )
+
+
 def test_activation_smc_boundary_accepts_only_the_imagination_loop() -> None:
     assert importlib.util.find_spec("empathy.model2.imagination") is not None
     assert hasattr(smc, "ActivationWorldSMC")
@@ -137,6 +155,33 @@ def test_continual_activation_search_retains_its_posterior_across_checkpoints() 
     assert second.parameter_particles.shape == (8, 3)
     assert np.isfinite(second.weights).all()
     assert second.weights.sum() == pytest.approx(1.0)
+
+
+def test_continual_search_can_cross_the_neutral_gap_toward_a_small_force() -> None:
+    target = np.asarray([-0.06], dtype=np.float32)
+    observed = (
+        Model1ActivationPacket(
+            "episode-0", 0, "frozen-model-1", target, target
+        ),
+    )
+    search = smc.ContinualActivationWorldSMC(
+        SMCConfig(
+            particle_count=24,
+            rounds=1,
+            seed=7,
+            jitter_scale=0.015,
+        )
+    )
+
+    for _ in range(5):
+        result = search.update(
+            ActivationImaginationLoop(observed, NarrowGravitySource())
+        )
+    mean, _ = smc.weighted_parameter_summary(
+        result.parameter_particles, result.weights
+    )
+
+    assert mean[0] == pytest.approx(-0.06, abs=0.025)
 
 
 def test_imagination_rejects_activation_shaped_objects_with_raw_frames() -> None:

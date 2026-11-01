@@ -95,6 +95,11 @@ def _initial_particles(config: SMCConfig, rng: np.random.Generator) -> np.ndarra
             [0.0, 0.30, 0.0],
             [0.0, 0.0, 0.30],
             [0.0, 0.0, 0.0],
+            [-0.06, 0.0, 0.0],
+            [0.06, 0.0, 0.0],
+            [0.0, -0.06, 0.0],
+            [0.0, 0.06, 0.0],
+            [0.0, 0.0, 0.03],
         ],
         dtype=np.float64,
     )
@@ -287,7 +292,7 @@ def weighted_hypothesis_clusters(
     clusters = [
         (
             np.average(values[group], axis=0, weights=probabilities[group]),
-            float(probabilities[group].sum()),
+            min(float(probabilities[group].sum()), 1.0),
         )
         for group in groups
     ]

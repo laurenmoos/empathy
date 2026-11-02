@@ -8,11 +8,11 @@ _One fixed world, many throws: Model 1 predicts through the occlusion; Model 2 s
 
 ## The thought experiment
 
-Imagine that one system learns to anticipate a moving object without ever being told the laws of its world. A second system cannot inspect that world, the object's true hidden path, or the first system's training targets. It can only observe the *form of the first system's experience*: detached activations before and after the object disappears.
+Model 1 learns to predict the motion of an occluded object without being given explicit physical rules. Model 2 does not receive the true world parameters, the hidden trajectory, or Model 1's training targets. Its input is limited to detached activations from Model 1 before and after occlusion.
 
-The second system is allowed to think. It proposes a world, runs a private counterfactual simulation, lets a frozen copy of the first system perceive it, and asks whether the resulting internal response resembles the response that actually occurred. Repeating this turns gravity, wind, and damping into competing hypotheses rather than supervised labels.
+Model 2 maintains candidate values for gravity, wind, and damping. For each candidate, it runs a counterfactual simulation and passes the resulting clip through a frozen copy of the current Model 1. Candidates whose activations resemble Model 1's observed response receive more posterior weight.
 
-The toy asks: **can a system recover the constraints organizing another system's perception by searching for worlds under which that perception would make sense?** If it can, coherence is not merely agreement with an observed trajectory. It is agreement between a hypothesized world and the structure of another perceiver's possible experience. “Empathy” is the deliberately ambitious name for that second-order inference.
+The experiment asks whether a perceptual model's internal response contains enough structure to recover the constraints of its environment. Here, coherence means that worlds which reproduce Model 1's response also approach the hidden physical parameters. “Empathy” names this limited form of second-order inference; it is not a claim about human-like empathy.
 
 ## Run
 
@@ -21,22 +21,6 @@ uv run empathy
 ```
 
 Open <http://127.0.0.1:8765/explorer.html>.
-
-To watch Seeing learn without the browser:
-
-```bash
-uv run empathy train-seeing --episodes 50 --log-dir runs/seeing
-```
-
-Each throw is one online update. The command writes a checkpoint, JSON metrics, and TensorBoard events; `prediction_loss` measures how well the belief formed before occlusion agrees with the later visible exit and departure. Inspect it with `uv run tensorboard --logdir runs/seeing`.
-
-To train in the source world and then reset the fast world state while carrying the slow network into an unseen environment:
-
-```bash
-uv run empathy train-seeing --episodes 100 --heldout-episodes 100 --log-dir runs/heldout
-```
-
-The held-out phase resets the fast world state, carries the shared video model forward, and continues the same observable-only learning procedure in a new environment.
 
 ## Environment
 

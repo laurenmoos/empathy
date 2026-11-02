@@ -23,6 +23,7 @@ def _packet(**overrides) -> Model1ActivationPacket:
         "event_ordinal": 0,
         "checkpoint_id": "checkpoint-a",
         "pre_activation": np.linspace(-1.0, 1.0, 6, dtype=np.float32),
+        "guess_activation": np.linspace(-0.5, 0.5, 12, dtype=np.float32),
         "post_activation": np.linspace(1.0, -1.0, 6, dtype=np.float32),
     }
     values.update(overrides)
@@ -36,6 +37,8 @@ def test_activation_packet_is_detached_validated_and_immutable() -> None:
 
     assert packet.pre_activation.tolist() == list(range(6))
     assert not packet.pre_activation.flags.writeable
+    assert packet.guess_activation.shape == (12,)
+    assert not packet.guess_activation.flags.writeable
     assert np.array_equal(
         packet.activation_difference,
         packet.post_activation - packet.pre_activation,
@@ -44,7 +47,7 @@ def test_activation_packet_is_detached_validated_and_immutable() -> None:
     with pytest.raises(ValueError, match="same shape"):
         _packet(post_activation=np.zeros(5, np.float32))
     with pytest.raises(ValueError, match="finite"):
-        _packet(pre_activation=np.full(6, np.nan, np.float32))
+        _packet(guess_activation=np.full(12, np.nan, np.float32))
     with pytest.raises(ValueError, match="checkpoint"):
         _packet(checkpoint_id="")
 

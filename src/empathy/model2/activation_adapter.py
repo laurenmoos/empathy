@@ -17,6 +17,7 @@ class Model1ActivationPacket:
     event_ordinal: int
     checkpoint_id: str
     pre_activation: np.ndarray
+    guess_activation: np.ndarray
     post_activation: np.ndarray
 
     def __post_init__(self) -> None:
@@ -26,7 +27,7 @@ class Model1ActivationPacket:
             raise ValueError("event ordinal must be a nonnegative integer")
         if not isinstance(self.checkpoint_id, str) or not self.checkpoint_id:
             raise ValueError("checkpoint_id must be nonempty")
-        for name in ("pre_activation", "post_activation"):
+        for name in ("pre_activation", "guess_activation", "post_activation"):
             value = np.array(getattr(self, name), dtype=np.float32, copy=True)
             if value.ndim != 1 or value.size < 1:
                 raise ValueError("activations must be nonempty vectors")

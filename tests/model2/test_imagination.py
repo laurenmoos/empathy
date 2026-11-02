@@ -132,6 +132,45 @@ def test_imagination_uses_batched_counterfactual_model_calls_when_available() ->
     assert source.calls == 2
 
 
+def test_imagination_score_is_driven_by_the_hidden_rollout_guess() -> None:
+    observed = (
+        Model1ActivationPacket(
+            episode_id="episode-0",
+            event_ordinal=0,
+            checkpoint_id="frozen-model-1",
+            pre_activation=np.zeros(2, dtype=np.float32),
+            guess_activation=np.zeros(8, dtype=np.float32),
+            post_activation=np.zeros(2, dtype=np.float32),
+        ),
+    )
+
+    class GuessSource:
+        def activations_for(self, world):
+            gravity = world.slot("vertical_acceleration")
+            wrong = gravity.active
+            return (
+                Model1ActivationPacket(
+                    episode_id="episode-0",
+                    event_ordinal=0,
+                    checkpoint_id="frozen-model-1",
+                    pre_activation=np.zeros(2, dtype=np.float32),
+                    guess_activation=np.full(8, float(wrong), dtype=np.float32),
+                    post_activation=np.zeros(2, dtype=np.float32),
+                ),
+            )
+
+    worlds = (
+        WorldSchema.v1().world(),
+        WorldSchema.v1().world(vertical_acceleration={"a_y": -0.30}),
+    )
+
+    discrepancy = ActivationImaginationLoop(observed, GuessSource()).discrepancies(
+        worlds
+    )
+
+    assert discrepancy[:, 0].tolist() == pytest.approx([0.0, 1_000_000.0])
+
+
 def test_continual_activation_search_retains_its_posterior_across_checkpoints() -> None:
     observed = (
         Model1ActivationPacket(

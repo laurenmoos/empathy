@@ -24,14 +24,23 @@ class CounterfactualActivationSource(Protocol):
     ) -> tuple[Model1ActivationPacket, ...]: ...
 
 
-def _event_vector(packet: Model1ActivationPacket) -> np.ndarray:
-    return np.concatenate(
-        (
-            packet.pre_activation,
-            packet.post_activation,
-            packet.activation_difference,
-        )
-    ).astype(np.float64, copy=False)
+def _normalized_mse(actual: np.ndarray, candidate: np.ndarray) -> float:
+    if actual.shape != candidate.shape:
+        raise CounterfactualUnavailable("counterfactual activation shape differs")
+    actual_values = actual.astype(np.float64, copy=False)
+    candidate_values = candidate.astype(np.float64, copy=False)
+    scale = max(float(np.mean(actual_values**2)), 1.0e-6)
+    return float(np.mean((actual_values - candidate_values) ** 2) / scale)
+
+
+def _event_discrepancy(
+    actual: Model1ActivationPacket,
+    candidate: Model1ActivationPacket,
+) -> float:
+    guess = _normalized_mse(actual.guess_activation, candidate.guess_activation)
+    before = _normalized_mse(actual.pre_activation, candidate.pre_activation)
+    after = _normalized_mse(actual.post_activation, candidate.post_activation)
+    return guess + 0.25 * (before + after)
 
 
 class ActivationImaginationLoop:
@@ -97,15 +106,8 @@ class ActivationImaginationLoop:
                         raise CounterfactualUnavailable(
                             "counterfactual used a different Model 1 checkpoint"
                         )
-                    actual_vector = _event_vector(actual)
-                    candidate_vector = _event_vector(candidate)
-                    if candidate_vector.shape != actual_vector.shape:
-                        raise CounterfactualUnavailable(
-                            "counterfactual activation shape differs"
-                        )
-                    scale = max(float(np.mean(actual_vector**2)), 1.0e-6)
-                    result[world_index, event_index] = float(
-                        np.mean((actual_vector - candidate_vector) ** 2) / scale
+                    result[world_index, event_index] = _event_discrepancy(
+                        actual, candidate
                     )
             except CounterfactualUnavailable:
                 result[world_index] = np.inf

@@ -12,7 +12,7 @@ _One fixed world, many throws: Model 1 predicts through the occlusion; Model 2 s
 
 ## The thought experiment
 
-Model 1 learns to predict the motion of an occluded object without being given explicit physical rules. Model 2 does not receive the true world parameters, the hidden trajectory, or Model 1's training targets. Its input is limited to detached activations from Model 1 before and after occlusion.
+Model 1 learns to predict the motion of an occluded object without being given explicit physical rules. Model 2 does not receive the true world parameters, the hidden trajectory, or Model 1's training targets. For each throw it receives one detached three-part packet from Model 1: the visible-before activation, Model 1's superposition of predicted hidden trajectories, and the visible-after activation.
 
 Model 2 maintains candidate values for gravity, wind, and damping. For each candidate, it runs a counterfactual simulation and passes the resulting clip through a frozen copy of the current Model 1. Candidates whose activations resemble Model 1's observed response receive more posterior weight.
 
@@ -26,11 +26,11 @@ When the ball reappears, its visible exit position, exit velocity, and first dep
 
 ## Model 2: Thinking
 
-Thinking is currently an explicit inference process, not a second trained CNN. After each throw it receives a new frozen Seeing checkpoint and a detached activation packet: the means and scales encoded before and after occlusion, plus their change. It never receives the actual frames, hidden path, or true world parameters.
+Thinking is currently an explicit inference process, not a second trained CNN. After each throw it receives a new frozen Seeing checkpoint and the three-part packet described above. The middle term contains all of Seeing's sampled hidden rollouts, interpolated onto one fixed time grid. The before and after activations provide context and normalization; the predicted hidden region is the primary inference signal. Thinking never receives the actual frames, hidden path, or true world parameters.
 
 Sequential Monte Carlo maintains a persistent population of candidate values for gravity, wind, and damping. For every candidate, a private imagination runner executes the complete toy simulator, renders a counterfactual clip, and passes that clip through the same frozen Seeing checkpoint. Candidate videos are batched, but only their detached activation packets cross back into Thinking.
 
-Worlds are weighted by normalized distance between their imagined and observed pre-activation, post-activation, and activation change. The posterior persists across throws, resampling and gently revising hypotheses when its effective population becomes too small. The interface displays the posterior mean, marginal ranges, and a few joint possible worlds rather than pretending that one trajectory uniquely identifies the rules.
+Worlds are weighted by component-normalized distance between the observed packet and the packet produced by the counterfactual Seeing run. The hidden-rollout term receives the primary weight; the two visible endpoint terms act as lower-weight anchors. The posterior persists across throws, resampling and gently revising hypotheses when its effective population becomes too small. The interface displays the posterior mean, marginal ranges, and a few joint possible worlds rather than pretending that one trajectory uniquely identifies the rules.
 
 Seeing and Thinking run asynchronously. Seeing continues learning from the real stream; Thinking periodically receives increasingly recent frozen checkpoints and searches against each without blocking the animation. Seeing never learns which candidates Thinking considered and is never optimized to make their recovery easy.
 

@@ -40,6 +40,8 @@ def test_frozen_model1_runner_returns_activations_without_perceptions() -> None:
     assert packets[0].checkpoint_id == "model1-test"
     assert packets[0].pre_activation.shape == (config.model.hidden_size,)
     assert packets[0].post_activation.shape == (config.model.hidden_size,)
+    assert packets[0].guess_activation.size > packets[0].pre_activation.size
+    assert not packets[0].guess_activation.flags.writeable
     assert not packets[0].pre_activation.flags.writeable
     assert not hasattr(packets[0], "frames")
     assert not model.training
@@ -80,11 +82,23 @@ def test_frozen_online_runner_imagines_with_the_same_model1_checkpoint() -> None
     assert len(observed) == len(imagined) == 1
     assert observed[0].checkpoint_id == imagined[0].checkpoint_id == "online-1"
     assert observed[0].pre_activation.shape == imagined[0].pre_activation.shape == (20,)
+    expected_guess_size = (
+        model_config.sample_count * frame_config.dataset.prediction_steps * 2
+    )
+    assert observed[0].guess_activation.shape == imagined[0].guess_activation.shape == (
+        expected_guess_size,
+    )
     assert observed[0].episode_id == imagined[0].episode_id == "episode-0"
     assert not hasattr(observed[0], "frames")
     assert not hasattr(runner, "observed_episodes")
     assert all(not parameter.requires_grad for parameter in runner.model.parameters())
     assert np.isfinite(imagined[0].activation_difference).all()
+
+    batched = runner.activations_for_many((WorldSchema.v1().world(),))
+    assert batched[0] is not None
+    assert np.array_equal(
+        batched[0][0].guess_activation, imagined[0].guess_activation
+    )
 
 
 def test_online_runner_marks_noncomparable_candidate_events_unavailable(

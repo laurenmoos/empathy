@@ -76,6 +76,7 @@ def activation_packet(ordinal=0, checkpoint="snapshot-a"):
         ordinal,
         checkpoint,
         np.full(4, ordinal / 10, np.float32),
+        np.full(4, ordinal / 10, np.float32),
         np.full(4, (ordinal + 1) / 10, np.float32),
     )
 
@@ -120,6 +121,7 @@ def test_shuffled_activation_control_preserves_shape_but_changes_evidence() -> N
             "activation-episode",
             0,
             "snapshot-a",
+            np.arange(4, dtype=np.float32),
             np.arange(4, dtype=np.float32),
             np.arange(4, dtype=np.float32)[::-1],
         )

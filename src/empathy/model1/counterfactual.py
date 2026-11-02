@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import torch
+from torch.nn import functional as F
 
 from empathy.model2.activation_adapter import Model1ActivationPacket
 from empathy.model2.imagination import CounterfactualUnavailable
@@ -76,18 +77,26 @@ class FrozenModel1CounterfactualRunner:
                 )
             batch = collate_model1([record], self.config)
             with torch.inference_mode():
-                pre = self.model.forward_with_trace(
+                pre_trace = self.model.forward_with_trace(
                     batch.pre_frames, batch.pre_times, batch.pre_mask
-                ).activation[0]
+                )
+                pre = pre_trace.activation[0]
                 post = self.model.forward_with_trace(
                     batch.post_frames, batch.post_times, batch.post_mask
                 ).activation[0]
+                guess = torch.cat(
+                    (
+                        pre_trace.prediction.positions[0].flatten(),
+                        pre_trace.prediction.weights[0],
+                    )
+                )
             packets.append(
                 Model1ActivationPacket(
                     episode.episode_id,
                     episode.event_ordinal,
                     self.checkpoint_id,
                     pre.cpu().numpy(),
+                    guess.cpu().numpy(),
                     post.cpu().numpy(),
                 )
             )
@@ -158,6 +167,21 @@ class FrozenOnlineSeeingCounterfactualRunner:
     ) -> list[np.ndarray]:
         if not items:
             return []
+        frames, mask, states = self._padded_inputs(items)
+        with torch.inference_mode():
+            belief = self.model.initial_belief(
+                frames,
+                mask,
+                states,
+                self.world_latent.expand(len(items), -1),
+            )
+        values = torch.cat((belief.mean, belief.log_scale), dim=-1).cpu().numpy()
+        return [value for value in values]
+
+    @staticmethod
+    def _padded_inputs(
+        items: list[tuple[torch.Tensor, torch.Tensor, torch.Tensor]],
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         max_steps = max(frames.shape[1] for frames, _, _ in items)
         _, _, channels, height, width = items[0][0].shape
         frames = torch.zeros(
@@ -169,15 +193,60 @@ class FrozenOnlineSeeingCounterfactualRunner:
             steps = item_frames.shape[1]
             frames[index, :steps] = item_frames[0]
             mask[index, :steps] = item_mask[0]
+        return frames, mask, states
+
+    def _guess_activations(
+        self,
+        episodes: list[ObservedSeeingEpisode],
+    ) -> list[np.ndarray]:
+        if not episodes:
+            return []
+        items = [
+            (episode.pre_frames, episode.pre_mask, episode.entry_state)
+            for episode in episodes
+        ]
+        frames, mask, states = self._padded_inputs(items)
+        if any(episode.dt != episodes[0].dt for episode in episodes[1:]):
+            raise ValueError("batched counterfactual episodes must share one time step")
         with torch.inference_mode():
             belief = self.model.initial_belief(
                 frames,
                 mask,
                 states,
-                self.world_latent.expand(len(items), -1),
+                self.world_latent.expand(len(episodes), -1),
             )
-        values = torch.cat((belief.mean, belief.log_scale), dim=-1).cpu().numpy()
-        return [value for value in values]
+            generator = torch.Generator(device=belief.mean.device).manual_seed(0)
+            noise = torch.randn(
+                1,
+                self.model.config.sample_count,
+                belief.mean.shape[-1],
+                dtype=belief.mean.dtype,
+                device=belief.mean.device,
+                generator=generator,
+            ).expand(len(episodes), -1, -1)
+            samples = belief.mean[:, None] + noise * belief.log_scale.clamp(
+                -4.0, 1.0
+            ).exp()[:, None]
+            max_hidden_steps = max(episode.hidden_steps for episode in episodes)
+            paths = self.model.rollout(
+                samples,
+                states,
+                self.world_latent.expand(len(episodes), -1),
+                steps=max_hidden_steps,
+                dt=episodes[0].dt,
+            )
+            fixed_steps = self.config.dataset.prediction_steps
+            values = []
+            for index, episode in enumerate(episodes):
+                path = paths[index, :, : episode.hidden_steps]
+                interpolated = F.interpolate(
+                    path.permute(0, 2, 1),
+                    size=fixed_steps,
+                    mode="linear",
+                    align_corners=True,
+                ).permute(0, 2, 1)
+                values.append(interpolated.flatten().cpu().numpy())
+        return values
 
     def _packet(
         self,
@@ -189,6 +258,7 @@ class FrozenOnlineSeeingCounterfactualRunner:
             event.event_ordinal,
             self.checkpoint_id,
             self._activation(episode.pre_frames, episode.pre_mask, episode.entry_state),
+            self._guess_activations([episode])[0],
             self._activation(episode.post_frames, episode.post_mask, episode.exit_state),
         )
 
@@ -289,9 +359,10 @@ class FrozenOnlineSeeingCounterfactualRunner:
                 for _, _, episode in valid
             ]
         )
+        guesses = self._guess_activations([episode for _, _, episode in valid])
         packets: list[list[Model1ActivationPacket]] = [[] for _ in worlds]
-        for (world_index, event, _), pre_value, post_value in zip(
-            valid, pre, post, strict=True
+        for (world_index, event, _), pre_value, guess_value, post_value in zip(
+            valid, pre, guesses, post, strict=True
         ):
             packets[world_index].append(
                 Model1ActivationPacket(
@@ -299,6 +370,7 @@ class FrozenOnlineSeeingCounterfactualRunner:
                     event.event_ordinal,
                     self.checkpoint_id,
                     pre_value,
+                    guess_value,
                     post_value,
                 )
             )

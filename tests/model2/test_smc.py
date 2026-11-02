@@ -129,6 +129,7 @@ def test_activation_entry_point_reuses_the_belief_smc_search() -> None:
             0,
             "snapshot",
             np.zeros(4, np.float32),
+            np.zeros(4, np.float32),
             np.ones(4, np.float32),
         )
     ]

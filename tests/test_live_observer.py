@@ -141,6 +141,7 @@ def test_activation_observer_processes_imagination_without_raw_perceptions() -> 
         0,
         "online-1",
         np.zeros(4, dtype=np.float32),
+        np.zeros(4, dtype=np.float32),
         np.ones(4, dtype=np.float32),
     )
 

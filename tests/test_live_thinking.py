@@ -296,6 +296,7 @@ def test_smc_runtime_scores_whole_counterfactual_model1_imaginations() -> None:
         0,
         "online-1",
         np.array([-0.2, 0.1, 0.2], np.float32),
+        np.array([-0.2, 0.1, 0.2], np.float32),
         np.array([-0.4, 0.2, 0.4], np.float32),
     )
 
@@ -306,7 +307,7 @@ def test_smc_runtime_scores_whole_counterfactual_model1_imaginations() -> None:
             activation = np.array([value, 0.1, 0.2], np.float32)
             return (
                 Model1ActivationPacket(
-                    "episode-0", 0, "online-1", activation, activation * 2
+                    "episode-0", 0, "online-1", activation, activation, activation * 2
                 ),
             )
 

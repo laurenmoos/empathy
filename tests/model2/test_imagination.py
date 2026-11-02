@@ -37,6 +37,7 @@ class ParameterActivationSource:
                 0,
                 "frozen-model-1",
                 activation,
+                activation,
                 activation * 2.0,
             ),
         )
@@ -64,6 +65,7 @@ class NarrowGravitySource(ParameterActivationSource):
                 "frozen-model-1",
                 activation,
                 activation,
+                activation,
             ),
         )
 
@@ -85,6 +87,7 @@ def test_particles_are_weighted_by_counterfactual_model1_activations() -> None:
             "episode-0",
             0,
             "frozen-model-1",
+            np.asarray([-0.30, 0.0, 0.0], dtype=np.float32),
             np.asarray([-0.30, 0.0, 0.0], dtype=np.float32),
             np.asarray([-0.60, 0.0, 0.0], dtype=np.float32),
         ),
@@ -108,6 +111,7 @@ def test_imagination_uses_batched_counterfactual_model_calls_when_available() ->
             "episode-0",
             0,
             "frozen-model-1",
+            np.zeros(3, dtype=np.float32),
             np.zeros(3, dtype=np.float32),
             np.zeros(3, dtype=np.float32),
         ),
@@ -178,6 +182,7 @@ def test_continual_activation_search_retains_its_posterior_across_checkpoints() 
             0,
             "frozen-model-1",
             np.asarray([-0.20, 0.10, 0.20], dtype=np.float32),
+            np.asarray([-0.20, 0.10, 0.20], dtype=np.float32),
             np.asarray([-0.40, 0.20, 0.40], dtype=np.float32),
         ),
     )
@@ -200,7 +205,7 @@ def test_continual_search_can_cross_the_neutral_gap_toward_a_small_force() -> No
     target = np.asarray([-0.06], dtype=np.float32)
     observed = (
         Model1ActivationPacket(
-            "episode-0", 0, "frozen-model-1", target, target
+            "episode-0", 0, "frozen-model-1", target, target, target
         ),
     )
     search = smc.ContinualActivationWorldSMC(
@@ -227,6 +232,7 @@ def test_imagination_rejects_activation_shaped_objects_with_raw_frames() -> None
     class RawActivationCarrier:
         checkpoint_id = "frozen-model-1"
         pre_activation = np.zeros(3, dtype=np.float32)
+        guess_activation = np.zeros(3, dtype=np.float32)
         post_activation = np.zeros(3, dtype=np.float32)
         frames = np.zeros((2, 8, 8), dtype=np.uint8)
 
@@ -242,6 +248,7 @@ def test_imagination_rejects_activation_shaped_objects_with_raw_frames() -> None
         "frozen-model-1",
         np.zeros(3, dtype=np.float32),
         np.zeros(3, dtype=np.float32),
+        np.zeros(3, dtype=np.float32),
     )
     with pytest.raises(TypeError, match="Model1ActivationPacket"):
         ActivationImaginationLoop((smuggled,), ParameterActivationSource())
@@ -253,6 +260,7 @@ def test_counterfactual_events_must_match_observed_episode_identity() -> None:
             "actual-episode",
             3,
             "frozen-model-1",
+            np.zeros(3, dtype=np.float32),
             np.zeros(3, dtype=np.float32),
             np.ones(3, dtype=np.float32),
         ),
@@ -268,6 +276,7 @@ def test_all_unavailable_counterfactuals_do_not_return_a_posterior() -> None:
             "actual-episode",
             3,
             "frozen-model-1",
+            np.zeros(3, dtype=np.float32),
             np.zeros(3, dtype=np.float32),
             np.ones(3, dtype=np.float32),
         ),
@@ -285,6 +294,7 @@ def test_search_rounds_report_activation_progress_and_parameter_estimates() -> N
             "episode-0",
             0,
             "frozen-model-1",
+            np.asarray([-0.30, 0.0, 0.0], dtype=np.float32),
             np.asarray([-0.30, 0.0, 0.0], dtype=np.float32),
             np.asarray([-0.60, 0.0, 0.0], dtype=np.float32),
         ),
@@ -313,6 +323,7 @@ def test_search_handles_mixed_valid_and_invalid_counterfactuals_without_nan() ->
             "episode-0",
             0,
             "frozen-model-1",
+            np.asarray([-0.30, 0.0, 0.0], dtype=np.float32),
             np.asarray([-0.30, 0.0, 0.0], dtype=np.float32),
             np.asarray([-0.60, 0.0, 0.0], dtype=np.float32),
         ),

@@ -28,7 +28,7 @@ To watch Seeing learn without the browser:
 uv run empathy train-seeing --episodes 50 --log-dir runs/seeing
 ```
 
-This prints one compact JSON line per throw and writes a checkpoint, `metrics.jsonl`, and TensorBoard-compatible events. `prediction_loss` scores the frozen pre-exit belief against the later visible exit and departure. One episode is one online update and one TensorBoard step. Optionally inspect the run with `uv run tensorboard --logdir runs/seeing`.
+Each throw is one online update. The command writes a checkpoint, JSON metrics, and TensorBoard events; `prediction_loss` measures how well the belief formed before occlusion agrees with the later visible exit and departure. Inspect it with `uv run tensorboard --logdir runs/seeing`.
 
 To train in the source world and then reset the fast world state while carrying the slow network into an unseen environment:
 
@@ -36,36 +36,34 @@ To train in the source world and then reset the fast world state while carrying 
 uv run empathy train-seeing --episodes 100 --heldout-episodes 100 --log-dir runs/heldout
 ```
 
-The held-out phase keeps the same single loss and continues updating both fast and slow parameters. Its log includes their distance from the start of the new environment.
+The held-out phase resets the fast world state, carries the shared video model forward, and continues the same observable-only learning procedure in a new environment.
 
 ## Environment
 
-A ball moves behind a fixed occluder. Each environment is defined by gravity, wind, and damping. These parameters compose at every time step to transform one ball state into the next, so the hidden trajectory carries their joint constraints without directly revealing their values.
+A ball moves behind a fixed occluder. Gravity, wind, and damping define one world and remain fixed while repeated throws vary the ball's initial height. The simulator supplies visible pixels before and after the gap; its hidden path is retained only as ground truth for the demonstration.
 
 ## Model 1: Seeing
 
-Model 1 uses a small 3D video CNN to encode the visible approach. That encoding initializes a distribution over recurrent states. A GRU then predicts acceleration and integrates position and velocity one physical time step at a time, producing a superposition of possible hidden rollouts. The visible exit position, velocity, and first departure frames reweight those rollouts; they do not disclose a unique hidden trajectory.
+Seeing is a small continual video world model. A shared 3D CNN encodes the visible approach together with the measured entry state and a fast latent for the current world. It produces the mean and scale of a distribution over GRU states. Samples from that distribution predict acceleration, update velocity, and integrate position one physical time step at a time, forming the visible fan of possible hidden trajectories.
 
-Within one environment, repeated throws vary the initial conditions while gravity, wind, and damping remain fixed. A fast per-world latent updates after each throw, shared weights move more slowly, and recent observations are replayed. The hidden simulator path is available only for evaluation and the ground-truth line in the visualization; it is not a training target.
+When the ball reappears, its visible exit position, exit velocity, and first departure points score the frozen pre-exit samples. A single evidence loss updates the fast world latent and, more slowly, the shared CNN and GRU; a short replay buffer revisits recent throws. The hidden simulator trajectory never enters this loss.
 
 ## Model 2: Thinking
 
-Model 2 receives the detached pre-belief, post-belief, and belief-change activations. It therefore encounters the internal form of Model 1's experience.
+Thinking is currently an explicit inference process, not a second trained CNN. After each throw it receives a new frozen Seeing checkpoint and a detached activation packet: the means and scales encoded before and after occlusion, plus their change. It never receives the actual frames, hidden path, or true world parameters.
 
-The pre-belief, post-belief, and difference panels are readable projections reconstructed from the underlying activation traces `z_pre`, `z_post`, and `z_post - z_pre`.
+Sequential Monte Carlo maintains a persistent population of candidate values for gravity, wind, and damping. For every candidate, a private imagination runner executes the complete toy simulator, renders a counterfactual clip, and passes that clip through the same frozen Seeing checkpoint. Candidate videos are batched, but only their detached activation packets cross back into Thinking.
 
-Sequential Monte Carlo maintains candidate settings of gravity, wind, and damping. A modular imagination loop simulates each candidate environment and privately calls the frozen Model 1 on its counterfactual clip. Only the resulting detached activations cross into Model 2, which gives greater weight to worlds whose activations resemble Model 1's actual activation history. Raw frames never enter Model 2's inference boundary.
+Worlds are weighted by normalized distance between their imagined and observed pre-activation, post-activation, and activation change. The posterior persists across throws, resampling and gently revising hypotheses when its effective population becomes too small. The interface displays the posterior mean, marginal ranges, and a few joint possible worlds rather than pretending that one trajectory uniquely identifies the rules.
 
-Model 1 is unaware of both the candidate world parameters and Model 2: it receives only a clip. Model 2 owns the search, tells the separate imagination runner which counterfactual world to generate, and receives only Model 1's detached response. Every search round reports the best and mean activation mismatch, effective particle count, accepted revisions, and current best and posterior-mean values for gravity, wind, and damping.
+Seeing and Thinking run asynchronously. Seeing continues learning from the real stream; Thinking periodically receives increasingly recent frozen checkpoints and searches against each without blocking the animation. Seeing never learns which candidates Thinking considered and is never optimized to make their recovery easy.
 
-This is a practical approximation to second-order perception: Model 1 sees an event, and Model 2 tries to understand the conditions under which that seeing took the form it did. The simulator search remains reflective thinking rather than immediate perception.
-
-Model 2 recovers the **intentional structure** of Model 1's experience only as an intermediate representation in its task of reconstructing the environment reflected in those activations.
+This separation is the point of the toy: Seeing predicts what could happen; Thinking asks what kind of world would make those predictions and revisions take that form.
 
 ## Coherence
 
-Model 2 is coherent when it can imagine a world whose conditions could have produced Model 1's experience. Measure coherence through parameter error and posterior concentration as episodes accumulate, plus stability across initial conditions and unseen environments.
+The system is coherent when candidate worlds that reproduce Seeing's internal response also approach the hidden world's constraints. The demo makes that test visible by placing the true parameter markers behind Thinking's posterior. Useful measurements are parameter error, posterior concentration, and stability across varied entry heights and held-out worlds.
 
-Because gravity, wind, and damping are compositional operators, successful recovery asks whether Model 1's activations preserve reusable physical constraints rather than individual trajectory templates. The VC-dimension connection remains a capacity analogy: recoverable dimension describes how many independent distinctions among possible worlds survive in Model 1's perceptual state.
+The experiment is therefore about identifiability as much as accuracy. Different operator combinations can explain one exit; varied throws should eliminate some combinations while preserving genuine alternatives. Success means the activation space retains reusable information about forces rather than memorizing a trajectory template.
 
-Model 1 remains independently trained, and its activations are detached before reaching Model 2. Model 2 learns to read the experience without shaping the system that produced it.
+The shattering connection remains a capacity question rather than a claim made by the live demo: how many independent distinctions among possible worlds can survive in Seeing's states and be recovered by Thinking before coherence breaks down?

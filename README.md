@@ -12,7 +12,7 @@ _One fixed world, many throws: Model 1 predicts through the occlusion; Model 2 s
 
 ## The thought experiment
 
-Model 1 learns to predict the motion of an occluded object without being given explicit physical rules. Model 2 does not receive the true world parameters, the hidden trajectory, or Model 1's training targets. For each throw it receives one detached three-part packet from Model 1: the visible-before activation, Model 1's superposition of predicted hidden trajectories, and the visible-after activation.
+Model 1 learns to predict the motion of an occluded object without being given explicit physical rules. Model 2 does not receive the true world parameters, the hidden trajectory, or Model 1's training targets. Its only perceptual input is one detached three-part packet from Model 1: the visible-before activation, Model 1's superposition of predicted hidden trajectories, and the visible-after activation. Event and checkpoint identifiers are used only to align comparisons.
 
 Model 2 maintains candidate values for gravity, wind, and damping. For each candidate, it runs a counterfactual simulation and passes the resulting clip through a frozen copy of the current Model 1. Candidates whose activations resemble Model 1's observed response receive more posterior weight.
 

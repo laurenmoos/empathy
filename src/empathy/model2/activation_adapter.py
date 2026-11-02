@@ -13,6 +13,13 @@ from torch.nn import functional as F
 
 @dataclass(frozen=True, eq=False)
 class Model1ActivationPacket:
+    """Model 2's complete perceptual input: two anchors and one hidden belief.
+
+    The identifiers only align events and checkpoints; they contain no perceptual
+    evidence. Raw frames, simulator states, targets, paths, and world parameters
+    must not cross this boundary.
+    """
+
     episode_id: str
     event_ordinal: int
     checkpoint_id: str

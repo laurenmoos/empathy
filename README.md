@@ -16,7 +16,7 @@ Model 1 learns to predict the motion of an occluded object through experience wi
 
 Model 2 maintains candidate values for gravity, wind, and damping. For each candidate, it runs a counterfactual simulation and passes the resulting clip through a frozen copy of the current Model 1. Candidates whose activations resemble Model 1's observed response receive more posterior weight.
 
-The experiment asks whether a perceptual model's internal response contains enough structure to recover the constraints organizing its experience. “Empathy” names this limited form of second-order inference.
+The experiment asks whether a perceptual model's internal response contains enough structure to recover the constraints organizing its experience.
 
 Recovering gravity, wind, and damping is a **surrogate task** with a known answer. The deeper target is Model 1's learned distribution of prediction errors: the structured pattern of fit and mismatch its beliefs produce across counterfactual worlds. Recovering that error distribution amounts to recovering Model 1's perceptual frame—the constraints that shape what it expects, where it remains uncertain, and how visible evidence revises its beliefs.
 

@@ -2,6 +2,10 @@
 
 Empathy asks whether one system can partially recover another **as a perceiver**, through the intentional structure preserved in its experience. **Model 1 sees; Model 2 thinks by imagining the world that could have made Model 1 see as it did.**
 
+## Environment
+
+A ball moves behind a fixed occluder. Gravity, wind, and damping define one world and remain fixed while repeated throws vary the ball's initial height. The simulator supplies visible pixels before and after the gap; its hidden path is retained only as ground truth for the demonstration.
+
 ![A ball approaches an occluder, becomes a superposition of possible hidden trajectories, exits, and continues visibly.](assets/experiment.svg)
 
 _One fixed world, many throws: Model 1 predicts through the occlusion; Model 2 searches for the world that would produce those beliefs._
@@ -13,18 +17,6 @@ Model 1 learns to predict the motion of an occluded object without being given e
 Model 2 maintains candidate values for gravity, wind, and damping. For each candidate, it runs a counterfactual simulation and passes the resulting clip through a frozen copy of the current Model 1. Candidates whose activations resemble Model 1's observed response receive more posterior weight.
 
 The experiment asks whether a perceptual model's internal response contains enough structure to recover the constraints of its environment. Here, coherence means that worlds which reproduce Model 1's response also approach the hidden physical parameters. “Empathy” names this limited form of second-order inference; it is not a claim about human-like empathy.
-
-## Run
-
-```bash
-uv run empathy
-```
-
-Open <http://127.0.0.1:8765/explorer.html>.
-
-## Environment
-
-A ball moves behind a fixed occluder. Gravity, wind, and damping define one world and remain fixed while repeated throws vary the ball's initial height. The simulator supplies visible pixels before and after the gap; its hidden path is retained only as ground truth for the demonstration.
 
 ## Model 1: Seeing
 
@@ -51,3 +43,11 @@ The system is coherent when candidate worlds that reproduce Seeing's internal re
 The experiment is therefore about identifiability as much as accuracy. Different operator combinations can explain one exit; varied throws should eliminate some combinations while preserving genuine alternatives. Success means the activation space retains reusable information about forces rather than memorizing a trajectory template.
 
 The shattering connection remains a capacity question rather than a claim made by the live demo: how many independent distinctions among possible worlds can survive in Seeing's states and be recovered by Thinking before coherence breaks down?
+
+## Run
+
+```bash
+uv run empathy
+```
+
+Open <http://127.0.0.1:8765/explorer.html>.
